@@ -16,13 +16,15 @@ function generateChunk(cx,cy){
 
   // Pozadí hvězdy
   const sc=C.CHUNK;
-  for(let i=0;i<200;i++){
+  for(let i=0;i<260;i++){
+    const bright=rng()<0.05?0.85+rng()*0.15:0.2+rng()*0.7;
     ch.stars.push({
       x:wx+rng()*sc, y:wy+rng()*sc,
-      r:rng()<0.04?rng()*1.4+0.6:rng()*0.8+0.2,
-      bright:0.25+rng()*0.75,
-      hue:rng()<0.12?(rng()<0.5?210:30):0,  // blue, orange, nebo white
-      twinkle:rng()*Math.PI*2
+      r:rng()<0.04?rng()*1.8+0.8:(rng()<0.12?rng()*0.8+0.3:rng()*0.5+0.1),
+      bright,
+      hue:rng()<0.1?(rng()<0.5?210:30):(rng()<0.04?60:0),
+      twinkle:rng()*Math.PI*2,
+      sparkle:bright>0.84&&rng()<0.35
     });
   }
 
@@ -127,67 +129,116 @@ function getPlanetPos(p,starX,starY,t){
   return{x:starX+Math.cos(a)*p.orbit, y:starY+Math.sin(a)*p.orbit};
 }
 
+// Pozice měsíce v čase (obíhá svou planetu)
+function getMoonPos(moon,planetX,planetY,t){
+  const a=(t/moon.period)*Math.PI*2+moon.phase;
+  return{x:planetX+Math.cos(a)*moon.orbit, y:planetY+Math.sin(a)*moon.orbit};
+}
+
 // ---- Sluneční soustava — speciální chunk ----
+function makePlanetStation(name,tier,color,r,seed){
+  const sr=makeRng(seed);
+  return{name:'Stanice '+name,tier,color,angle:sr()*Math.PI*2,rotSpeed:0.003+sr()*0.004,r,
+    inv:generateInv(makeRng(seed+999)),fixed:true,x:0,y:0};
+}
+function makeMoon(name,orbit,phase,period,r,color,seed,hasSt,stTier){
+  const sr=makeRng(seed);
+  return{name,orbit,phase,period,r,color,
+    station:hasSt?{name:'Stanice '+name,tier:stTier,color:'#ff9500',
+      angle:sr()*Math.PI*2,rotSpeed:0.003+sr()*0.005,r:22+stTier*6,
+      inv:generateInv(makeRng(seed+999)),fixed:false,x:0,y:0}:null};
+}
 function generateSolarSystem(cx,cy){
   const rng=makeRng(chunkSeed(cx,cy));
   const wx=cx*C.CHUNK, wy=cy*C.CHUNK, sc=C.CHUNK;
   const ch={cx,cy,wx,wy,stars:[],nebula:null,system:null,asteroids:[]};
+  const seed=chunkSeed(cx,cy);
 
-  // Pozadí hvězdy
-  for(let i=0;i<200;i++){
+  // Hustší hvězdné pozadí
+  for(let i=0;i<320;i++){
+    const bright=rng()<0.06?0.85+rng()*0.15:0.2+rng()*0.65;
     ch.stars.push({x:wx+rng()*sc,y:wy+rng()*sc,
-      r:rng()<0.04?rng()*1.4+0.6:rng()*0.8+0.2,
-      bright:0.2+rng()*0.7,hue:rng()<0.1?(rng()<0.5?210:30):0,twinkle:rng()*Math.PI*2});
+      r:rng()<0.05?rng()*2+0.9:(rng()<0.15?rng()*0.9+0.4:rng()*0.5+0.15),
+      bright,hue:rng()<0.08?(rng()<0.5?210:30):(rng()<0.05?60:0),
+      twinkle:rng()*Math.PI*2,
+      sparkle:bright>0.82&&rng()<0.4});
   }
 
   const sunX=wx+sc*0.5, sunY=wy+sc*0.5;
 
+  // Orbity jsou v herních jednotkách; planety obíhají velmi pomalu (period = sekundy)
   const planets=[
-    {name:'Merkur', orbit:155, phase:0.3,  period:600,   r:5,  color:'#a8a8a8', atmo:false},
-    {name:'Venuše', orbit:230, phase:1.2,  period:1200,  r:9,  color:'#e8d080', atmo:true},
-    {name:'Země',   orbit:320, phase:2.1,  period:2000,  r:10, color:'#3a7fd4', atmo:true},
-    {name:'Mars',   orbit:430, phase:3.5,  period:3200,  r:7,  color:'#c84030', atmo:true},
-    {name:'Jupiter',orbit:620, phase:0.8,  period:9000,  r:26, color:'#c8804a', atmo:true},
-    {name:'Saturn', orbit:800, phase:4.2,  period:15000, r:21, color:'#e0c060', atmo:true, rings:true},
-    {name:'Uran',   orbit:940, phase:1.7,  period:22000, r:15, color:'#7dd0c8', atmo:true, rings:true},
-    {name:'Neptun', orbit:1060,phase:5.1,  period:30000, r:14, color:'#4060d8', atmo:true},
+    {name:'Merkur', orbit:2500,  phase:0.3,  period:20000,   r:8,  color:'#a8a8a0', atmo:false,
+     station:makePlanetStation('Merkur',1,'#b8b8b0',32,seed+1), moons:[]},
+    {name:'Venuše', orbit:4500,  phase:1.2,  period:50000,   r:14, color:'#e8d080', atmo:true,
+     station:makePlanetStation('Venuše',1,'#e8d080',38,seed+2), moons:[]},
+    {name:'Země',   orbit:7000,  phase:2.1,  period:100000,  r:16, color:'#3a7fd4', atmo:true,
+     station:makePlanetStation('Země',3,'#4488ff',65,seed+3),
+     moons:[makeMoon('Luna',500,0.8,8000,6,'#aaaaaa',seed+101,true,2)]},
+    {name:'Mars',   orbit:10500, phase:3.5,  period:190000,  r:11, color:'#c84030', atmo:true,
+     station:makePlanetStation('Mars',2,'#d05040',42,seed+4),
+     moons:[makeMoon('Phobos',180,1.2,1500,3,'#997755',seed+102,false),
+            makeMoon('Deimos',320,3.1,3000,2,'#887766',seed+103,false)]},
+    {name:'Ceres',  orbit:13000, phase:1.5,  period:280000,  r:5,  color:'#b0a898', atmo:false,
+     station:makePlanetStation('Ceres',1,'#b0a8a0',28,seed+10), moons:[]},
+    {name:'Jupiter',orbit:20000, phase:0.8,  period:600000,  r:42, color:'#c8804a', atmo:true,
+     station:makePlanetStation('Jupiter',2,'#c88050',55,seed+5),
+     moons:[makeMoon('Io',       800, 0.5, 8000, 8,'#e8c040',seed+104,true, 1),
+            makeMoon('Europa',  1200, 2.1,16000, 7,'#c8b8a0',seed+105,true, 2),
+            makeMoon('Ganymede',1800, 4.3,40000,10,'#a09080',seed+106,true, 2),
+            makeMoon('Callisto',2500, 5.7,90000, 9,'#807060',seed+107,false)]},
+    {name:'Saturn', orbit:31000, phase:4.2,  period:1500000, r:32, color:'#e0c060', atmo:true, rings:true,
+     station:makePlanetStation('Saturn',2,'#d4b850',48,seed+6),
+     moons:[makeMoon('Enceladus', 600,1.8, 6000, 5,'#e0e8ff',seed+108,false),
+            makeMoon('Titan',    1400,3.5,50000, 9,'#d4a040',seed+109,true, 2)]},
+    {name:'Uran',   orbit:44000, phase:1.7,  period:4250000, r:22, color:'#7dd0c8', atmo:true, rings:true,
+     station:makePlanetStation('Uran',1,'#7dd0c8',40,seed+7),
+     moons:[makeMoon('Titania',700,0.9,20000,6,'#88a8c0',seed+110,false),
+            makeMoon('Oberon', 900,2.8,35000,5,'#9090a0',seed+111,false)]},
+    {name:'Neptun', orbit:60000, phase:5.1,  period:8000000, r:20, color:'#4060d8', atmo:true,
+     station:makePlanetStation('Neptun',1,'#5070d8',38,seed+8),
+     moons:[makeMoon('Triton',600,1.2,15000,7,'#a0c8d0',seed+112,true,1)]},
+    {name:'Pluto',  orbit:78000, phase:3.8,  period:18000000,r:4,  color:'#c0b0a8', atmo:false,
+     station:makePlanetStation('Pluto',1,'#c0c0b8',28,seed+9), moons:[]},
   ];
 
-  // Stanice Země — u Země v čase t=0
-  const earthAngle=2.1; // fáze Země
-  const stX=sunX+Math.cos(earthAngle)*320+50;
-  const stY=sunY+Math.sin(earthAngle)*320+50;
-  const station={
-    x:stX, y:stY,
-    name:'Stanice Země', tier:3, color:'#4488ff',
-    angle:0, rotSpeed:0.004, r:60,
-    inv:generateInv(makeRng(chunkSeed(cx,cy)+77)),
-    fixed:true
-  };
+  // Sluneční observatoř — stanice obíhající blízko Slunce
+  const solObs={x:sunX+1200,y:sunY,name:'Sluneční Observatoř',tier:2,color:'#ffcc44',
+    angle:0,rotSpeed:0.0015,r:42,inv:generateInv(makeRng(seed+1000)),fixed:false};
 
   ch.system={
     sx:sunX, sy:sunY,
-    color:'#fff8c0',
-    glow:'rgba(255,220,60,',
-    r:130,
-    planets,
-    station
+    color:'#fff8c0', glow:'rgba(255,220,60,', r:155,
+    planets, station:solObs
   };
 
-  // Pás asteroidů (mezi Marsem a Jupiterem)
-  for(let i=0;i<35;i++){
-    const a=rng()*Math.PI*2;
-    const d=510+rng()*90;
-    const sz=4+rng()*14,nv=5+Math.floor(rng()*4),verts=[];
+  // Pás asteroidů (mezi Marsem a Jupiterem, orbit 11500–18000)
+  for(let i=0;i<65;i++){
+    const a=rng()*Math.PI*2, d=11500+rng()*6500;
+    const sz=4+rng()*16,nv=5+Math.floor(rng()*5),verts=[];
     for(let j=0;j<nv;j++){const av=j/nv*Math.PI*2;verts.push({x:Math.cos(av)*sz*(0.55+rng()*0.45),y:Math.sin(av)*sz*(0.55+rng()*0.45)});}
     ch.asteroids.push({
       x:sunX+Math.cos(a)*d, y:sunY+Math.sin(a)*d,
-      vx:(rng()-.5)*0.08, vy:(rng()-.5)*0.08,
-      angle:rng()*Math.PI*2, rot:(rng()-.5)*0.005,
+      vx:(rng()-.5)*0.06, vy:(rng()-.5)*0.06,
+      angle:rng()*Math.PI*2, rot:(rng()-.5)*0.004,
       sz,verts,hp:Math.ceil(sz/5),maxHp:Math.ceil(sz/5),
-      color:`hsl(${22+Math.floor(rng()*18)},${8+Math.floor(rng()*14)}%,${22+Math.floor(rng()*18)}%)`
+      color:`hsl(${20+Math.floor(rng()*20)},${8+Math.floor(rng()*12)}%,${20+Math.floor(rng()*18)}%)`
     });
   }
 
+  // Kuiperův pás (za Neptunem, orbit 62000–80000)
+  const krng=makeRng(seed+500);
+  for(let i=0;i<45;i++){
+    const a=krng()*Math.PI*2, d=62000+krng()*18000;
+    const sz=3+krng()*12,nv=4+Math.floor(krng()*5),verts=[];
+    for(let j=0;j<nv;j++){const av=j/nv*Math.PI*2;verts.push({x:Math.cos(av)*sz*(0.5+krng()*0.5),y:Math.sin(av)*sz*(0.5+krng()*0.5)});}
+    ch.asteroids.push({
+      x:sunX+Math.cos(a)*d, y:sunY+Math.sin(a)*d,
+      vx:(krng()-.5)*0.02, vy:(krng()-.5)*0.02,
+      angle:krng()*Math.PI*2, rot:(krng()-.5)*0.002,
+      sz,verts,hp:Math.ceil(sz/5),maxHp:Math.ceil(sz/5),
+      color:`hsl(${195+Math.floor(krng()*40)},${4+Math.floor(krng()*10)}%,${14+Math.floor(krng()*14)}%)`
+    });
+  }
   return ch;
 }

@@ -147,19 +147,23 @@ function renderMinimap(player,chunks,navTarget,t){
     mmCtx.beginPath();mmCtx.arc(hx,hy,0.6,0,Math.PI*2);mmCtx.fill();
   }
 
-  // Stanice
-  chunks.forEach(ch=>{
-    if(!ch.system?.station)return;
-    const st=ch.system.station;
+  // Stanice (systémové + planetární)
+  const drawMmStation=(st,pulse)=>{
+    if(!st)return;
     const px=cx+(st.x-player.x)*sc,py=cy+(st.y-player.y)*sc;
     if(Math.hypot(px-cx,py-cy)>S/2-4)return;
-    const pulse=0.6+Math.sin(t*3+ch.cx)*0.4;
     mmCtx.save();
     mmCtx.fillStyle=st.color;mmCtx.globalAlpha=0.5+pulse*0.3;
     mmCtx.beginPath();
     for(let i=0;i<6;i++){const a=i*Math.PI/3;mmCtx.lineTo(px+Math.cos(a)*4,py+Math.sin(a)*4);}
     mmCtx.closePath();mmCtx.fill();mmCtx.globalAlpha=1;
     mmCtx.restore();
+  };
+  chunks.forEach(ch=>{
+    if(!ch.system)return;
+    const pulse=0.6+Math.sin(t*3+ch.cx)*0.4;
+    drawMmStation(ch.system.station,pulse);
+    ch.system.planets?.forEach(pl=>drawMmStation(pl.station,pulse));
   });
 
   // Nepřátelé
@@ -218,7 +222,7 @@ function initMapCanvas(){
 function drawBigMap(){
   if(!mapCtx||!window.gameState)return;
   const player=window.gameState.player;
-  const S=700,cx=S/2+mapPan.x,cy=S/2+mapPan.y;
+  const S=mapCanvas.width,cx=S/2+mapPan.x,cy=S/2+mapPan.y;
   const baseScale=S/8000*mapZoom;
   mapCtx.clearRect(0,0,S,S);
   mapCtx.fillStyle='#000408';mapCtx.fillRect(0,0,S,S);
@@ -293,33 +297,55 @@ function drawBigMap(){
     mapCtx.restore();
   }
 
-  // SOL ukazatel (vždy viditelný i bez navštíveného chunku)
+  // Planety sluneční soustavy (vždy — force-load chunku)
   {
-    const sc2=C.SOLAR_CHUNK;
-    const solWX=sc2.cx*C.CHUNK+C.CHUNK*0.5,solWY=sc2.cy*C.CHUNK+C.CHUNK*0.5;
-    const{x:spx,y:spy}=wp(solWX-player.x,solWY-player.y);
-    if(spx>0&&spx<S&&spy>0&&spy<S){
+    const solCh=getChunk(C.SOLAR_CHUNK.cx,C.SOLAR_CHUNK.cy);
+    if(solCh?.system){
+      const sys=solCh.system;
+      const gt=window.gameState.t||0;
+      solCh.system.planets.forEach(pl=>{
+        const pos=getPlanetPos(pl,sys.sx,sys.sy,gt);
+        const{x:ppx,y:ppy}=wp(pos.x-player.x,pos.y-player.y);
+        if(ppx<-20||ppx>S+20||ppy<-20||ppy>S+20)return;
+        // Planeta
+        const pr=Math.max(4,pl.r*baseScale*0.6);
+        mapCtx.save();
+        const pg=mapCtx.createRadialGradient(ppx-pr*0.3,ppy-pr*0.3,0,ppx,ppy,pr);
+        pg.addColorStop(0,'#ffffff88');pg.addColorStop(0.3,pl.color);pg.addColorStop(1,pl.color+'88');
+        mapCtx.fillStyle=pg;mapCtx.beginPath();mapCtx.arc(ppx,ppy,pr,0,Math.PI*2);mapCtx.fill();
+        // Název
+        mapCtx.font=`bold ${8+Math.floor(pr*0.3)}px "Courier New", monospace`;
+        mapCtx.textAlign='center';mapCtx.fillStyle='#ffd080';mapCtx.globalAlpha=0.85;
+        mapCtx.fillText(pl.name,ppx,ppy-pr-5);
+        // Stanice hexagon
+        if(pl.station){
+          const isNav=window.gameState.navTarget===pl.station;
+          const stx=ppx+pr+8,sty=ppy;
+          mapCtx.strokeStyle=isNav?'#00ff88':pl.color;mapCtx.lineWidth=isNav?2:1;
+          mapCtx.fillStyle='rgba(0,4,14,0.9)';mapCtx.globalAlpha=0.9;
+          const sr=4+pl.station.tier*1.5;
+          mapCtx.beginPath();
+          for(let i=0;i<6;i++){const a=i*Math.PI/3;mapCtx.lineTo(stx+Math.cos(a)*sr,sty+Math.sin(a)*sr);}
+          mapCtx.closePath();mapCtx.fill();mapCtx.stroke();
+        }
+        mapCtx.restore();
+      });
+    }
+  }
+
+  // SOL — střed sluneční soustavy (vždy viditelný, force-load)
+  {
+    const solSys=getChunk(C.SOLAR_CHUNK.cx,C.SOLAR_CHUNK.cy)?.system;
+    if(solSys){
+      const{x:spx,y:spy}=wp(solSys.sx-player.x,solSys.sy-player.y);
       mapCtx.save();
-      const sg=mapCtx.createRadialGradient(spx,spy,0,spx,spy,22);
-      sg.addColorStop(0,'rgba(255,230,80,0.4)');sg.addColorStop(1,'rgba(255,230,80,0)');
-      mapCtx.fillStyle=sg;mapCtx.beginPath();mapCtx.arc(spx,spy,22,0,Math.PI*2);mapCtx.fill();
-      mapCtx.fillStyle='#fff8c0';mapCtx.beginPath();mapCtx.arc(spx,spy,6,0,Math.PI*2);mapCtx.fill();
-      mapCtx.font='bold 10px "Courier New", monospace';mapCtx.textAlign='center';
-      mapCtx.fillStyle='#ffee88';mapCtx.fillText('SOL ☀',spx,spy-12);
+      const sg=mapCtx.createRadialGradient(spx,spy,0,spx,spy,28);
+      sg.addColorStop(0,'rgba(255,240,100,0.55)');sg.addColorStop(1,'rgba(255,240,100,0)');
+      mapCtx.fillStyle=sg;mapCtx.beginPath();mapCtx.arc(spx,spy,28,0,Math.PI*2);mapCtx.fill();
+      mapCtx.fillStyle='#fff8c0';mapCtx.beginPath();mapCtx.arc(spx,spy,8,0,Math.PI*2);mapCtx.fill();
+      mapCtx.font='bold 11px "Courier New", monospace';mapCtx.textAlign='center';
+      mapCtx.fillStyle='#ffee88';mapCtx.fillText('☀ SOL',spx,spy-14);
       mapCtx.restore();
-    } else {
-      // Šipka na okraj
-      const ang=Math.atan2(solWY-player.y,solWX-player.x);
-      const margin=24;
-      const ex=clamp(S/2+Math.cos(ang)*500,margin,S-margin);
-      const ey=clamp(S/2+Math.sin(ang)*500,margin,S-margin);
-      mapCtx.save();
-      mapCtx.translate(ex,ey);mapCtx.rotate(ang);
-      mapCtx.fillStyle='#ffee88';mapCtx.globalAlpha=0.7;
-      mapCtx.beginPath();mapCtx.moveTo(10,0);mapCtx.lineTo(-6,-5);mapCtx.lineTo(-6,5);mapCtx.closePath();mapCtx.fill();
-      mapCtx.restore();
-      mapCtx.fillStyle='#ffee88';mapCtx.font='8px "Courier New", monospace';mapCtx.textAlign='center';
-      mapCtx.fillText('SOL',ex,ey-10);
     }
   }
 
@@ -336,23 +362,36 @@ function handleMapClick(e){
   const player=window.gameState.player;
   const rect=mapCanvas.getBoundingClientRect();
   const mx=e.clientX-rect.left,my=e.clientY-rect.top;
-  const S=700,baseScale=S/8000*mapZoom;
+  const S=mapCanvas.width,baseScale=S/8000*mapZoom;
   const cx=S/2+mapPan.x,cy=S/2+mapPan.y;
   let closest=null,closestD=30;
   chunkCache.forEach(ch=>{
-    if(!ch.system?.station)return;
-    const st=ch.system.station;
-    const px=cx+(st.x-player.x)*baseScale,py=cy+(st.y-player.y)*baseScale;
-    const d=Math.hypot(mx-px,my-py);
-    if(d<closestD){closestD=d;closest=st;}
+    if(!ch.system)return;
+    const checkSt=(st)=>{
+      if(!st)return;
+      const px=cx+(st.x-player.x)*baseScale,py=cy+(st.y-player.y)*baseScale;
+      const d=Math.hypot(mx-px,my-py);
+      if(d<closestD){closestD=d;closest=st;}
+    };
+    checkSt(ch.system.station);
+    // Planetární stanice — hledej i v solárním chunku
+    ch.system.planets?.forEach(pl=>{
+      if(!pl.station)return;
+      const pos=getPlanetPos(pl,ch.system.sx,ch.system.sy,window.gameState.t||0);
+      const stx=pos.x+(pl.r+pl.station.r)*1.9, sty=pos.y;
+      const spx=cx+(stx-player.x)*baseScale,spy=cy+(sty-player.y)*baseScale;
+      const d=Math.hypot(mx-spx,my-spy);
+      if(d<closestD+10){closestD=d;closest=pl.station;}
+    });
   });
-  // Kliknutí na SOL (fake station jako nav target)
+  // Kliknutí na SOL (střed slunce)
   if(!closest){
-    const sc2=C.SOLAR_CHUNK;
-    const solWX=sc2.cx*C.CHUNK+C.CHUNK*0.5,solWY=sc2.cy*C.CHUNK+C.CHUNK*0.5;
-    const px2=cx+(solWX-player.x)*baseScale,py2=cy+(solWY-player.y)*baseScale;
-    if(Math.hypot(mx-px2,my-py2)<30){
-      closest={x:solWX,y:solWY,name:'Sluneční soustava'};
+    const solSys=getChunk(C.SOLAR_CHUNK.cx,C.SOLAR_CHUNK.cy)?.system;
+    if(solSys){
+      const px2=cx+(solSys.sx-player.x)*baseScale,py2=cy+(solSys.sy-player.y)*baseScale;
+      if(Math.hypot(mx-px2,my-py2)<35){
+        closest={x:solSys.sx,y:solSys.sy,name:'SOL — Sluneční soustava'};
+      }
     }
   }
   if(closest){

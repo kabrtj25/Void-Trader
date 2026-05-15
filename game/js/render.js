@@ -24,16 +24,30 @@ function renderBackground(chunks,t){
         if(!inView(sx,sy,10))return;
         const twinkle=0.7+Math.sin(t*1.8+s.twinkle)*0.3;
         ctx.globalAlpha=s.bright*twinkle;
-        if(s.hue===210) ctx.fillStyle=`#90b8ff`;
-        else if(s.hue===30) ctx.fillStyle=`#ffbb60`;
+        if(s.hue===210) ctx.fillStyle='#90b8ff';
+        else if(s.hue===30) ctx.fillStyle='#ffbb60';
+        else if(s.hue===60) ctx.fillStyle='#ffeeaa';
         else ctx.fillStyle='#e8eeff';
         const r=s.r*layer.scale;
         ctx.beginPath();ctx.arc(sx,sy,r,0,Math.PI*2);ctx.fill();
-        // Záblesk pro velké hvězdy
-        if(r>0.9&&s.bright>0.7){
-          ctx.globalAlpha=s.bright*twinkle*0.25;
+        // Záře pro větší hvězdy
+        if(r>0.85&&s.bright>0.65){
+          ctx.globalAlpha=s.bright*twinkle*0.22;
           ctx.fillStyle='#ffffff';
-          ctx.beginPath();ctx.arc(sx,sy,r*2.5,0,Math.PI*2);ctx.fill();
+          ctx.beginPath();ctx.arc(sx,sy,r*3,0,Math.PI*2);ctx.fill();
+        }
+        // Křížový záblesk pro nejjasnější hvězdy
+        if(s.sparkle&&r>0.8){
+          ctx.globalAlpha=s.bright*twinkle*0.55;
+          ctx.strokeStyle='#ffffff';ctx.lineWidth=0.6;
+          const sl=r*10;
+          ctx.beginPath();ctx.moveTo(sx-sl,sy);ctx.lineTo(sx+sl,sy);ctx.stroke();
+          ctx.beginPath();ctx.moveTo(sx,sy-sl);ctx.lineTo(sx,sy+sl);ctx.stroke();
+          // Diagonála slabší
+          ctx.globalAlpha=s.bright*twinkle*0.2;
+          const sd=sl*0.5;
+          ctx.beginPath();ctx.moveTo(sx-sd,sy-sd);ctx.lineTo(sx+sd,sy+sd);ctx.stroke();
+          ctx.beginPath();ctx.moveTo(sx+sd,sy-sd);ctx.lineTo(sx-sd,sy+sd);ctx.stroke();
         }
       });
     });
@@ -102,135 +116,333 @@ function renderSystems(chunks,t){
     sys.planets.forEach(p=>{
       const pos=getPlanetPos(p,sys.sx,sys.sy,t);
       const{x:px,y:py}=toScreen(pos.x,pos.y);
-      if(!inView(px,py,p.r*(p.rings?4:3)))return;
+      if(!inView(px,py,p.r*(p.rings?4.5:2.5)))return;
       ctx.save();
-      // Prstence (pozadí — za planetou)
+
+      // Prstence — vrstva pod planetou
       if(p.rings){
         ctx.save();ctx.translate(px,py);
-        ctx.strokeStyle=p.color+'38';ctx.lineWidth=p.r*0.45;
-        ctx.beginPath();ctx.ellipse(0,0,p.r*2.8,p.r*0.55,0.28,0,Math.PI*2);ctx.stroke();
-        ctx.strokeStyle=p.color+'22';ctx.lineWidth=p.r*0.25;
-        ctx.beginPath();ctx.ellipse(0,0,p.r*3.5,p.r*0.7,0.28,0,Math.PI*2);ctx.stroke();
+        ctx.strokeStyle=p.color+'35';ctx.lineWidth=p.r*0.5;
+        ctx.beginPath();ctx.ellipse(0,0,p.r*2.9,p.r*0.52,0.3,0,Math.PI*2);ctx.stroke();
+        ctx.strokeStyle=p.color+'20';ctx.lineWidth=p.r*0.28;
+        ctx.beginPath();ctx.ellipse(0,0,p.r*3.6,p.r*0.68,0.3,0,Math.PI*2);ctx.stroke();
         ctx.restore();
       }
+
       // Atmosféra
       if(p.atmo){
-        const atGr=ctx.createRadialGradient(px,py,p.r*0.7,px,py,p.r*1.6);
-        atGr.addColorStop(0,p.color+'40');atGr.addColorStop(1,p.color+'00');
-        ctx.fillStyle=atGr;ctx.beginPath();ctx.arc(px,py,p.r*1.6,0,Math.PI*2);ctx.fill();
+        const atGr=ctx.createRadialGradient(px,py,p.r*0.75,px,py,p.r*1.7);
+        atGr.addColorStop(0,p.color+'38');atGr.addColorStop(1,p.color+'00');
+        ctx.fillStyle=atGr;ctx.beginPath();ctx.arc(px,py,p.r*1.7,0,Math.PI*2);ctx.fill();
       }
-      // Tělo planety
-      const pg=ctx.createRadialGradient(px-p.r*0.3,py-p.r*0.3,1,px,py,p.r);
-      pg.addColorStop(0,lighten(p.color,40));pg.addColorStop(0.6,p.color);pg.addColorStop(1,darken(p.color,40));
-      ctx.fillStyle=pg;ctx.beginPath();ctx.arc(px,py,p.r,0,Math.PI*2);ctx.fill();
-      // Lesk
-      ctx.globalAlpha=0.28;
-      const sg=ctx.createRadialGradient(px-p.r*0.35,py-p.r*0.35,0,px,py,p.r);
-      sg.addColorStop(0,'rgba(255,255,255,0.6)');sg.addColorStop(0.5,'transparent');
-      ctx.fillStyle=sg;ctx.beginPath();ctx.arc(px,py,p.r,0,Math.PI*2);ctx.fill();
+
+      // Tělo planety se clip — povrch nepřetéká ven
+      ctx.save();
+      ctx.beginPath();ctx.arc(px,py,p.r,0,Math.PI*2);ctx.clip();
+
+      // Základní gradient
+      const pg=ctx.createRadialGradient(px-p.r*0.32,py-p.r*0.28,p.r*0.05,px,py,p.r);
+      pg.addColorStop(0,lighten(p.color,50));pg.addColorStop(0.5,p.color);pg.addColorStop(1,darken(p.color,50));
+      ctx.fillStyle=pg;ctx.fillRect(px-p.r,py-p.r,p.r*2,p.r*2);
+
+      // Povrchové detaily podle jména planety
+      if(p.name==='Země'){
+        // Oceán (modrý základ je v gradientu)
+        // Kontinenty
+        ctx.globalAlpha=0.55;ctx.fillStyle='#2e8b30';
+        ctx.beginPath();ctx.ellipse(px-p.r*0.18,py-p.r*0.15,p.r*0.42,p.r*0.32,0.5,0,Math.PI*2);ctx.fill();
+        ctx.beginPath();ctx.ellipse(px+p.r*0.28,py+p.r*0.05,p.r*0.28,p.r*0.38,-0.3,0,Math.PI*2);ctx.fill();
+        ctx.beginPath();ctx.ellipse(px-p.r*0.05,py+p.r*0.38,p.r*0.35,p.r*0.2,0.8,0,Math.PI*2);ctx.fill();
+        // Mraky
+        ctx.globalAlpha=0.38;ctx.fillStyle='#ffffff';
+        ctx.beginPath();ctx.ellipse(px-p.r*0.25,py+p.r*0.28,p.r*0.42,p.r*0.11,0.7,0,Math.PI*2);ctx.fill();
+        ctx.beginPath();ctx.ellipse(px+p.r*0.1,py-p.r*0.42,p.r*0.38,p.r*0.1,-0.4,0,Math.PI*2);ctx.fill();
+        ctx.beginPath();ctx.ellipse(px-p.r*0.4,py-p.r*0.05,p.r*0.22,p.r*0.08,0.2,0,Math.PI*2);ctx.fill();
+      } else if(p.name==='Mars'){
+        // Tmavé skvrny / kaňony
+        ctx.globalAlpha=0.38;ctx.fillStyle='#7a1808';
+        ctx.beginPath();ctx.ellipse(px-p.r*0.12,py+p.r*0.08,p.r*0.55,p.r*0.38,-0.4,0,Math.PI*2);ctx.fill();
+        ctx.beginPath();ctx.ellipse(px+p.r*0.3,py-p.r*0.2,p.r*0.22,p.r*0.18,0.6,0,Math.PI*2);ctx.fill();
+        // Polární čepičky
+        ctx.globalAlpha=0.82;ctx.fillStyle='#f0f0f0';
+        ctx.beginPath();ctx.ellipse(px,py-p.r*0.82,p.r*0.28,p.r*0.11,0,0,Math.PI*2);ctx.fill();
+        ctx.globalAlpha=0.5;
+        ctx.beginPath();ctx.ellipse(px,py+p.r*0.84,p.r*0.14,p.r*0.07,0,0,Math.PI*2);ctx.fill();
+      } else if(p.name==='Jupiter'){
+        // Horizontální pásma
+        ctx.globalAlpha=0.32;
+        const jBands=[['#d4a068',0.18],['#b87040',0.28],['#d4a870',0.16],['#c07840',0.24],['#d09060',0.14]];
+        let jy=py-p.r;
+        jBands.forEach(([col,frac])=>{
+          ctx.fillStyle=col;
+          ctx.fillRect(px-p.r,jy,p.r*2,p.r*2*frac);
+          jy+=p.r*2*frac;
+        });
+        // Velká červená skvrna
+        ctx.globalAlpha=0.55;ctx.fillStyle='#bb2808';
+        ctx.beginPath();ctx.ellipse(px+p.r*0.22,py+p.r*0.18,p.r*0.28,p.r*0.16,0.1,0,Math.PI*2);ctx.fill();
+      } else if(p.name==='Saturn'){
+        // Jemná pásma
+        ctx.globalAlpha=0.22;
+        for(let i=0;i<5;i++){
+          ctx.fillStyle=i%2===0?'#c0a038':'#d4b860';
+          ctx.fillRect(px-p.r,py-p.r+p.r*0.4*i,p.r*2,p.r*0.4);
+        }
+      } else if(p.name==='Venuše'){
+        // Oblačný závoj
+        ctx.globalAlpha=0.3;ctx.fillStyle='#f0e090';
+        ctx.beginPath();ctx.ellipse(px,py-p.r*0.2,p.r*0.8,p.r*0.5,0.3,0,Math.PI*2);ctx.fill();
+        ctx.beginPath();ctx.ellipse(px-p.r*0.1,py+p.r*0.3,p.r*0.7,p.r*0.35,-0.4,0,Math.PI*2);ctx.fill();
+      }
       ctx.globalAlpha=1;
-      // Prstence (popředí — přes planetu)
+
+      // Lesk (highlight)
+      const sg=ctx.createRadialGradient(px-p.r*0.38,py-p.r*0.38,0,px-p.r*0.1,py-p.r*0.1,p.r*1.1);
+      sg.addColorStop(0,'rgba(255,255,255,0.45)');sg.addColorStop(0.4,'rgba(255,255,255,0.08)');sg.addColorStop(1,'transparent');
+      ctx.fillStyle=sg;ctx.fillRect(px-p.r,py-p.r,p.r*2,p.r*2);
+
+      ctx.restore(); // Konec clip
+
+      // Prstence — vrstva nad planetou (jen polovina efektu)
       if(p.rings){
         ctx.save();ctx.translate(px,py);
-        ctx.strokeStyle=p.color+'28';ctx.lineWidth=p.r*0.35;
-        ctx.beginPath();ctx.ellipse(0,0,p.r*2.8,p.r*0.55,0.28,0,Math.PI*2);ctx.stroke();
+        ctx.strokeStyle=p.color+'22';ctx.lineWidth=p.r*0.32;
+        ctx.beginPath();ctx.ellipse(0,0,p.r*2.9,p.r*0.52,0.3,0,Math.PI*2);ctx.stroke();
         ctx.restore();
       }
-      // Název planety (jen pokud má name)
-      if(p.name&&p.r>4){
-        ctx.globalAlpha=0.65;
-        ctx.font=`${Math.max(8,p.r*0.7)}px "Courier New", monospace`;
-        ctx.fillStyle='#ffcc88';ctx.textAlign='center';
-        ctx.fillText(p.name,px,py-p.r*(p.rings?3.8:1.8));
+
+      // Název planety
+      if(p.name){
+        ctx.globalAlpha=0.75;
+        ctx.font=`bold ${Math.max(9,Math.min(14,p.r*0.75))}px "Courier New", monospace`;
+        ctx.fillStyle='#ffd080';ctx.textAlign='center';ctx.shadowColor='#000';ctx.shadowBlur=4;
+        ctx.fillText(p.name,px,py-p.r*(p.rings?4.0:1.85)-2);
+        ctx.shadowBlur=0;
       }
       ctx.restore();
+    });
+
+    // Měsíce — oběžné dráhy + tělesa (samostatný průchod)
+    sys.planets.forEach(p=>{
+      if(!p.moons?.length)return;
+      const pos=getPlanetPos(p,sys.sx,sys.sy,t);
+      const{x:px,y:py}=toScreen(pos.x,pos.y);
+      const maxOrb=p.moons.reduce((m,mn)=>Math.max(m,mn.orbit),0);
+      if(!inView(px,py,maxOrb+60))return;
+      // Oběžné dráhy měsíců
+      ctx.save();
+      ctx.strokeStyle='rgba(140,150,200,0.07)';ctx.lineWidth=0.5;ctx.setLineDash([2,6]);
+      p.moons.forEach(mn=>{ctx.beginPath();ctx.arc(px,py,mn.orbit,0,Math.PI*2);ctx.stroke();});
+      ctx.setLineDash([]);ctx.restore();
+      // Tělesa měsíců
+      p.moons.forEach(mn=>{
+        const mwp=getMoonPos(mn,pos.x,pos.y,t);
+        const{x:mx,y:my}=toScreen(mwp.x,mwp.y);
+        if(!inView(mx,my,mn.r+15))return;
+        ctx.save();
+        ctx.beginPath();ctx.arc(mx,my,mn.r,0,Math.PI*2);
+        const mg=ctx.createRadialGradient(mx-mn.r*0.3,my-mn.r*0.3,0.5,mx,my,mn.r);
+        mg.addColorStop(0,lighten(mn.color,25));mg.addColorStop(1,darken(mn.color,30));
+        ctx.fillStyle=mg;ctx.fill();
+        ctx.strokeStyle=mn.color+'44';ctx.lineWidth=0.5;ctx.stroke();
+        ctx.globalAlpha=0.55;ctx.font='8px "Courier New",monospace';
+        ctx.fillStyle='#cccccc';ctx.textAlign='center';ctx.shadowColor='#000';ctx.shadowBlur=3;
+        ctx.fillText(mn.name,mx,my-mn.r-3);ctx.shadowBlur=0;ctx.globalAlpha=1;
+        ctx.restore();
+      });
     });
   });
 }
 
-// ---- Stanice ----
+// ---- Stanice (ISS styl) ----
+function stationRoundRect(x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.arcTo(x+w,y,x+w,y+r,r);
+  ctx.lineTo(x+w,y+h-r);ctx.arcTo(x+w,y+h,x+w-r,y+h,r);
+  ctx.lineTo(x+r,y+h);ctx.arcTo(x,y+h,x,y+h-r,r);
+  ctx.lineTo(x,y+r);ctx.arcTo(x,y,x+r,y,r);
+  ctx.closePath();
+}
+
 function renderStation(st,t,nearDock,dockable){
   const{x:sx,y:sy}=toScreen(st.x,st.y);
   const R=st.r;
-  if(!inView(sx,sy,R*4))return;
+  if(!inView(sx,sy,R*6))return;
 
   ctx.save();
-  ctx.translate(sx,sy);ctx.rotate(st.angle);
+  ctx.translate(sx,sy);
+  ctx.rotate(st.angle);
 
-  // Záře stanice
-  const gGr=ctx.createRadialGradient(0,0,0,0,0,R*3.5);
-  gGr.addColorStop(0,st.color+'15');gGr.addColorStop(1,st.color+'00');
-  ctx.fillStyle=gGr;ctx.beginPath();ctx.arc(0,0,R*3.5,0,Math.PI*2);ctx.fill();
+  // Záře
+  const gGr=ctx.createRadialGradient(0,0,0,0,0,R*4.5);
+  gGr.addColorStop(0,st.color+'14');gGr.addColorStop(1,st.color+'00');
+  ctx.fillStyle=gGr;ctx.beginPath();ctx.arc(0,0,R*4.5,0,Math.PI*2);ctx.fill();
 
-  // Vnější prstenec
-  ctx.strokeStyle=st.color+'60';ctx.lineWidth=3;ctx.setLineDash([8,6]);
-  ctx.beginPath();ctx.arc(0,0,R*1.5,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);
-
-  // Tělo stanice — osmiúhelník
-  const sides=8;
-  ctx.fillStyle='#0a0f1a';ctx.strokeStyle=st.color+'aa';ctx.lineWidth=2.5;
-  ctx.beginPath();
-  for(let i=0;i<sides;i++){const a=i/sides*Math.PI*2;ctx.lineTo(Math.cos(a)*R,Math.sin(a)*R);}
-  ctx.closePath();ctx.fill();ctx.stroke();
-
-  // Vnitřní prstenec
-  ctx.strokeStyle=st.color+'44';ctx.lineWidth=1.5;
-  ctx.beginPath();ctx.arc(0,0,R*0.6,0,Math.PI*2);ctx.stroke();
-
-  // Světla na rozích
-  for(let i=0;i<sides;i++){
-    const a=i/sides*Math.PI*2;
-    const lx=Math.cos(a)*R,ly=Math.sin(a)*R;
-    const blink=Math.sin(t*3+i*0.8)>0.1;
-    ctx.save();
-    ctx.globalAlpha=blink?0.95:0.2;
-    ctx.fillStyle=i%2===0?st.color:'#ff4040';
-    ctx.beginPath();ctx.arc(lx,ly,3.5,0,Math.PI*2);ctx.fill();
-    if(blink){
-      ctx.globalAlpha=0.3;
-      ctx.beginPath();ctx.arc(lx,ly,8,0,Math.PI*2);ctx.fill();
-    }
-    ctx.restore();
+  // ===== HLAVNÍ TRUSS (horizontální nosník) =====
+  const tL=R*3.6, tH=R*0.13;
+  ctx.fillStyle='#1a2535';ctx.strokeStyle=st.color+'55';ctx.lineWidth=0.8;
+  ctx.fillRect(-tL/2,-tH/2,tL,tH);ctx.strokeRect(-tL/2,-tH/2,tL,tH);
+  // Segmenty nosníku
+  ctx.strokeStyle=st.color+'25';ctx.lineWidth=0.5;
+  for(let i=1;i<10;i++){const x=-tL/2+i*(tL/10);ctx.beginPath();ctx.moveTo(x,-tH/2);ctx.lineTo(x,tH/2);ctx.stroke();}
+  // Diagonální výztuhy
+  ctx.strokeStyle=st.color+'18';
+  for(let i=0;i<5;i++){
+    const x0=-tL/2+i*(tL/5),x1=x0+tL/5;
+    ctx.beginPath();ctx.moveTo(x0,-tH/2);ctx.lineTo(x1,tH/2);ctx.stroke();
   }
 
-  // Jádro
-  const cGr=ctx.createRadialGradient(0,0,0,0,0,R*0.4);
-  cGr.addColorStop(0,'#1a2030');cGr.addColorStop(1,'#050810');
-  ctx.fillStyle=cGr;ctx.beginPath();ctx.arc(0,0,R*0.4,0,Math.PI*2);ctx.fill();
-  ctx.strokeStyle=st.color+'55';ctx.lineWidth=1;
-  ctx.beginPath();ctx.arc(0,0,R*0.4,0,Math.PI*2);ctx.stroke();
+  // ===== SOLÁRNÍ PANELY =====
+  const drawPanelSet=(tx,mH,pW,pH)=>{
+    // Vertikální masty od truss
+    ctx.strokeStyle=st.color+'55';ctx.lineWidth=R*0.042;
+    ctx.beginPath();ctx.moveTo(tx,-tH/2);ctx.lineTo(tx,-mH);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(tx,tH/2);ctx.lineTo(tx,mH);ctx.stroke();
+    // Koncová lišta mast
+    ctx.strokeStyle=st.color+'40';ctx.lineWidth=R*0.06;
+    ctx.beginPath();ctx.moveTo(tx-pW*0.1,-mH);ctx.lineTo(tx+pW*0.1,-mH);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(tx-pW*0.1,mH);ctx.lineTo(tx+pW*0.1,mH);ctx.stroke();
 
-  // Dokovací průchod — "mail slot"
-  const slotW=R*0.55,slotH=R*0.2;
-  const slotX=R*0.82;
-  ctx.fillStyle='#000000';ctx.strokeStyle=dockable?'#00ff88':'rgba(255,150,0,0.6)';ctx.lineWidth=2.5;
-  ctx.fillRect(slotX-slotW/2,-slotH/2,slotW,slotH);
-  ctx.strokeRect(slotX-slotW/2,-slotH/2,slotW,slotH);
-  // Světlo průchodu
-  ctx.globalAlpha=dockable?0.6:0.25;
+    const drawPanel=(py2,flip)=>{
+      // Panel tělo
+      ctx.fillStyle='#0c1d32';ctx.strokeStyle='#2460a8';ctx.lineWidth=0.8;
+      ctx.fillRect(tx-pW/2,py2,pW,pH*flip);ctx.strokeRect(tx-pW/2,py2,pW,pH*flip);
+      // Buňky (7 sloupců × 2 řady)
+      ctx.strokeStyle='#1a4a8880';ctx.lineWidth=0.35;
+      for(let c=1;c<7;c++){const px2=tx-pW/2+c*(pW/7);ctx.beginPath();ctx.moveTo(px2,py2);ctx.lineTo(px2,py2+pH*flip);ctx.stroke();}
+      ctx.beginPath();ctx.moveTo(tx-pW/2,py2+pH*flip*0.5);ctx.lineTo(tx+pW/2,py2+pH*flip*0.5);ctx.stroke();
+      // Odlesk panelu
+      ctx.globalAlpha=0.12;
+      const pg=ctx.createLinearGradient(tx-pW/2,py2,tx+pW/2,py2);
+      pg.addColorStop(0,'#4499ff');pg.addColorStop(0.5,'transparent');pg.addColorStop(1,'#2266cc');
+      ctx.fillStyle=pg;ctx.fillRect(tx-pW/2,py2,pW,pH*flip);
+      ctx.globalAlpha=1;
+    };
+    drawPanel(-mH,-1);  // horní panel (roste nahoru)
+    drawPanel(mH,1);    // dolní panel (roste dolů)
+  };
+
+  const outerMH=R*0.72, outerPW=R*1.1, outerPH=R*0.33;
+  const innerMH=R*0.58, innerPW=R*0.88, innerPH=R*0.27;
+
+  // Outer sety
+  drawPanelSet(-tL*0.42,outerMH,outerPW,outerPH);
+  drawPanelSet(tL*0.42,outerMH,outerPW,outerPH);
+  // Inner sety (tier 2+)
+  if(R>=38){
+    drawPanelSet(-tL*0.16,innerMH,innerPW,innerPH);
+    drawPanelSet(tL*0.16,innerMH,innerPW,innerPH);
+  }
+  // Extra inner sety (tier 3 / velké stanice)
+  if(R>=55){
+    drawPanelSet(-tL*0.29,innerMH*0.9,innerPW*0.8,innerPH*0.9);
+    drawPanelSet(tL*0.29,innerMH*0.9,innerPW*0.8,innerPH*0.9);
+  }
+
+  // ===== CENTRÁLNÍ MODULY (vertikální sada válců) =====
+  const nMods=Math.max(3,Math.min(6,Math.round(R/12)));
+  const mW=R*0.35, mH2=R*0.44;
+  const totH=nMods*mH2;
+
+  for(let i=0;i<nMods;i++){
+    const my=-totH/2+i*mH2;
+    const isFirst=i===0, isLast=i===nMods-1;
+    const mc=isFirst||isLast?'#14202e':'#182538';
+    ctx.fillStyle=mc;
+    ctx.strokeStyle=st.color+(isFirst||isLast?'55':'88');
+    ctx.lineWidth=1.1;
+    stationRoundRect(-mW/2,my,mW,mH2,mW*0.28);
+    ctx.fill();ctx.stroke();
+
+    // Přepážka mezi moduly
+    if(!isFirst){
+      ctx.strokeStyle=st.color+'35';ctx.lineWidth=0.5;
+      ctx.beginPath();ctx.moveTo(-mW/2,my);ctx.lineTo(mW/2,my);ctx.stroke();
+    }
+
+    // Okna (2 na modul, mírně pulzující)
+    if(!isFirst&&!isLast){
+      const wa=0.28+Math.sin(t*0.7+i*1.8)*0.08;
+      ctx.globalAlpha=wa;ctx.fillStyle='#88d8ff';
+      const wy2=my+mH2*0.32;
+      ctx.beginPath();ctx.ellipse(-mW*0.22,wy2,mW*0.1,mW*0.075,0,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.ellipse(mW*0.22,wy2,mW*0.1,mW*0.075,0,0,Math.PI*2);ctx.fill();
+      ctx.globalAlpha=1;
+    }
+
+    // Radiátor (boční chladič) na každém druhém modulu
+    if(i%2===1){
+      const radW=mW*0.55, radH=mH2*0.5, radY=my+mH2*0.25;
+      ctx.fillStyle='#0e1a28';ctx.strokeStyle=st.color+'30';ctx.lineWidth=0.5;
+      ctx.fillRect(-mW/2-radW,radY,radW,radH);ctx.strokeRect(-mW/2-radW,radY,radW,radH);
+      ctx.fillRect(mW/2,radY,radW,radH);ctx.strokeRect(mW/2,radY,radW,radH);
+    }
+  }
+
+  // Spojovací uzel (Node) uprostřed
+  ctx.fillStyle='#1c2d42';ctx.strokeStyle=st.color+'80';ctx.lineWidth=1.4;
+  ctx.beginPath();ctx.arc(0,0,R*0.24,0,Math.PI*2);ctx.fill();ctx.stroke();
+  ctx.strokeStyle=st.color+'35';ctx.lineWidth=0.8;
+  ctx.beginPath();ctx.arc(0,0,R*0.15,0,Math.PI*2);ctx.stroke();
+
+  // ===== DOKOVACÍ PORT (pravá strana, na úrovni node) =====
+  const dpX=R*0.88, dpW=R*0.26, dpH=R*0.42;
+  // Hrdlo (krátký tunýlek)
+  ctx.fillStyle='#0e1820';ctx.strokeStyle=st.color+'60';ctx.lineWidth=0.8;
+  ctx.fillRect(R*0.22,-tH*0.9,dpX-R*0.22,tH*1.8);ctx.strokeRect(R*0.22,-tH*0.9,dpX-R*0.22,tH*1.8);
+  // Port
+  ctx.fillStyle='#050810';
+  ctx.strokeStyle=dockable?'#00ff88':'rgba(255,150,0,0.8)';
+  ctx.lineWidth=2;
+  ctx.fillRect(dpX,-dpH/2,dpW,dpH);ctx.strokeRect(dpX,-dpH/2,dpW,dpH);
+  // Vnitřní světlo
+  ctx.globalAlpha=dockable?0.65:0.22;
   ctx.fillStyle=dockable?'#00ff88':st.color;
-  ctx.fillRect(slotX-slotW/2,-slotH/2,slotW,slotH);
+  ctx.fillRect(dpX+1.5,-dpH/2+1.5,dpW-3,dpH-3);
   ctx.globalAlpha=1;
+  // Blikající vodící světla portu
+  const dlB=0.4+Math.sin(t*4.5)*0.6;
+  ctx.save();
+  ctx.globalAlpha=dlB;ctx.fillStyle=dockable?'#00ff88':'#ffaa00';ctx.shadowColor=ctx.fillStyle;ctx.shadowBlur=8;
+  ctx.beginPath();ctx.arc(dpX+dpW/2,-dpH/2,R*0.045,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(dpX+dpW/2,dpH/2,R*0.045,0,Math.PI*2);ctx.fill();
+  ctx.restore();
+
+  // ===== NAVIGAČNÍ SVĚTLA =====
+  const navLights=[
+    {x:-tL/2,y:0,c:'#ff2020',freq:1.9},
+    {x:tL/2, y:0,c:'#00dd44',freq:1.9+Math.PI},
+    {x:0,y:-totH/2-R*0.15,c:'#ffffff',freq:3.1},
+    {x:0,y:totH/2+R*0.15, c:'#ffffff',freq:3.1+1.2},
+  ];
+  navLights.forEach(l=>{
+    const b=Math.sin(t*l.freq)*0.5+0.5;
+    ctx.save();
+    ctx.globalAlpha=0.2+b*0.8;
+    ctx.fillStyle=l.c;ctx.shadowColor=l.c;ctx.shadowBlur=10;
+    ctx.beginPath();ctx.arc(l.x,l.y,R*0.058,0,Math.PI*2);ctx.fill();
+    if(b>0.7){ctx.globalAlpha=(b-0.7)*0.5;ctx.beginPath();ctx.arc(l.x,l.y,R*0.15,0,Math.PI*2);ctx.fill();}
+    ctx.restore();
+  });
 
   ctx.restore();
 
-  // Název & vzdálenost (bez rotace)
+  // ===== LABEL (bez rotace) =====
   ctx.save();
   ctx.textAlign='center';
+  const labelY=sy-R*3.8;
   if(nearDock){
     ctx.font='bold 14px "Courier New", monospace';
     ctx.fillStyle=st.color;ctx.shadowColor=st.color;ctx.shadowBlur=8;
-    ctx.fillText(st.name,sx,sy-R*2.2);
-    ctx.shadowBlur=0;
+    ctx.fillText(st.name,sx,labelY);ctx.shadowBlur=0;
     ctx.font='11px "Courier New", monospace';
-    ctx.fillStyle=dockable?'#00ff88':'rgba(255,150,40,0.8)';
-    ctx.fillText(dockable?'▶ DOKOVACÍ KORIDOR — VOLNÝ':'▷ Přibližte se z dokovacího koridoru',sx,sy-R*2.2-18);
-    const tierStr='◆'.repeat(st.tier)+'◇'.repeat(3-st.tier);
-    ctx.fillStyle=st.color+'88';ctx.font='10px "Courier New", monospace';
-    ctx.fillText(tierStr,sx,sy+R*2.2+14);
+    ctx.fillStyle=dockable?'#00ff88':'rgba(255,150,40,0.85)';
+    ctx.fillText(dockable?'▶ DOKOVACÍ PORT — VOLNÝ':'▷ Přiblíž se k dokovacímu portu',sx,labelY-18);
+    ctx.fillStyle=st.color+'80';ctx.font='10px "Courier New", monospace';
+    ctx.fillText('◆'.repeat(st.tier)+'◇'.repeat(Math.max(0,3-st.tier)),sx,sy+R*3.8+12);
   } else {
-    ctx.font='10px "Courier New", monospace';ctx.fillStyle='rgba(255,150,40,0.45)';
-    ctx.fillText(st.name,sx,sy-R*1.9);
+    ctx.font='10px "Courier New", monospace';ctx.fillStyle='rgba(255,150,40,0.5)';
+    ctx.fillText(st.name,sx,sy-R*2.8);
   }
   ctx.restore();
 }

@@ -2,7 +2,7 @@
 const C = {
   // Svět
   CHUNK:        3000,
-  VIEW_R:       3,
+  VIEW_R:       5,
   SAFE_ZONE:    4000,
 
   // Let — pomalejší, realistické
@@ -41,7 +41,7 @@ const C = {
   // Ostatní
   SAVE_KEY:     'spacetradersave_v2',
   MINIMAP_R:    2200,
-  SOLAR_CHUNK:  {cx:5, cy:-3},   // chunk s naší soustavou
+  SOLAR_CHUNK:  {cx:0, cy:0},    // chunk s naší soustavou — hráč startuje uvnitř
 };
 
 const GOODS = [
@@ -65,8 +65,9 @@ const UPGRADES = [
 ];
 
 // Fixní stanice (garantované při spuštění)
+// Poznámka: chunk (0,0) je vyhrazen pro Sluneční soustavu, Stanice Alfa přesunuta
 const FIXED_STATIONS = [
-  {cx:0,  cy:0,  name:'Stanice Alfa',      tier:3, color:'#ff9500'},
+  {cx:2,  cy:0,  name:'Stanice Alfa',      tier:3, color:'#ff9500'},
   {cx:3,  cy:1,  name:'Základna Beta',     tier:2, color:'#ff6a00'},
   {cx:-2, cy:3,  name:'Port Gamma',        tier:2, color:'#ffbb00'},
   {cx:4,  cy:-2, name:'Stanice Delta',     tier:1, color:'#ff8c00'},

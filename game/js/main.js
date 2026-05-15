@@ -41,8 +41,11 @@ function startGame(fromSave=false){
 
   const save=fromSave?loadSave():null;
 
+  // Výchozí spawn: u Země (SOL chunk 0,0; sunX=1500,sunY=1500; Země orbit 7000, phase 2.1)
+  // earthX = 1500 + cos(2.1)*7000 ≈ 1500-3534 = -2034,  earthY = 1500 + sin(2.1)*7000 ≈ 1500+6042 = 7542
+  const EARTH_X=-2034, EARTH_Y=7542;
   const player={
-    x:save?.x||0, y:save?.y||0,
+    x:save?.x||EARTH_X, y:save?.y||EARTH_Y,
     vx:0, vy:0, angle:save?.angle||-Math.PI/2,
     hull:save?.hull||100, hullMax:100,
     shield:save?.shield||100, shieldMax:100,
@@ -67,6 +70,9 @@ function startGame(fromSave=false){
     t:0
   };
   window.gameState=gameState;
+
+  // Pre-generuj sluneční soustavu aby byla viditelná na mapě od začátku
+  getChunk(C.SOLAR_CHUNK.cx, C.SOLAR_CHUNK.cy);
 
   // Spawnuj nepřátele
   spawnInitialEnemies();
@@ -320,17 +326,39 @@ function update(dt){
 
   // Chunks
   gs.chunks=getVisibleChunks(p.x,p.y);
+  // Sluneční soustava je vždy viditelná (planety na vzdálenost 120 000 jednotek)
+  if(!gs.chunks.find(ch=>ch.cx===C.SOLAR_CHUNK.cx&&ch.cy===C.SOLAR_CHUNK.cy))
+    gs.chunks.push(getChunk(C.SOLAR_CHUNK.cx,C.SOLAR_CHUNK.cy));
 
   // Stanice — dokovací logika
   gs.nearStation=null;
   let closestStD=Infinity;
-  gs.chunks.forEach(ch=>{
-    if(!ch.system?.station)return;
-    const st=ch.system.station;
-    // Rotace stanice
+  const processStation=(st)=>{
+    if(!st)return;
     st.angle+=st.rotSpeed;
     const d=dist2(p,st);
     if(d<closestStD){closestStD=d;if(d<800)gs.nearStation=st;}
+  };
+  gs.chunks.forEach(ch=>{
+    if(!ch.system)return;
+    processStation(ch.system.station);
+    // Planetární a měsíční stanice — aktualizuj pozice aby sledovaly planetu/měsíc
+    ch.system.planets?.forEach(pl=>{
+      const pos=getPlanetPos(pl,ch.system.sx,ch.system.sy,gs.t);
+      if(pl.station){
+        pl.station.x=pos.x+(pl.r+pl.station.r)*1.9;
+        pl.station.y=pos.y;
+        processStation(pl.station);
+      }
+      pl.moons?.forEach(mn=>{
+        const mpos=getMoonPos(mn,pos.x,pos.y,gs.t);
+        if(mn.station){
+          mn.station.x=mpos.x+(mn.r+mn.station.r)*1.5;
+          mn.station.y=mpos.y;
+          processStation(mn.station);
+        }
+      });
+    });
   });
 
   // Dokovací podmínky
@@ -518,13 +546,19 @@ function render(dt,t){
   // Nepřátelé
   gs.enemies.forEach(e=>renderEnemy(e,t));
 
-  // Stanice
+  // Stanice (systémové + planetární)
   gs.chunks.forEach(ch=>{
-    if(!ch.system?.station)return;
-    const st=ch.system.station;
-    const isNear=st===gs.nearStation;
-    const dockable=isNear&&gs.dockingState?.dockable;
-    renderStation(st,t,isNear,dockable);
+    if(!ch.system)return;
+    const drawSt=(st)=>{
+      if(!st)return;
+      const isNear=st===gs.nearStation;
+      renderStation(st,t,isNear,isNear&&gs.dockingState?.dockable);
+    };
+    drawSt(ch.system.station);
+    ch.system.planets?.forEach(pl=>{
+      drawSt(pl.station);
+      pl.moons?.forEach(mn=>drawSt(mn.station));
+    });
   });
 
   // Střely
