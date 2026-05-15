@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SPACE TRADER</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- HLAVNÍ CANVAS -->
+<canvas id="c"></canvas>
+
+<!-- MENU -->
+<div id="menu">
+  <div id="menu-stars"></div>
+  <div id="menu-content">
+    <div id="menu-logo">
+      <span class="logo-space">SPACE</span>
+      <span class="logo-trader">TRADER</span>
+    </div>
+    <div id="menu-sub">Elite vesmírný obchod a průzkum · v1.0</div>
+    <div id="menu-buttons">
+      <button class="menu-btn primary" id="btn-new">▶ NOVÁ HRA</button>
+      <button class="menu-btn" id="btn-load">↺ POKRAČOVAT</button>
+      <button class="menu-btn" id="btn-settings">⚙ NASTAVENÍ</button>
+    </div>
+    <div id="settings-panel" style="display:none">
+      <div class="setting-row">
+        <span>Ovládání:</span>
+        <div class="ctrl-grid">
+          <span class="ck">W / ↑</span><span class="cd">Zrychlení (thrust)</span>
+          <span class="ck">A/D ← →</span><span class="cd">Otočení</span>
+          <span class="ck">S / ↓</span><span class="cd">Brzdění (retro)</span>
+          <span class="ck">SHIFT + W</span><span class="cd">Boost (spotřebuje palivo)</span>
+          <span class="ck">MEZERNÍK</span><span class="cd">Střelba</span>
+          <span class="ck">E</span><span class="cd">Přistání na stanici</span>
+          <span class="ck">M</span><span class="cd">Otevřít mapu galaxie</span>
+          <span class="ck">N</span><span class="cd">Zrušit navigaci</span>
+          <span class="ck">ESC</span><span class="cd">Mapa / Pauza</span>
+        </div>
+      </div>
+    </div>
+    <div id="menu-footer">SPACE TRADER © 2025 — Nekonečný vesmír</div>
+  </div>
+</div>
+
+<!-- HUD (zobrazí se při hře) -->
+<div id="hud" style="display:none">
+  <!-- Minimapa -->
+  <div id="minimap-wrap">
+    <canvas id="mm" width="180" height="180"></canvas>
+    <div id="minimap-label">RADAR</div>
+  </div>
+</div>
+
+<!-- MAPA OVERLAY -->
+<div id="map-overlay" style="display:none">
+  <div id="map-box">
+    <div id="map-header">
+      <span id="map-title">// MAPA GALAXIE</span>
+      <span id="map-hint">Kliknutím na stanici nastavíš navigaci</span>
+      <button id="btn-close-map">✕ Zavřít [M]</button>
+    </div>
+    <canvas id="map-canvas" width="700" height="700"></canvas>
+  </div>
+</div>
+
+<!-- DOKOVACÍ PANEL -->
+<div id="dock-panel" style="display:none">
+  <div id="dock-header">
+    <div id="dock-name">STANICE</div>
+    <div id="dock-tier"></div>
+    <button id="btn-undock">↑ Vzlétnout [E]</button>
+  </div>
+  <div id="dock-tabs">
+    <button class="dtab active" onclick="switchDockTab('services')">SERVIS</button>
+    <button class="dtab" onclick="switchDockTab('trade')">OBCHOD</button>
+    <button class="dtab" onclick="switchDockTab('upgrades')">UPGRADY</button>
+  </div>
+  <div id="dock-body">
+    <!-- SERVIS -->
+    <div id="dtab-services">
+      <div class="service-card">
+        <div class="svc-title">⛽ PALIVO</div>
+        <div class="svc-row"><span id="fuel-cost">—</span><button class="svc-btn" id="fuel-btn">Doplnit</button></div>
+      </div>
+      <div class="service-card">
+        <div class="svc-title">🔧 OPRAVA TRUPU</div>
+        <div class="svc-row"><span id="hull-cost">—</span><button class="svc-btn" id="hull-btn">Opravit</button></div>
+      </div>
+      <div class="service-card">
+        <div class="svc-title">🛡 ŠTÍT</div>
+        <div class="svc-row"><span id="shield-cost">—</span><button class="svc-btn" id="shield-btn">Dobít</button></div>
+      </div>
+      <button class="svc-btn" id="btn-save" style="margin-top:12px;width:100%">↓ Uložit hru</button>
+    </div>
+    <!-- OBCHOD -->
+    <div id="dtab-trade" style="display:none">
+      <div class="trade-col">
+        <div class="trade-title">Koupit</div>
+        <div id="buy-list"></div>
+      </div>
+      <div class="trade-col">
+        <div class="trade-title">Prodat</div>
+        <div id="sell-list"></div>
+      </div>
+    </div>
+    <!-- UPGRADY -->
+    <div id="dtab-upgrades" style="display:none">
+      <div id="upgrade-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- PAUZA -->
+<div id="pause-screen" style="display:none">
+  <div id="pause-box">
+    <div id="pause-title">// PAUZA</div>
+    <div id="pause-sub">HRA POZASTAVENA</div>
+    <button class="menu-btn primary" id="btn-resume">▶ POKRAČOVAT [ESC]</button>
+    <button class="menu-btn" id="btn-pause-save">↓ ULOŽIT HRU</button>
+    <button class="menu-btn" id="btn-pause-menu">↩ HLAVNÍ MENU</button>
+  </div>
+</div>
+
+<!-- SMRT -->
+<div id="death-screen" style="display:none">
+  <div id="death-box">
+    <div id="death-title">LOĎ ZNIČENA</div>
+    <div id="death-sub">Vaše mise skončila</div>
+    <button class="menu-btn primary" id="btn-restart">↺ NOVÁ HRA</button>
+    <button class="menu-btn" id="btn-menu">↩ HLAVNÍ MENU</button>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/world.js"></script>
+<script src="js/render.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

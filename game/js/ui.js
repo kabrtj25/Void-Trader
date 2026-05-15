@@ -1,294 +1,457 @@
-// --- Pause tabs ---
-function switchPauseTab(tab){
-  const tabs=['actions','graphics','hud','audio'];
-  document.querySelectorAll('.pause-tab').forEach((t,i)=>t.classList.toggle('active',tabs[i]===tab));
-  tabs.forEach(id=>{const el=document.getElementById('ptab-'+id);if(el)el.style.display=id===tab?'block':'none';});
-}
+// ===== SPACE TRADER — UI / HUD / Mapy =====
 
-function updateSetting(key,val){
-  const v=Number(val);
-  if(key==='sfxVol'){settings.sfxVol=v/100;document.getElementById('set-sfx-val').textContent=val;}
-  if(key==='particleCount'){settings.particleCount=v;document.getElementById('set-particles-val').textContent=val;}
-  if(key==='parallax'){settings.parallax=v;document.getElementById('set-parallax-val').textContent=val;}
-  if(key==='minimapSize'){settings.minimapSize=v;document.getElementById('set-mmsize-val').textContent=val;}
-  if(key==='hudOpacity'){settings.hudOpacity=v;document.getElementById('set-hudopa-val').textContent=val;applyHudOpacity();}
-  if(key==='minimapRange'){settings.minimapRange=v;document.getElementById('set-mmrange-val').textContent=val;}
-}
+// ---- HUD ----
+function renderHUD(player,nearStation,dockingState,t){
+  const pad=16;
 
-function toggleSetting(key,el){
-  settings[key]=!settings[key];
-  el.classList.toggle('on',settings[key]);
-  const labels={shake:['VYP','ZAP'],trails:['VYP','ZAP'],nebulae:['VYP','ZAP'],stars:['VYP','ZAP'],
-    scanlines:['VYP','ZAP'],vignette:['VYP','ZAP'],minimapLegend:['VYP','ZAP'],engineSound:['VYP','ZAP'],shootSound:['VYP','ZAP']};
-  const valMap={shake:'set-shake-val',trails:'set-trails-val',nebulae:'set-nebulae-val',stars:'set-stars-val',
-    scanlines:'set-scanlines-val',vignette:'set-vignette-val',minimapLegend:'set-mmlegend-val',
-    engineSound:'set-enginesound-val',shootSound:'set-shotsound-val'};
-  if(valMap[key])document.getElementById(valMap[key]).textContent=settings[key]?labels[key][1]:labels[key][0];
-  if(key==='scanlines')document.getElementById('scanlines-canvas').style.opacity=settings.scanlines?'1':'0';
-  if(key==='minimapLegend')document.getElementById('minimap-legend').style.display=settings.minimapLegend?'flex':'none';
-}
+  // === Levý panel — systémy lodi ===
+  const lx=pad,ly=pad,lw=200,lh=180;
+  hudPanel(lx,ly,lw,lh);
 
-function applyHudOpacity(){
-  const op=settings.hudOpacity/100;
-  document.querySelectorAll('.hud-block,.hud-block-r,#hud-xp,#boost-indicator').forEach(el=>el.style.opacity=op);
-}
+  ctx.save();
+  ctx.font='9px "Courier New", monospace';ctx.fillStyle='rgba(255,149,0,0.5)';ctx.textAlign='left';
+  ctx.fillText('// SYSTÉMY LODI',lx+10,ly+14);
 
-function buildScanlines(){
-  const sc=document.getElementById('scanlines-canvas');
-  sc.width=window.innerWidth;sc.height=window.innerHeight;
-  const sctx=sc.getContext('2d');
-  for(let y=0;y<sc.height;y+=4){sctx.fillStyle='rgba(0,0,0,0.18)';sctx.fillRect(0,y,sc.width,1);}
-}
+  // HP bar
+  const hullPct=player.hull/player.hullMax;
+  hudBar(lx+10,ly+26,lw-20,10,'HULL',hullPct,hullPct<0.3?'#ff2200':'#ff9500');
 
-function buildMenuStars(){
-  const bg=document.getElementById('menu-bg');bg.innerHTML='';
-  for(let i=0;i<200;i++){
-    const s=document.createElement('div');s.className='menu-star';
-    const sz=Math.random()*2.5+.5;
-    s.style.cssText=`width:${sz}px;height:${sz}px;top:${Math.random()*100}%;left:${Math.random()*100}%;opacity:${Math.random()*.8+.1};animation-delay:${Math.random()*3}s;animation-duration:${2+Math.random()*4}s`;
-    bg.appendChild(s);
+  // Štít bar
+  const shldPct=player.shield/player.shieldMax;
+  hudBar(lx+10,ly+50,lw-20,10,'ŠTÍT',shldPct,'#4080ff');
+
+  // Palivo bar
+  const fuelPct=player.fuel/player.fuelMax;
+  hudBar(lx+10,ly+74,lw-20,10,'PALIVO',fuelPct,fuelPct<0.2?'#ff4400':'#ff9500');
+
+  // Rychlost
+  const spd=Math.round(Math.hypot(player.vx,player.vy));
+  ctx.font='10px "Courier New", monospace';ctx.fillStyle='rgba(255,149,0,0.7)';
+  ctx.fillText('RYCHLOST',lx+10,ly+102);
+  ctx.font='bold 18px "Courier New", monospace';ctx.fillStyle='#ffaa00';
+  ctx.fillText(spd+' m/s',lx+10,ly+120);
+
+  // Souřadnice
+  ctx.font='9px "Courier New", monospace';ctx.fillStyle='rgba(255,149,0,0.5)';
+  ctx.fillText(`${Math.round(player.x/100)}, ${Math.round(player.y/100)} AU`,lx+10,ly+140);
+
+  // Level
+  ctx.font='9px "Courier New", monospace';ctx.fillStyle='rgba(255,149,0,0.5)';
+  ctx.fillText(`CMDR LVL ${player.level}`,lx+10,ly+158);
+  // XP bar
+  const xpPct=player.xp/xpNeeded(player.level);
+  ctx.fillStyle='#1a0800';ctx.fillRect(lx+10,ly+162,lw-20,4);
+  ctx.fillStyle='#ff9500';ctx.fillRect(lx+10,ly+162,(lw-20)*xpPct,4);
+
+  ctx.restore();
+
+  // === Pravý panel — kredity & náklad ===
+  const rw=200,rh=140,rx=W-pad-rw,ry=pad;
+  hudPanel(rx,ry,rw,rh);
+  ctx.save();
+  ctx.font='9px "Courier New", monospace';ctx.fillStyle='rgba(255,149,0,0.5)';ctx.textAlign='left';
+  ctx.fillText('// EKONOMIKA',rx+10,ry+14);
+  ctx.font='bold 22px "Courier New", monospace';ctx.fillStyle='#ffcc00';ctx.shadowColor='#ffcc00';ctx.shadowBlur=10;
+  ctx.fillText(player.credits.toLocaleString('cs')+' Cr',rx+10,ry+42);
+  ctx.shadowBlur=0;
+  ctx.font='9px "Courier New", monospace';ctx.fillStyle='rgba(255,149,0,0.5)';
+  const cmax=getCargoMax(player);
+  ctx.fillText(`NÁKLAD: ${player.cargoCount}/${cmax}`,rx+10,ry+60);
+  // Cargo bar
+  ctx.fillStyle='#1a0800';ctx.fillRect(rx+10,ry+66,rw-20,6);
+  ctx.fillStyle=player.cargoCount/cmax>0.85?'#ff4400':'#ff9500';
+  ctx.fillRect(rx+10,ry+66,(rw-20)*player.cargoCount/cmax,6);
+  // Náklad seznam
+  ctx.font='9px "Courier New", monospace';ctx.fillStyle='rgba(255,149,0,0.7)';
+  let cy2=ry+82;
+  Object.entries(player.cargo).slice(0,4).forEach(([name,qty])=>{
+    ctx.fillText(`${name} ×${qty}`,rx+10,cy2);cy2+=13;
+  });
+  ctx.restore();
+
+  // === Dolní střed — zprávy ===
+  if(window.msgText&&window.msgTimer>0){
+    ctx.save();
+    const alpha=Math.min(1,window.msgTimer/500);
+    ctx.globalAlpha=alpha;
+    ctx.textAlign='center';ctx.font='13px "Courier New", monospace';
+    ctx.fillStyle='#ffcc00';ctx.shadowColor='#ffcc00';ctx.shadowBlur=12;
+    ctx.fillText(window.msgText,W/2,H-90);
+    ctx.restore();
+  }
+
+  // Boost indikátor
+  if(player.boosting&&player.fuel>0){
+    ctx.save();
+    ctx.textAlign='center';ctx.font='bold 13px "Courier New", monospace';
+    ctx.fillStyle='#00ccff';ctx.shadowColor='#00ccff';ctx.shadowBlur=15;
+    ctx.fillText('⚡ BOOST AKTIVNÍ',W/2,H-110);
+    ctx.restore();
+  }
+  if(player.fuel<10){
+    ctx.save();
+    const fa=0.5+Math.sin(t*6)*0.5;
+    ctx.globalAlpha=fa;ctx.textAlign='center';ctx.font='bold 13px "Courier New", monospace';
+    ctx.fillStyle='#ff2200';ctx.shadowColor='#ff2200';ctx.shadowBlur=15;
+    ctx.fillText('⚠ KRITICKÁ HLADINA PALIVA',W/2,H-130);
+    ctx.restore();
   }
 }
 
-// --- Menu actions ---
-function showMenuControls(){
-  const el=document.getElementById('menu-controls');
-  el.style.display=el.style.display==='none'?'block':'none';
-}
-function startGame(){
-  const m=document.getElementById('menu');m.classList.add('fade-out');playMenuClick();
-  setTimeout(()=>{m.style.display='none';m.classList.remove('fade-out');initGame();},600);
-}
-function loadAndStart(){
-  const m=document.getElementById('menu');m.classList.add('fade-out');playMenuClick();
-  setTimeout(()=>{m.style.display='none';m.classList.remove('fade-out');initGame(true);},600);
-}
-function showMainMenu(){
-  gameRunning=false;paused=false;
-  hidePause();hideOverview();
-  document.getElementById('death').style.display='none';
-  document.getElementById('panel').style.display='none';
-  document.getElementById('menu').style.display='flex';
+function hudPanel(x,y,w,h){
+  ctx.save();
+  ctx.fillStyle='rgba(0,4,14,0.82)';ctx.fillRect(x,y,w,h);
+  ctx.strokeStyle='rgba(255,149,0,0.35)';ctx.lineWidth=1;ctx.strokeRect(x,y,w,h);
+  // Corner accents
+  const cs=10;
+  ctx.strokeStyle='rgba(255,149,0,0.7)';ctx.lineWidth=1.5;
+  [[x,y],[x+w,y],[x,y+h],[x+w,y+h]].forEach(([cx,cy],i)=>{
+    const sx=i%2===0?1:-1,sy=i<2?1:-1;
+    ctx.beginPath();ctx.moveTo(cx+sx*cs,cy);ctx.lineTo(cx,cy);ctx.lineTo(cx,cy+sy*cs);ctx.stroke();
+  });
+  ctx.restore();
 }
 
-// --- Pause ---
-function openPause(){
-  if(!gameRunning||player.dead)return;
-  paused=true;
-  document.getElementById('pause-overlay').classList.add('active');
-  document.getElementById('panel').style.display='none';
-  dockedStation=null;
+function hudBar(x,y,w,h,label,pct,color){
+  ctx.font='8px "Courier New", monospace';ctx.fillStyle='rgba(255,149,0,0.5)';
+  ctx.fillText(label,x,y-2);
+  ctx.fillStyle='rgba(255,149,0,0.1)';ctx.fillRect(x,y,w,h);
+  ctx.fillStyle=color;ctx.fillRect(x,y,w*clamp(pct,0,1),h);
+  ctx.strokeStyle='rgba(255,149,0,0.2)';ctx.lineWidth=1;ctx.strokeRect(x,y,w,h);
+  ctx.fillStyle='rgba(255,255,255,0.7)';
+  ctx.fillText(Math.round(pct*100)+'%',x+w+4,y+h-1);
 }
-function hidePause(){paused=false;document.getElementById('pause-overlay').classList.remove('active');}
-function resumeGame(){hidePause();}
-function pauseSave(){saveGame();setMsg('Hra uložena!',2000);}
-function pauseMenu(){hidePause();showMainMenu();}
-function pauseRestart(){hidePause();restartGame();}
-function openOverviewFromPause(){hidePause();openOverview();}
 
-// --- Overview map controls ---
-function ovZoom(dir){
-  let idx=OV_ZOOM_STEPS.indexOf(ovZoomLevel);
-  if(idx<0)idx=4;
-  idx=Math.max(0,Math.min(OV_ZOOM_STEPS.length-1,idx+dir));
-  ovZoomLevel=OV_ZOOM_STEPS[idx];
-  document.getElementById('ov-zoom-val').textContent=ovZoomLevel+'×';
-  drawOverviewMap();
+// ---- Minimapa ----
+let mmCanvas,mmCtx;
+function initMinimap(){
+  mmCanvas=document.getElementById('mm');mmCtx=mmCanvas.getContext('2d');
 }
-function openOverview(){
-  if(!gameRunning||!player)return;
-  ovPanX=0;ovPanY=0;
-  document.getElementById('overview-overlay').classList.add('active');
-  document.getElementById('ov-sector-display').textContent=`sektor ${Math.round(player.x/100)}, ${Math.round(player.y/100)}`;
-  drawOverviewMap();
-}
-function hideOverview(){document.getElementById('overview-overlay').classList.remove('active');}
-function isOverviewOpen(){return document.getElementById('overview-overlay').classList.contains('active');}
+function renderMinimap(player,chunks,navTarget,t){
+  if(!mmCanvas)return;
+  const S=mmCanvas.width,cx=S/2,cy=S/2,sc=S/(C.MINIMAP_R*2);
+  mmCtx.clearRect(0,0,S,S);
+  // Pozadí
+  mmCtx.fillStyle='rgba(0,4,14,0.88)';
+  mmCtx.beginPath();mmCtx.arc(cx,cy,S/2,0,Math.PI*2);mmCtx.fill();
+  // Border
+  mmCtx.strokeStyle='rgba(255,149,0,0.4)';mmCtx.lineWidth=1.5;
+  mmCtx.beginPath();mmCtx.arc(cx,cy,S/2-1,0,Math.PI*2);mmCtx.stroke();
+  // Clip na kruh
+  mmCtx.save();mmCtx.beginPath();mmCtx.arc(cx,cy,S/2-2,0,Math.PI*2);mmCtx.clip();
 
-// --- Trading panel ---
-function switchTab(tab){
-  currentTab=tab;
-  document.querySelectorAll('.ptab').forEach((t,i)=>t.classList.toggle('active',['trade','service','upgrades'][i]===tab));
-  document.getElementById('tab-trade').style.display=tab==='trade'?'block':'none';
-  document.getElementById('tab-service').style.display=tab==='service'?'block':'none';
-  document.getElementById('tab-upgrades').style.display=tab==='upgrades'?'block':'none';
-  if(tab==='service'&&dockedStation)updateServicePanel();
-  if(tab==='upgrades')updateUpgradePanel();
+  // Hvězdičky pozadí
+  mmCtx.fillStyle='rgba(200,210,255,0.4)';
+  for(let i=0;i<80;i++){
+    const hx=(Math.sin(i*137.5)*0.5+0.5)*S,hy=(Math.cos(i*97.3)*0.5+0.5)*S;
+    mmCtx.beginPath();mmCtx.arc(hx,hy,0.6,0,Math.PI*2);mmCtx.fill();
+  }
+
+  // Stanice
+  chunks.forEach(ch=>{
+    if(!ch.system?.station)return;
+    const st=ch.system.station;
+    const px=cx+(st.x-player.x)*sc,py=cy+(st.y-player.y)*sc;
+    if(Math.hypot(px-cx,py-cy)>S/2-4)return;
+    const pulse=0.6+Math.sin(t*3+ch.cx)*0.4;
+    mmCtx.save();
+    mmCtx.fillStyle=st.color;mmCtx.globalAlpha=0.5+pulse*0.3;
+    mmCtx.beginPath();
+    for(let i=0;i<6;i++){const a=i*Math.PI/3;mmCtx.lineTo(px+Math.cos(a)*4,py+Math.sin(a)*4);}
+    mmCtx.closePath();mmCtx.fill();mmCtx.globalAlpha=1;
+    mmCtx.restore();
+  });
+
+  // Nepřátelé
+  if(window.gameState?.enemies){
+    window.gameState.enemies.forEach(e=>{
+      const px=cx+(e.x-player.x)*sc,py=cy+(e.y-player.y)*sc;
+      if(Math.hypot(px-cx,py-cy)>S/2-4)return;
+      mmCtx.fillStyle='#ff3030';mmCtx.beginPath();mmCtx.arc(px,py,2.5,0,Math.PI*2);mmCtx.fill();
+    });
+  }
+
+  // Loot
+  if(window.gameState?.loots){
+    window.gameState.loots.forEach(l=>{
+      const px=cx+(l.x-player.x)*sc,py=cy+(l.y-player.y)*sc;
+      if(Math.hypot(px-cx,py-cy)>S/2-4)return;
+      mmCtx.fillStyle='#ffaa00';mmCtx.beginPath();mmCtx.arc(px,py,2,0,Math.PI*2);mmCtx.fill();
+    });
+  }
+
+  // Nav target
+  if(navTarget){
+    const px=cx+(navTarget.x-player.x)*sc,py=cy+(navTarget.y-player.y)*sc;
+    mmCtx.save();mmCtx.strokeStyle='#00ff88';mmCtx.lineWidth=1;mmCtx.setLineDash([3,4]);
+    mmCtx.beginPath();mmCtx.moveTo(cx,cy);
+    const edgePx=Math.hypot(px-cx,py-cy)<S/2-6?px:cx+Math.cos(Math.atan2(py-cy,px-cx))*(S/2-6);
+    const edgePy=Math.hypot(px-cx,py-cy)<S/2-6?py:cy+Math.sin(Math.atan2(py-cy,px-cx))*(S/2-6);
+    mmCtx.lineTo(edgePx,edgePy);mmCtx.stroke();mmCtx.setLineDash([]);mmCtx.restore();
+  }
+
+  // Hráč
+  mmCtx.save();mmCtx.translate(cx,cy);mmCtx.rotate(player.angle+Math.PI/2);
+  mmCtx.fillStyle='#ff9500';mmCtx.shadowColor='#ff9500';mmCtx.shadowBlur=6;
+  mmCtx.beginPath();mmCtx.moveTo(0,-6);mmCtx.lineTo(4,4);mmCtx.lineTo(-4,4);mmCtx.closePath();mmCtx.fill();
+  mmCtx.restore();
+
+  mmCtx.restore();
+  // Coordinates label
+  mmCtx.fillStyle='rgba(255,149,0,0.55)';mmCtx.font='8px "Courier New", monospace';mmCtx.textAlign='center';
+  mmCtx.fillText(`${Math.round(player.x/100)},${Math.round(player.y/100)}`,S/2,S-4);
 }
-function showPanel(st){
-  document.getElementById('panel').style.display='block';
-  document.getElementById('panel-title').textContent='⬡ '+st.name;
-  renderTradeTab(st);
-  if(currentTab==='service')updateServicePanel();
-  if(currentTab==='upgrades')updateUpgradePanel();
+
+// ---- Velká mapa ----
+let mapCanvas,mapCtx,mapZoom=1,mapPan={x:0,y:0},mapDragStart=null;
+function initMapCanvas(){
+  mapCanvas=document.getElementById('map-canvas');mapCtx=mapCanvas.getContext('2d');
+  mapCanvas.addEventListener('wheel',e=>{e.preventDefault();mapZoom=clamp(mapZoom*(e.deltaY<0?1.2:0.83),0.1,6);drawBigMap();},{passive:false});
+  mapCanvas.addEventListener('mousedown',e=>{mapDragStart={x:e.clientX-mapPan.x,y:e.clientY-mapPan.y};mapCanvas.style.cursor='grabbing';});
+  mapCanvas.addEventListener('mousemove',e=>{if(mapDragStart){mapPan.x=e.clientX-mapDragStart.x;mapPan.y=e.clientY-mapDragStart.y;drawBigMap();}});
+  mapCanvas.addEventListener('mouseup',()=>{mapDragStart=null;mapCanvas.style.cursor='grab';});
+  mapCanvas.addEventListener('mouseleave',()=>{mapDragStart=null;});
+  mapCanvas.addEventListener('click',e=>{handleMapClick(e);});
+  mapCanvas.style.cursor='grab';
 }
-function renderTradeTab(st){
-  const buyEl=document.getElementById('buy-list');buyEl.innerHTML='';
-  Object.entries(st.inv).forEach(([name,info])=>{
-    if(info.buyPrice!==null&&info.qty>0){
-      const g=GOODS.find(g=>g.name===name),cmax=getCargoMax(),canBuy=player.credits>=info.buyPrice&&player.cargoCount<cmax;
-      const row=document.createElement('div');row.className='trade-row';
-      row.innerHTML=`<span class="good-name" style="color:${g?g.color:'#bdf'}">${name}</span><span class="good-price">${info.buyPrice} cr</span><span class="good-stock">${info.qty}×</span>`;
-      const btn=document.createElement('button');btn.className='tbtn';btn.textContent='Koupit';btn.disabled=!canBuy;
-      btn.onclick=()=>{buyGood(st,name,info);renderTradeTab(st);};row.appendChild(btn);buyEl.appendChild(row);
+
+function drawBigMap(){
+  if(!mapCtx||!window.gameState)return;
+  const player=window.gameState.player;
+  const S=700,cx=S/2+mapPan.x,cy=S/2+mapPan.y;
+  const baseScale=S/8000*mapZoom;
+  mapCtx.clearRect(0,0,S,S);
+  mapCtx.fillStyle='#000408';mapCtx.fillRect(0,0,S,S);
+  // Grid
+  mapCtx.strokeStyle='rgba(255,149,0,0.06)';mapCtx.lineWidth=0.5;
+  for(let x=0;x<S;x+=40){mapCtx.beginPath();mapCtx.moveTo(x,0);mapCtx.lineTo(x,S);mapCtx.stroke();}
+  for(let y=0;y<S;y+=40){mapCtx.beginPath();mapCtx.moveTo(0,y);mapCtx.lineTo(S,y);mapCtx.stroke();}
+
+  function wp(wx,wy){return{x:cx+wx*baseScale,y:cy+wy*baseScale};}
+
+  // Mlhoviny
+  chunkCache.forEach(ch=>{
+    if(!ch.nebula)return;
+    const{x:px,y:py}=wp(ch.nebula.x-player.x,ch.nebula.y-player.y);
+    const pr=ch.nebula.r*baseScale;
+    const gr=mapCtx.createRadialGradient(px,py,0,px,py,pr);
+    gr.addColorStop(0,ch.nebula.col+'0.1)');gr.addColorStop(1,ch.nebula.col+'0)');
+    mapCtx.fillStyle=gr;mapCtx.beginPath();mapCtx.arc(px,py,pr,0,Math.PI*2);mapCtx.fill();
+  });
+
+  // Hvězdné systémy & stanice
+  chunkCache.forEach(ch=>{
+    if(!ch.system)return;
+    const sys=ch.system;
+    const{x:px,y:py}=wp(sys.sx-player.x,sys.sy-player.y);
+    // Hvězda
+    mapCtx.save();
+    const sr=Math.max(3,sys.r*baseScale*0.5);
+    const gr=mapCtx.createRadialGradient(px,py,0,px,py,sr*2.5);
+    gr.addColorStop(0,sys.glow+'0.6)');gr.addColorStop(1,sys.glow+'0)');
+    mapCtx.fillStyle=gr;mapCtx.beginPath();mapCtx.arc(px,py,sr*2.5,0,Math.PI*2);mapCtx.fill();
+    mapCtx.fillStyle=sys.color;mapCtx.beginPath();mapCtx.arc(px,py,sr,0,Math.PI*2);mapCtx.fill();
+    mapCtx.restore();
+    // Stanice
+    if(sys.station){
+      const st=sys.station;
+      const{x:spx,y:spy}=wp(st.x-player.x,st.y-player.y);
+      const isNav=window.gameState.navTarget===st;
+      mapCtx.save();
+      mapCtx.strokeStyle=isNav?'#00ff88':st.color;mapCtx.lineWidth=isNav?2:1;
+      mapCtx.fillStyle='rgba(0,4,14,0.9)';
+      const stR=5+st.tier*2;
+      mapCtx.beginPath();
+      for(let i=0;i<6;i++){const a=i*Math.PI/3;mapCtx.lineTo(spx+Math.cos(a)*stR,spy+Math.sin(a)*stR);}
+      mapCtx.closePath();mapCtx.fill();mapCtx.stroke();
+      mapCtx.fillStyle=isNav?'#00ff88':st.color;
+      mapCtx.font=`${9+st.tier}px "Courier New", monospace`;mapCtx.textAlign='center';
+      mapCtx.fillText(st.name,spx,spy-stR-5);
+      // Klikací oblast — data-attr pro klik
+      mapCtx.restore();
     }
   });
-  if(!buyEl.children.length)buyEl.innerHTML='<div style="color:#1a2030;font-size:11px;padding:6px 0">Nic k prodeji</div>';
-  const sellEl=document.getElementById('sell-list');sellEl.innerHTML='';
-  Object.entries(player.cargo).forEach(([name])=>{
-    const info=st.inv[name];if(!info||!info.sellPrice)return;
-    const g=GOODS.find(g=>g.name===name);
-    const row=document.createElement('div');row.className='trade-row';
-    row.innerHTML=`<span class="good-name" style="color:${g?g.color:'#bdf'}">${name}</span><span class="good-price">${info.sellPrice} cr</span><span class="good-stock">${player.cargo[name]}×</span>`;
-    const btn=document.createElement('button');btn.className='tbtn sbtn';btn.textContent='Prodat';
-    btn.onclick=()=>{sellGood(st,name,info);renderTradeTab(st);};row.appendChild(btn);sellEl.appendChild(row);
-  });
-  Object.entries(st.inv).forEach(([name,info])=>{
-    if(info.sellPrice&&!player.cargo[name]){
-      const g=GOODS.find(g=>g.name===name);
-      const row=document.createElement('div');row.className='trade-row';
-      row.innerHTML=`<span class="good-name" style="color:#1a2030">${name}</span><span class="good-price" style="color:#1a2838">${info.sellPrice} cr</span><span class="good-stock" style="color:#1a2030">hledají</span>`;
-      sellEl.appendChild(row);
+
+  // Hráč
+  const{x:ppx,y:ppy}=wp(0,0);
+  mapCtx.save();
+  mapCtx.translate(ppx,ppy);mapCtx.rotate(player.angle+Math.PI/2);
+  mapCtx.fillStyle='#ff9500';mapCtx.shadowColor='#ff9500';mapCtx.shadowBlur=12;
+  mapCtx.beginPath();mapCtx.moveTo(0,-8);mapCtx.lineTo(5,6);mapCtx.lineTo(-5,6);mapCtx.closePath();mapCtx.fill();
+  mapCtx.restore();
+  // Hráčův dosah
+  mapCtx.strokeStyle='rgba(255,149,0,0.15)';mapCtx.lineWidth=1;mapCtx.setLineDash([3,6]);
+  mapCtx.beginPath();mapCtx.arc(ppx,ppy,C.MINIMAP_R*baseScale,0,Math.PI*2);mapCtx.stroke();mapCtx.setLineDash([]);
+
+  // Nav linka
+  if(window.gameState.navTarget){
+    const nt=window.gameState.navTarget;
+    const{x:nx,y:ny}=wp(nt.x-player.x,nt.y-player.y);
+    mapCtx.save();
+    mapCtx.strokeStyle='rgba(0,255,136,0.4)';mapCtx.lineWidth=1.5;mapCtx.setLineDash([6,8]);
+    mapCtx.beginPath();mapCtx.moveTo(ppx,ppy);mapCtx.lineTo(nx,ny);mapCtx.stroke();mapCtx.setLineDash([]);
+    mapCtx.restore();
+  }
+
+  // SOL ukazatel (vždy viditelný i bez navštíveného chunku)
+  {
+    const sc2=C.SOLAR_CHUNK;
+    const solWX=sc2.cx*C.CHUNK+C.CHUNK*0.5,solWY=sc2.cy*C.CHUNK+C.CHUNK*0.5;
+    const{x:spx,y:spy}=wp(solWX-player.x,solWY-player.y);
+    if(spx>0&&spx<S&&spy>0&&spy<S){
+      mapCtx.save();
+      const sg=mapCtx.createRadialGradient(spx,spy,0,spx,spy,22);
+      sg.addColorStop(0,'rgba(255,230,80,0.4)');sg.addColorStop(1,'rgba(255,230,80,0)');
+      mapCtx.fillStyle=sg;mapCtx.beginPath();mapCtx.arc(spx,spy,22,0,Math.PI*2);mapCtx.fill();
+      mapCtx.fillStyle='#fff8c0';mapCtx.beginPath();mapCtx.arc(spx,spy,6,0,Math.PI*2);mapCtx.fill();
+      mapCtx.font='bold 10px "Courier New", monospace';mapCtx.textAlign='center';
+      mapCtx.fillStyle='#ffee88';mapCtx.fillText('SOL ☀',spx,spy-12);
+      mapCtx.restore();
+    } else {
+      // Šipka na okraj
+      const ang=Math.atan2(solWY-player.y,solWX-player.x);
+      const margin=24;
+      const ex=clamp(S/2+Math.cos(ang)*500,margin,S-margin);
+      const ey=clamp(S/2+Math.sin(ang)*500,margin,S-margin);
+      mapCtx.save();
+      mapCtx.translate(ex,ey);mapCtx.rotate(ang);
+      mapCtx.fillStyle='#ffee88';mapCtx.globalAlpha=0.7;
+      mapCtx.beginPath();mapCtx.moveTo(10,0);mapCtx.lineTo(-6,-5);mapCtx.lineTo(-6,5);mapCtx.closePath();mapCtx.fill();
+      mapCtx.restore();
+      mapCtx.fillStyle='#ffee88';mapCtx.font='8px "Courier New", monospace';mapCtx.textAlign='center';
+      mapCtx.fillText('SOL',ex,ey-10);
     }
+  }
+
+  // Zoom label
+  mapCtx.fillStyle='rgba(255,149,0,0.5)';mapCtx.font='9px "Courier New", monospace';mapCtx.textAlign='left';
+  mapCtx.fillText(`ZOOM: ${mapZoom.toFixed(1)}×  |  ${Math.round(player.x/100)}, ${Math.round(player.y/100)} AU`,8,S-8);
+  // Legenda
+  mapCtx.textAlign='right';
+  mapCtx.fillText('● Hvězda  ◆ Stanice  ☀ Sol  [KLIK] = Nastavit navigaci',S-8,S-8);
+}
+
+function handleMapClick(e){
+  if(!window.gameState)return;
+  const player=window.gameState.player;
+  const rect=mapCanvas.getBoundingClientRect();
+  const mx=e.clientX-rect.left,my=e.clientY-rect.top;
+  const S=700,baseScale=S/8000*mapZoom;
+  const cx=S/2+mapPan.x,cy=S/2+mapPan.y;
+  let closest=null,closestD=30;
+  chunkCache.forEach(ch=>{
+    if(!ch.system?.station)return;
+    const st=ch.system.station;
+    const px=cx+(st.x-player.x)*baseScale,py=cy+(st.y-player.y)*baseScale;
+    const d=Math.hypot(mx-px,my-py);
+    if(d<closestD){closestD=d;closest=st;}
   });
-  if(!sellEl.children.length)sellEl.innerHTML='<div style="color:#1a2030;font-size:11px;padding:6px 0">Nic nekupují</div>';
+  // Kliknutí na SOL (fake station jako nav target)
+  if(!closest){
+    const sc2=C.SOLAR_CHUNK;
+    const solWX=sc2.cx*C.CHUNK+C.CHUNK*0.5,solWY=sc2.cy*C.CHUNK+C.CHUNK*0.5;
+    const px2=cx+(solWX-player.x)*baseScale,py2=cy+(solWY-player.y)*baseScale;
+    if(Math.hypot(mx-px2,my-py2)<30){
+      closest={x:solWX,y:solWY,name:'Sluneční soustava'};
+    }
+  }
+  if(closest){
+    window.gameState.navTarget=closest;
+    setMsg(`NAVIGACE: ${closest.name}  (${(dist2(player,closest)/1000).toFixed(1)} AU)`,4000);
+    drawBigMap();
+  }
 }
-function updateServicePanel(){
-  const fm=100-player.fuel,fc=Math.ceil(fm*FUEL_COST_PER_PCT);
-  document.getElementById('svc-fuel-bar').style.width=player.fuel+'%';
-  document.getElementById('svc-fuel-val').textContent=Math.round(player.fuel)+'%';
-  document.getElementById('svc-fuel-cost').textContent=fm<1?'Plná nádrž':`Cena: ${fc} cr`;
-  const fb=document.getElementById('svc-fuel-btn');fb.disabled=fm<1||player.credits<fc;fb.textContent=fm<1?'Plná nádrž':'Doplnit palivo';
-  const hm=player.hullMax-player.hull,hc=Math.ceil(hm*HULL_COST_PER_PCT);
-  document.getElementById('svc-hull-bar').style.width=(player.hull/player.hullMax*100)+'%';
-  document.getElementById('svc-hull-val').textContent=Math.round(player.hull)+'/'+player.hullMax;
-  document.getElementById('svc-hull-cost').textContent=hm<1?'Trup OK':`Cena: ${hc} cr`;
-  const hb=document.getElementById('svc-hull-btn');hb.disabled=hm<1||player.credits<hc;hb.textContent=hm<1?'Opraveno':'Opravit trup';
-  const sm=getShieldMax(),smiss=sm-player.shield,sc=Math.ceil(smiss*SHIELD_COST_PER_PCT);
-  document.getElementById('svc-shield-bar').style.width=(player.shield/sm*100)+'%';
-  document.getElementById('svc-shield-val').textContent=Math.round(player.shield)+'/'+sm;
-  document.getElementById('svc-shield-cost').textContent=smiss<1?'Štít nabit':`Cena: ${sc} cr`;
-  const sb=document.getElementById('svc-shield-btn');sb.disabled=smiss<1||player.credits<sc;sb.textContent=smiss<1?'Nabit':'Dobít štít';
+
+// ---- Tab switching ----
+function switchDockTab(tab){
+  document.querySelectorAll('.dtab').forEach(btn=>{
+    const map={services:'SERVIS',trade:'OBCHOD',upgrades:'UPGRADY'};
+    btn.classList.toggle('active',btn.textContent.trim()===map[tab]);
+  });
+  ['services','trade','upgrades'].forEach(id=>{
+    const el=document.getElementById('dtab-'+id);
+    if(!el)return;
+    if(id==='trade') el.style.display=id===tab?'flex':'none';
+    else el.style.display=id===tab?'block':'none';
+  });
+  if(tab==='trade'&&window.gameState?.dockStation)
+    renderTradePanel(window.gameState.player,window.gameState.dockStation);
 }
-function updateUpgradePanel(){
+
+// ---- Dokovací panel ----
+function renderDockPanel(player,station){
+  const el=document.getElementById('dock-panel');if(!el)return;
+  el.style.display='flex';
+  // Reset na services tab
+  switchDockTab('services');
+  document.getElementById('dock-name').textContent=station.name;
+  document.getElementById('dock-tier').textContent='◆'.repeat(station.tier)+'◇'.repeat(3-station.tier);
+  // Services
+  const fm=player.fuelMax-player.fuel,fc=Math.ceil(fm*C.FUEL_PRICE);
+  document.getElementById('fuel-cost').textContent=fm<1?'Plná nádrž':`${fc} Cr`;
+  document.getElementById('fuel-btn').disabled=fm<1||player.credits<fc;
+  document.getElementById('fuel-btn').onclick=()=>{
+    if(player.credits>=fc&&fm>=1){player.credits-=fc;player.fuel=player.fuelMax;renderDockPanel(player,station);setMsg('Palivo doplněno!',2000);}
+  };
+  const hm=player.hullMax-player.hull,hc=Math.ceil(hm*C.HULL_PRICE);
+  document.getElementById('hull-cost').textContent=hm<1?'Trup OK':`${hc} Cr`;
+  document.getElementById('hull-btn').disabled=hm<1||player.credits<hc;
+  document.getElementById('hull-btn').onclick=()=>{
+    if(player.credits>=hc&&hm>=1){player.credits-=hc;player.hull=player.hullMax;renderDockPanel(player,station);setMsg('Trup opraven!',2000);}
+  };
+  const sm=player.shieldMax-player.shield,sc2=Math.ceil(sm*C.SHIELD_PRICE);
+  document.getElementById('shield-cost').textContent=sm<1?'Nabit':`${sc2} Cr`;
+  document.getElementById('shield-btn').disabled=sm<1||player.credits<sc2;
+  document.getElementById('shield-btn').onclick=()=>{
+    if(player.credits>=sc2&&sm>=1){player.credits-=sc2;player.shield=player.shieldMax;renderDockPanel(player,station);setMsg('Štít nabit!',2000);}
+  };
+  // Upgrades
   const ul=document.getElementById('upgrade-list');ul.innerHTML='';
   UPGRADES.forEach(upg=>{
-    const lvl=player.upgrades[upg.id]||0,maxed=lvl>=upg.maxLvl;
-    const cost=Math.ceil(upg.baseCost*Math.pow(1.6,lvl));
+    const lvl=player.upgrades[upg.id]||0,maxed=lvl>=upg.max;
+    const cost=Math.ceil(upg.cost*Math.pow(1.7,lvl));
     const row=document.createElement('div');row.className='upgrade-row';
-    const pips=Array.from({length:upg.maxLvl},(_,i)=>`<div class="upgrade-pip${i<lvl?' filled':''}"></div>`).join('');
-    row.innerHTML=`<div style="flex:1"><div class="upgrade-name">${upg.name}</div><div style="color:#1a2838;font-size:10px;margin-top:2px">${upg.effect}</div><div class="upgrade-level" style="margin-top:4px">${pips}</div></div><div class="upgrade-cost">${maxed?'MAX':cost+' cr'}</div>`;
-    if(!maxed){
-      const btn=document.createElement('button');btn.className='tbtn';btn.style.marginLeft='8px';btn.textContent='↑';btn.disabled=player.credits<cost;
-      btn.onclick=()=>{if(player.credits>=cost){player.credits-=cost;player.upgrades[upg.id]++;playSfxBuy();updateHUD();updateUpgradePanel();}};
-      row.appendChild(btn);
-    }
+    const pips=Array.from({length:upg.max},(_,i)=>`<span class="pip${i<lvl?' on':''}"></span>`).join('');
+    row.innerHTML=`<span class="uname">${upg.name}</span><span class="udesc">${upg.desc}</span><div class="upips">${pips}</div><span class="ucost">${maxed?'MAX':cost+' Cr'}</span>`;
+    if(!maxed){const btn=document.createElement('button');btn.className='ubtn';btn.textContent='↑';btn.disabled=player.credits<cost;
+      btn.onclick=()=>{if(player.credits>=cost){player.credits-=cost;player.upgrades[upg.id]=lvl+1;applyUpgrades(player);renderDockPanel(player,station);setMsg(`${upg.name} vylepšen!`,2000);}};
+      row.appendChild(btn);}
     ul.appendChild(row);
   });
+  // Trade
+  renderTradePanel(player,station);
 }
 
-// --- Services ---
-function serviceFuel(){const m=100-player.fuel,c=Math.ceil(m*FUEL_COST_PER_PCT);if(player.credits<c||m<1)return;player.credits-=c;player.fuel=100;updateHUD();updateServicePanel();setMsg(`Palivo doplněno! (-${c} cr)`,2000);playSfxBuy();}
-function serviceHull(){const m=player.hullMax-player.hull,c=Math.ceil(m*HULL_COST_PER_PCT);if(player.credits<c||m<1)return;player.credits-=c;player.hull=player.hullMax;updateHUD();updateServicePanel();setMsg(`Trup opraven! (-${c} cr)`,2000);playSfxBuy();}
-function serviceShield(){const sm=getShieldMax(),m=sm-player.shield,c=Math.ceil(m*SHIELD_COST_PER_PCT);if(player.credits<c||m<1)return;player.credits-=c;player.shield=sm;updateHUD();updateServicePanel();setMsg(`Štít nabit! (-${c} cr)`,2000);playSfxBuy();}
-function buyGood(st,name,info){const cmax=getCargoMax();if(player.credits<info.buyPrice||player.cargoCount>=cmax||info.qty<=0)return;player.credits-=info.buyPrice;info.qty--;player.cargo[name]=(player.cargo[name]||0)+1;player.cargoCount++;playSfxBuy();addXP(2);updateHUD();}
-function sellGood(st,name,info){if(!player.cargo[name])return;const profit=info.sellPrice;player.credits+=profit;totalEarned+=profit;player.cargo[name]--;if(!player.cargo[name])delete player.cargo[name];player.cargoCount--;playSfxBuy();addXP(Math.ceil(profit/5));updateHUD();}
-
-// --- HUD ---
-let _hudPrev={hull:-1,shield:-1,fuel:-1,credits:-1,cargoCount:-1,xp:-1,level:-1};
-function updateHUD(){
-  if(!player)return;
-  const hullPct=player.hull/player.hullMax*100;
-  const shieldPct=player.shield/getShieldMax()*100;
-  document.getElementById('hull-fill').style.width=hullPct+'%';
-  document.getElementById('shield-fill').style.width=shieldPct+'%';
-  document.getElementById('fuel-fill').style.width=player.fuel+'%';
-  document.getElementById('hull-val').textContent=Math.round(player.hull);
-  document.getElementById('shield-val').textContent=Math.round(player.shield);
-  document.getElementById('fuel-val').textContent=Math.round(player.fuel);
-  if(hullPct>60)document.getElementById('hull-fill').style.background='linear-gradient(90deg,#c43020,#f06030)';
-  else if(hullPct>30)document.getElementById('hull-fill').style.background='linear-gradient(90deg,#c07010,#e0a020)';
-  else document.getElementById('hull-fill').style.background='linear-gradient(90deg,#c01010,#f03020)';
-  if(player.fuel<20)document.getElementById('fuel-fill').style.background='linear-gradient(90deg,#8a4000,#e08000)';
-  else document.getElementById('fuel-fill').style.background='linear-gradient(90deg,#0a8a8a,#20d0d0)';
-  const sx=Math.round(player.x/100),sy=Math.round(player.y/100);
-  document.getElementById('pos').textContent=`${sx}, ${sy}`;
-  document.getElementById('minimap-coords').textContent=`${sx},${sy}`;
-  document.getElementById('spd').textContent=(Math.hypot(player.vx,player.vy)*10).toFixed(0);
-  document.getElementById('credits-big').textContent=player.credits.toLocaleString('cs');
-  document.getElementById('credits-earned').textContent='vydělano: '+totalEarned.toLocaleString('cs')+' cr';
-  const cmax=getCargoMax();
-  document.getElementById('cargo-title').textContent=`NÁKLAD (${player.cargoCount}/${cmax})`;
-  document.getElementById('cargo-bar-fill').style.width=(player.cargoCount/cmax*100)+'%';
-  if(player.cargoCount/cmax>0.85)document.getElementById('cargo-bar-fill').style.background='linear-gradient(90deg,#6a2000,#e04010)';
-  else document.getElementById('cargo-bar-fill').style.background='linear-gradient(90deg,#1a5a30,#30c060)';
-  const cl=document.getElementById('cargo-list');
-  cl.innerHTML=Object.entries(player.cargo).map(([n,q])=>{
-    const g=GOODS.find(g=>g.name===n);return `<span style="color:${g?g.color:'#adf'}">${n} ×${q}</span><br>`;
-  }).join('');
-  const xpNeeded=getXpForLevel(player.level),xpPct=Math.min(100,player.xp/xpNeeded*100);
-  document.getElementById('xp-level').textContent=player.level;
-  document.getElementById('xp-bar-fill').style.width=xpPct+'%';
-  document.getElementById('xp-next').textContent=`${player.xp} / ${xpNeeded} XP`;
-}
-
-function updatePlanetNav(){
-  const el=document.getElementById('planet-nav');
-  if(!el)return;
-  el.style.display=showPlanetNav?'block':'none';
-  if(!showPlanetNav||!player)return;
-  const DIRS=['→','↗','↑','↖','←','↙','↓','↘'];
-  let html='';
-  SOLAR_SYSTEM.forEach(p=>{
-    const pos=getPlanetPos(p,solarTime);
-    const d=Math.hypot(player.x-pos.x,player.y-pos.y),sl=(d/1000).toFixed(1);
-    const worldAngle=Math.atan2(pos.y-player.y,pos.x-player.x);
-    const relAngle=((worldAngle-player.angle+Math.PI*2.5)%(Math.PI*2));
-    const dirIdx=Math.round(relAngle/(Math.PI/4))%8;
-    const nearest=d<3000;
-    html+=`<div class="pnav-row${nearest?' nearest':''}">
-      <span class="pnav-dot" style="background:${p.innerColor}"></span>
-      <span class="pnav-name">${p.name}</span>
-      <span class="pnav-arrow">${DIRS[dirIdx]}</span>
-      <span class="pnav-dist">${sl} sl</span>
-    </div>`;
+function renderTradePanel(player,station){
+  const inv=station.inv;
+  const bl=document.getElementById('buy-list');bl.innerHTML='';
+  const sl=document.getElementById('sell-list');sl.innerHTML='';
+  Object.entries(inv).forEach(([name,info])=>{
+    if(info.buy&&info.qty>0){
+      const cmax=getCargoMax(player);
+      const row=document.createElement('div');row.className='trade-row';
+      row.innerHTML=`<span class="tname">${name}</span><span class="tprice">${info.buy} Cr</span><span class="tqty">${info.qty}×</span>`;
+      const btn=document.createElement('button');btn.className='tbtn';btn.textContent='Koupit';
+      btn.disabled=player.credits<info.buy||player.cargoCount>=cmax;
+      btn.onclick=()=>{if(player.credits>=info.buy&&player.cargoCount<cmax){player.credits-=info.buy;info.qty--;player.cargo[name]=(player.cargo[name]||0)+1;player.cargoCount++;renderTradePanel(player,station);setMsg(`Zakoupeno: ${name}`,1500);}};
+      row.appendChild(btn);bl.appendChild(row);
+    }
+    if(info.sell){
+      const qty=player.cargo[name]||0;if(!qty)return;
+      const row=document.createElement('div');row.className='trade-row';
+      row.innerHTML=`<span class="tname">${name}</span><span class="tprice sell">${info.sell} Cr</span><span class="tqty">${qty}×</span>`;
+      const btn=document.createElement('button');btn.className='tbtn sbtn';btn.textContent='Prodat';
+      btn.onclick=()=>{player.credits+=info.sell;player.cargo[name]--;if(!player.cargo[name])delete player.cargo[name];player.cargoCount--;renderTradePanel(player,station);setMsg(`Prodáno: ${name} za ${info.sell} Cr`,1500);};
+      row.appendChild(btn);sl.appendChild(row);
+    }
   });
-  document.getElementById('planet-nav-list').innerHTML=html;
+  if(!bl.children.length)bl.innerHTML='<div class="empty">Nic k prodeji</div>';
+  if(!sl.children.length)sl.innerHTML='<div class="empty">Nic k prodeji ve skladu</div>';
 }
 
-function updateStationArrow(chunks){
-  const el=document.getElementById('station-arrow');
-  let bestSt=null,bestD=Infinity;
-  chunks.forEach(ch=>{if(ch.station){const d=dist2(player,ch.station);if(d<bestD){bestD=d;bestSt=ch.station;}}});
-  if(!bestSt||bestD<180){el.style.opacity='0';return;}
-  const angle=Math.atan2(bestSt.y-player.y,bestSt.x-player.x);
-  const margin=40,cx=W/2,cy=H/2,halfW=W/2-margin,halfH=H/2-margin;
-  const tx=Math.cos(angle),ty=Math.sin(angle);let ex,ey;
-  if(Math.abs(ty/tx)<halfH/halfW){ex=Math.sign(tx)*halfW;ey=ty/tx*halfW;}else{ey=Math.sign(ty)*halfH;ex=tx/ty*halfH;}
-  el.style.opacity='0.85';el.style.left=(cx+ex-20)+'px';el.style.top=(cy+ey-12)+'px';
-  document.getElementById('station-arrow-icon').style.transform=`rotate(${angle*(180/Math.PI)+90}deg)`;
-  document.getElementById('station-arrow-dist').textContent=Math.round(bestD/100)+' AU';
+function applyUpgrades(p){
+  p.fuelMax=C.FUEL_MAX*(1+0.25*(p.upgrades.fuel||0));
+  p.shieldMax=100+30*(p.upgrades.shield||0);
+  p.hullMax=100+25*(p.upgrades.hull||0);
 }
-
-// --- Messages ---
-function setMsg(txt,ms=3000){
-  const el=document.getElementById('msg');el.textContent=txt;el.style.opacity='1';msgTimer=ms;
-}
-function showEventNotif(txt){
-  const el=document.getElementById('event-notif');el.textContent=txt;el.style.opacity='1';eventNotifTimer=4000;
-}
-function addKill(txt){
-  const el=document.createElement('div');el.className='kf-entry';el.textContent=txt;
-  document.getElementById('killfeed').appendChild(el);
-  setTimeout(()=>{el.style.opacity='0';setTimeout(()=>el.remove(),1000);},2500);
-}
-function showXpPopup(txt){
-  const el=document.getElementById('xp-popup');
-  el.textContent=txt;el.style.opacity='1';el.style.transition='none';el.style.transform='translate(-50%,-50%) scale(1)';
-  setTimeout(()=>{el.style.transition='opacity 1.2s ease, transform 1.2s ease';el.style.opacity='0';el.style.transform='translate(-50%,-120%) scale(1.3)';},800);
-}
-function showSaveNotif(){const el=document.getElementById('save-notif');el.style.opacity='1';setTimeout(()=>el.style.opacity='0',2000);}
-function showDeath(){
-  const d=document.getElementById('death');d.style.display='flex';
-  document.getElementById('death-score').textContent=`Celkově vydělali: ${totalEarned.toLocaleString('cs')} cr · Level: ${player.level}`;
-}
+function getCargoMax(p){return 10+5*(p.upgrades.cargo||0);}
