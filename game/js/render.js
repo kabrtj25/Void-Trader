@@ -229,9 +229,9 @@ function renderSystems(chunks,t){
       const{x:px,y:py}=toScreen(pos.x,pos.y);
       const maxOrb=p.moons.reduce((m,mn)=>Math.max(m,mn.orbit),0);
       if(!inView(px,py,maxOrb+60))return;
-      // Oběžné dráhy měsíců
+      // Oběžné dráhy měsíců (pohybují se s planetou)
       ctx.save();
-      ctx.strokeStyle='rgba(140,150,200,0.07)';ctx.lineWidth=0.5;ctx.setLineDash([2,6]);
+      ctx.strokeStyle='rgba(160,170,220,0.18)';ctx.lineWidth=0.6;ctx.setLineDash([3,7]);
       p.moons.forEach(mn=>{ctx.beginPath();ctx.arc(px,py,mn.orbit,0,Math.PI*2);ctx.stroke();});
       ctx.setLineDash([]);ctx.restore();
       // Tělesa měsíců
@@ -447,6 +447,69 @@ function renderStation(st,t,nearDock,dockable){
   ctx.restore();
 }
 
+// ---- Cinematická sekvence přistávání ----
+function renderDockingSequence(gs,t){
+  const anim=gs.dockAnim;
+  if(!anim)return;
+  const prog=anim.progress,p=gs.player,st=anim.station;
+  // Zoom kvadratický — pomalu začíná, rychle zrychluje ke konci
+  const zoom=1+prog*prog*3;
+
+  // Svět + loď se zoomem — kamera je na stanici (nastaveno v updateDocking)
+  ctx.save();
+  ctx.translate(W/2,H/2);ctx.scale(zoom,zoom);ctx.translate(-W/2,-H/2);
+  renderBackground(gs.chunks,t);
+  renderSystems(gs.chunks,t);
+  gs.chunks.forEach(ch=>ch.asteroids.forEach(a=>renderAsteroid(a,t)));
+  renderParticles([...engineTrails,...gs.particles]);
+  renderStation(st,t,true,false);
+  // Loď na skutečné pozici — viditelná jak letí do dokovacího portu
+  const{x:shipSX,y:shipSY}=toScreen(p.x,p.y);
+  renderPlayerShip(p,t,shipSX,shipSY);
+  ctx.restore();
+
+  renderVignette();
+
+  // Letterbox — filmové pruhy
+  const lbH=H*0.105;
+  ctx.fillStyle='#000000';
+  ctx.fillRect(0,0,W,lbH);
+  ctx.fillRect(0,H-lbH,W,lbH);
+  ctx.save();
+  let gr=ctx.createLinearGradient(0,lbH,0,lbH+55);
+  gr.addColorStop(0,'rgba(0,0,0,0.55)');gr.addColorStop(1,'transparent');
+  ctx.fillStyle=gr;ctx.fillRect(0,lbH,W,55);
+  gr=ctx.createLinearGradient(0,H-lbH-55,0,H-lbH);
+  gr.addColorStop(0,'transparent');gr.addColorStop(1,'rgba(0,0,0,0.55)');
+  ctx.fillStyle=gr;ctx.fillRect(0,H-lbH-55,W,55);
+  ctx.restore();
+
+  // HUD overlay
+  const phase=prog<0.35?'PŘIBLIŽOVÁNÍ':prog<0.72?'PŘISTÁVÁNÍ':'DOKOVÁNÍ';
+  ctx.save();ctx.textAlign='center';
+  // Název stanice — nahoře v letterboxu
+  ctx.font='11px "Courier New",monospace';
+  ctx.fillStyle='rgba(255,150,40,0.65)';
+  ctx.fillText(anim.station.name,W/2,lbH*0.55);
+  // Fáze — dole
+  ctx.font='bold 15px "Courier New",monospace';
+  ctx.fillStyle='#ff9500';ctx.shadowColor='#ff9500';ctx.shadowBlur=12;
+  ctx.fillText(phase,W/2,H-lbH*0.62);ctx.shadowBlur=0;
+  // Progress bar
+  const bw=180,bh=3,by=H-lbH*0.26;
+  ctx.fillStyle='rgba(255,150,40,0.16)';ctx.fillRect(W/2-90,by,bw,bh);
+  ctx.fillStyle='#ff9500';ctx.shadowColor='#ff9500';ctx.shadowBlur=6;
+  ctx.fillRect(W/2-90,by,bw*prog,bh);ctx.shadowBlur=0;
+  ctx.restore();
+
+  // Bílý záblesk při přistání
+  if(prog>0.85){
+    const fa=Math.pow((prog-0.85)/0.15,1.5);
+    ctx.globalAlpha=fa;ctx.fillStyle='#ffffff';
+    ctx.fillRect(0,0,W,H);ctx.globalAlpha=1;
+  }
+}
+
 // ---- Asteroidy ----
 function renderAsteroid(a,t){
   const{x:sx,y:sy}=toScreen(a.x,a.y);
@@ -492,8 +555,9 @@ function renderEnemy(e,t){
 }
 
 // ---- Loď hráče ----
-function renderPlayerShip(player,t){
-  const sx=W/2,sy=H/2;
+function renderPlayerShip(player,t,sx,sy){
+  if(sx===undefined)sx=W/2;
+  if(sy===undefined)sy=H/2;
   ctx.save();
   ctx.translate(sx,sy);ctx.rotate(player.angle+Math.PI/2);
   // Motor flame

@@ -170,8 +170,65 @@ function tryDock(){
   if(!gameState)return;
   const gs=gameState;
   if(gs.dockingState.dockable&&gs.nearStation){
-    startDocking(gs.nearStation);
+    initDockingSequence(gs.nearStation);
   }
+}
+
+function initDockingSequence(station){
+  const gs=gameState,p=gs.player;
+  // Zmrazit pozici portu — loď poletí přesně do otvoru
+  const portX=station.x+station.r*0.88*Math.cos(station.angle);
+  const portY=station.y+station.r*0.88*Math.sin(station.angle);
+  gs.dockAnim={station,timer:0,duration:3.8,progress:0,
+    startX:p.x,startY:p.y,portX,portY,
+    savedRotSpeed:station.rotSpeed};
+  station.rotSpeed=0.00012; // téměř zastavit rotaci
+  state='docking';
+  document.getElementById('hud').style.display='none';
+  setMsg('');
+}
+
+function completeDocking(station){
+  const anim=gameState.dockAnim;
+  if(anim)station.rotSpeed=anim.savedRotSpeed;
+  gameState.dockAnim=null;
+  startDocking(station);
+}
+
+function updateDocking(dt){
+  const gs=gameState;
+  if(!gs.dockAnim)return;
+  const anim=gs.dockAnim,p=gs.player,st=anim.station;
+  anim.timer+=dt;
+  anim.progress=Math.min(1,anim.timer/anim.duration);
+  const prog=anim.progress;
+  // Let k dokovacímu portu (zmrazená pozice)
+  const ease=Math.pow(Math.min(1,prog*1.08),0.6);
+  p.x=anim.startX+(anim.portX-anim.startX)*ease;
+  p.y=anim.startY+(anim.portY-anim.startY)*ease;
+  p.angle=Math.atan2(anim.portY-anim.startY,anim.portX-anim.startX);
+  p.thrusting=prog<0.8;p.boosting=false;
+  // Rotace stanice (téměř zastavena)
+  st.angle+=st.rotSpeed*dt;
+  // Engine trail
+  if(prog<0.8){
+    for(let i=0;i<3;i++){
+      const spread=(Math.random()-.5)*0.25,ba=p.angle+Math.PI+spread,spd=rnd(0.8,2.2);
+      engineTrails.push({
+        x:p.x+Math.cos(p.angle+Math.PI)*16+rnd(-3,3),
+        y:p.y+Math.sin(p.angle+Math.PI)*16+rnd(-3,3),
+        vx:Math.cos(ba)*spd,vy:Math.sin(ba)*spd,
+        life:rnd(0.1,0.32),maxLife:0.32,r:rnd(1.5,2.8),color:'#ff7700',glow:true
+      });
+    }
+  }
+  engineTrails.forEach(tr=>{tr.x+=tr.vx;tr.y+=tr.vy;tr.life-=dt;tr.vx*=0.92;tr.vy*=0.92;});
+  engineTrails=engineTrails.filter(tr=>tr.life>0);
+  camX=st.x-W/2;camY=st.y-H/2; // kamera na stanici, loď je vidět jak letí do portu
+  gs.chunks=getVisibleChunks(p.x,p.y);
+  if(!gs.chunks.find(ch=>ch.cx===C.SOLAR_CHUNK.cx&&ch.cy===C.SOLAR_CHUNK.cy))
+    gs.chunks.push(getChunk(C.SOLAR_CHUNK.cx,C.SOLAR_CHUNK.cy));
+  if(anim.progress>=1)completeDocking(st);
 }
 
 function startDocking(station){
@@ -514,7 +571,8 @@ function loop(ts){
   frameCount++;
 
   if(state==='menu')return;
-  if(state!=='paused')update(dt);
+  if(state==='docking')updateDocking(dt);
+  else if(state!=='paused')update(dt);
   render(dt,ts/1000);
 }
 
@@ -522,6 +580,13 @@ function render(dt,t){
   if(!gameState)return;
   const gs=gameState;
   const p=gs.player;
+
+  // Cinematická sekvence přistávání
+  if(state==='docking'){
+    ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.setLineDash([]);ctx.shadowBlur=0;
+    renderDockingSequence(gs,t);
+    return;
+  }
 
   // Absolutní reset canvas
   ctx.setTransform(1,0,0,1,0,0);
