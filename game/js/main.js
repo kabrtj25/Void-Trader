@@ -59,6 +59,7 @@ function startGame(fromSave=false){
   document.getElementById('hud').style.display='block';
   window.currentGalaxy='sol';
   window.warpTarget=null;
+  window._warpArrival=0;
   warpPhase=null;warpTimer=0;warpElapsed=0;
 
   const save=fromSave?loadSave():null;
@@ -337,25 +338,28 @@ function beginWarp(){
   const p=gameState.player;
   const g=window.warpTarget;
   p.fuel=Math.max(0,p.fuel-(g.fuelCost/100)*p.fuelMax);
-  p.vx=0;p.vy=0;
-  warpPhase='warping';
+  // Loď NELÉTÁ zpět — pokračuje s aktuální rychlostí
+  warpPhase='boosting';
   warpElapsed=0;
   document.getElementById('warp-overlay').style.display='none';
+  setMsg('TERMOJETOVÉ MOTORY NASTARTOVÁNY — drž [W] pro warp!',6000);
 }
 function completeWarp(){
   const g=window.warpTarget;
+  const p=gameState.player;
+  // Záblesk při příjezdu
+  window._warpArrival=0.9;
+  // Prudké zpomalení
+  p.vx*=0.03;p.vy*=0.03;
   window.currentGalaxy=g.id;
   window.warpTarget=null;
   warpPhase=null;warpElapsed=0;
   chunkCache.clear();
-  const p=gameState.player;
-  p.x=g.id==='sol'?-2034:7500;
-  p.y=g.id==='sol'?7542:7500;
-  p.vx=0;p.vy=0;p.angle=-Math.PI/2;
+  // Sol: přistání u Země; ostatní: zůstaň na aktuální pozici (nový svět se vygeneruje kolem)
+  if(g.id==='sol'){p.x=-2034;p.y=7542;p.vx=0;p.vy=0;p.angle=-Math.PI/2;getChunk(C.SOLAR_CHUNK.cx,C.SOLAR_CHUNK.cy);}
+  getChunk(Math.floor(p.x/C.CHUNK),Math.floor(p.y/C.CHUNK));
   gameState.bullets=[];gameState.enemies=[];gameState.particles=[];gameState.loots=[];
   gameState.navTarget=null;
-  if(g.id==='sol')getChunk(C.SOLAR_CHUNK.cx,C.SOLAR_CHUNK.cy);
-  getChunk(Math.floor(p.x/C.CHUNK),Math.floor(p.y/C.CHUNK));
   spawnInitialEnemies();
   setMsg(`Warp úspěšný! Vítejte v ${g.name}.`,6000);
 }
@@ -605,21 +609,14 @@ function spawnTrail(p){
 function update(dt){
   if(!gameState)return;
 
-  // Warp countdown — hra zmražena, pouze odpočet
+  // Warp countdown — hra zmražena (ale render běží pro warm-up efekt)
   if(warpPhase==='countdown'){
     warpTimer=Math.max(0,warpTimer-dt);
     const pct=(20-warpTimer)/20;
     document.getElementById('warp-countdown-num').textContent=Math.ceil(warpTimer)||'0';
     document.getElementById('warp-bar-fill').style.width=(pct*100)+'%';
     if(warpTimer<=0)beginWarp();
-    return;
-  }
-
-  // Warp probíhá — pouze timer
-  if(warpPhase==='warping'){
-    warpElapsed+=dt;
-    if(warpElapsed>=window.warpTarget.warpSecs)completeWarp();
-    return;
+    return;  // hra zmražena
   }
 
   if(state!=='playing')return;
@@ -636,36 +633,31 @@ function update(dt){
   const braking=isKey('KeyS','ArrowDown');
   const strafeL=isKey('KeyA','ArrowLeft');
   const strafeR=isKey('KeyD','ArrowRight');
-  const boost=isKey('ShiftLeft','ShiftRight')&&thrusting&&p.fuel>0;
+  const warpBoosting=warpPhase==='boosting'&&thrusting;
+  const normalBoost=!warpBoosting&&isKey('ShiftLeft','ShiftRight')&&thrusting&&p.fuel>0;
+  const boost=normalBoost||warpBoosting;
   window._strafeL=strafeL; window._strafeR=strafeR;
+  window._warpBoosting=warpBoosting;
 
   const engMult=1+0.15*(p.upgrades.engine||0);
 
-  // Hlavní motor (dopředu)
+  // Hlavní motor — warp má mnohem větší tah
   if(thrusting){
-    const thrust=(boost?C.BOOST_THRUST:C.THRUST)*engMult;
+    const thrust=warpBoosting?C.WARP_THRUST:(boost?C.BOOST_THRUST:C.THRUST)*engMult;
     p.vx+=Math.cos(p.angle)*thrust;p.vy+=Math.sin(p.angle)*thrust;
     p.fuel=Math.max(0,p.fuel-(boost?C.FUEL_BOOST:C.FUEL_THRUST));
     spawnTrail(p);
   }
 
-  // Boční trysky — strafe (kolmo na osu lodi)
-  const sideThr=C.SIDE_THRUST*engMult;
-  if(strafeL){
-    // Levá tryska (pushes ship LEFT in ship-local space)
-    p.vx+=Math.sin(p.angle)*sideThr;
-    p.vy-=Math.cos(p.angle)*sideThr;
-    p.fuel=Math.max(0,p.fuel-C.FUEL_THRUST*0.4);
-  }
-  if(strafeR){
-    // Pravá tryska
-    p.vx-=Math.sin(p.angle)*sideThr;
-    p.vy+=Math.cos(p.angle)*sideThr;
-    p.fuel=Math.max(0,p.fuel-C.FUEL_THRUST*0.4);
+  // Boční trysky — strafe (zakázáno při warpu)
+  if(warpPhase!=='boosting'){
+    const sideThr=C.SIDE_THRUST*engMult;
+    if(strafeL){p.vx+=Math.sin(p.angle)*sideThr;p.vy-=Math.cos(p.angle)*sideThr;p.fuel=Math.max(0,p.fuel-C.FUEL_THRUST*0.4);}
+    if(strafeR){p.vx-=Math.sin(p.angle)*sideThr;p.vy+=Math.cos(p.angle)*sideThr;p.fuel=Math.max(0,p.fuel-C.FUEL_THRUST*0.4);}
   }
 
-  // Brzdění (retro trysky)
-  if(braking){
+  // Brzdění — zakázáno při warp boostu
+  if(braking&&warpPhase!=='boosting'){
     const spd=Math.hypot(p.vx,p.vy);
     if(spd>0.01){
       const brakePow=C.THRUST*C.BRAKE_MULT*engMult;
@@ -674,15 +666,15 @@ function update(dt){
     }else{p.vx=0;p.vy=0;}
   }
 
-  // Speed cap jen pro normální let (boost nemá cap → kontinuální akcelerace)
+  // Speed cap — žádný při boost nebo warpu
   if(!boost){
     const spd=Math.hypot(p.vx,p.vy);
     const maxSpd=C.MAX_SPD*engMult;
     if(spd>maxSpd){p.vx*=maxSpd/spd;p.vy*=maxSpd/spd;}
   }
 
-  // Drag (boost má mnohem menší drag → loď se stále zrychluje)
-  const drag=boost?C.DRAG_BOOST:C.DRAG;
+  // Drag — warp má nejmenší drag (loď se nepřestává zrychlovat)
+  const drag=warpBoosting?C.DRAG_WARP:(boost?C.DRAG_BOOST:C.DRAG);
   p.vx*=drag;p.vy*=drag;
   p.x+=p.vx;p.y+=p.vy;
   p.thrusting=thrusting;p.boosting=boost;
@@ -695,9 +687,16 @@ function update(dt){
     p.angle+=da*Math.min(0.18,dt*2.2);
   }
 
-  // Camera zoom — oddaluje se s rychlostí (efekt startu)
+  // Camera zoom — oddaluje se s rychlostí
   const targetZoom=Math.max(0.08,1/(1+spd*0.026));
   camZoom+=(targetZoom-camZoom)*Math.min(1,dt*2.8);
+
+  // Warp boost — počítej čas při vysoké rychlosti → příjezd
+  if(warpPhase==='boosting'){
+    const spdKms=spd*C.SPEED_KMS_FACTOR;
+    if(spdKms>=C.WARP_SPEED_KMS){warpElapsed+=dt;}
+    if(window.warpTarget&&warpElapsed>=window.warpTarget.warpSecs){completeWarp();return;}
+  }
 
   // Idle fuel
   p.fuel=Math.max(0,p.fuel-C.FUEL_IDLE);
@@ -912,12 +911,6 @@ function render(dt,t){
   const gs=gameState;
   const p=gs.player;
 
-  // Warp vizuál — přepisuje vše ostatní
-  if(warpPhase==='warping'&&window.warpTarget){
-    renderWarp(warpElapsed,window.warpTarget.warpSecs,window.warpTarget.name,t);
-    return;
-  }
-
   // Cinematická sekvence přistávání
   if(state==='docking'){
     ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.setLineDash([]);ctx.shadowBlur=0;
@@ -970,6 +963,29 @@ function render(dt,t){
   // Hráčova loď — vždy uprostřed, vždy stejně velká
   if(!p.dead)renderPlayerShip(p,t);
 
+  // Warp warm-up efekt (engine stream při odpočtu)
+  if(warpPhase==='countdown'&&!p.dead){
+    const pct=clamp(1-warpTimer/20,0,1);
+    renderWarpWarmup(p,pct,t);
+  }
+
+  // Warp flicker (problikávání planet při vysoké rychlosti)
+  if(warpPhase==='boosting'&&!p.dead){
+    const spdKms=Math.hypot(p.vx,p.vy)*C.SPEED_KMS_FACTOR;
+    if(spdKms>C.WARP_SPEED_KMS*0.6){
+      const intensity=clamp((spdKms-C.WARP_SPEED_KMS*0.6)/(C.WARP_SPEED_KMS*2),0,1);
+      renderWarpFlicker(intensity,t);
+    }
+  }
+
+  // Záblesk při příjezdu
+  if(window._warpArrival>0){
+    window._warpArrival=Math.max(0,window._warpArrival-dt*2);
+    ctx.globalAlpha=window._warpArrival;
+    ctx.fillStyle='#ffffff';ctx.fillRect(0,0,W,H);
+    ctx.globalAlpha=1;
+  }
+
   // Vigneta
   renderVignette();
 
@@ -982,6 +998,36 @@ function render(dt,t){
     if(gs.navTarget){
       renderNavArrow(gs.navTarget.x,gs.navTarget.y,p.x,p.y,gs.navTarget.name);
     }
+  }
+
+  // Warp boost status bar (nahoře uprostřed)
+  if(warpPhase==='boosting'&&window.warpTarget){
+    const spdKms=Math.hypot(p.vx,p.vy)*C.SPEED_KMS_FACTOR;
+    const pctSpd=clamp(spdKms/C.WARP_SPEED_KMS,0,1);
+    const pctTime=clamp(warpElapsed/window.warpTarget.warpSecs,0,1);
+    ctx.save();
+    ctx.setTransform(1,0,0,1,0,0);
+    // Název destinace
+    ctx.textAlign='center';ctx.font='bold 12px "Courier New", monospace';
+    ctx.fillStyle='#ff9500';ctx.shadowColor='rgba(255,149,0,0.5)';ctx.shadowBlur=10;
+    ctx.fillText(`WARP → ${window.warpTarget.name.toUpperCase()}`,W/2,28);
+    // Speed bar
+    const bw=320,bh=3,bx=W/2-bw/2,by=38;
+    ctx.shadowBlur=0;ctx.globalAlpha=0.2;ctx.fillStyle='#ff9500';ctx.fillRect(bx,by,bw,bh);
+    ctx.globalAlpha=1;
+    ctx.fillStyle=pctSpd<1?'#ff9500':'#00ff88';
+    ctx.shadowColor=pctSpd<1?'rgba(255,149,0,0.7)':'rgba(0,255,136,0.7)';ctx.shadowBlur=6;
+    ctx.fillRect(bx,by,bw*pctSpd,bh);
+    // Progress bar (warp time)
+    if(pctSpd>=1){
+      ctx.globalAlpha=0.15;ctx.fillStyle='#00ff88';ctx.fillRect(bx,by+6,bw,bh);
+      ctx.globalAlpha=1;ctx.fillStyle='#00ff88';ctx.fillRect(bx,by+6,bw*pctTime,bh);
+    }
+    ctx.font='9px "Courier New", monospace';ctx.shadowBlur=0;
+    ctx.fillStyle='rgba(255,149,0,0.6)';
+    const hint=pctSpd<1?`${Math.round(spdKms).toLocaleString('cs')} km/s — drž [W]`:`WARP AKTIVNÍ — přílet ${Math.max(0,window.warpTarget.warpSecs-warpElapsed).toFixed(1)} s`;
+    ctx.fillText(hint,W/2,52);
+    ctx.restore();
   }
 
   // Minimapa

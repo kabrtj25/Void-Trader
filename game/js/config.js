@@ -11,8 +11,11 @@ const C = {
   BRAKE_MULT:       0.80,
   DRAG:             0.984,
   DRAG_BOOST:       0.9985,
+  DRAG_WARP:        0.9990,
   MAX_SPD:          28,
   BOOST_THRUST:     0.90,
+  WARP_THRUST:      3.2,
+  WARP_SPEED_KMS:   20000,
   ROT_SPD:          2.0,
   SPEED_KMS_FACTOR: 50,
 

@@ -700,7 +700,80 @@ function renderVignette(){
   ctx.restore();
 }
 
-// ---- Warp vizuál (hyperspace) ----
+// ---- Warp warm-up: engine stream při odpočtu ----
+function renderWarpWarmup(p,pct,t){
+  ctx.save();
+  ctx.translate(W/2,H/2);
+  ctx.rotate(p.angle+Math.PI/2);
+
+  const streamLen=40+pct*200+Math.sin(t*16)*14;
+
+  // Hlavní plazmový proud (modrý)
+  ctx.globalAlpha=0.5+pct*0.5;
+  const g1=ctx.createLinearGradient(0,14,0,14+streamLen);
+  g1.addColorStop(0,'rgba(40,180,255,1)');
+  g1.addColorStop(0.25,'rgba(0,110,255,0.7)');
+  g1.addColorStop(0.7,'rgba(0,50,200,0.25)');
+  g1.addColorStop(1,'transparent');
+  ctx.fillStyle=g1;
+  ctx.beginPath();ctx.moveTo(-7,12);ctx.lineTo(7,12);ctx.lineTo(0,14+streamLen);ctx.fill();
+
+  // Širší záře kolem
+  ctx.globalAlpha=(0.2+pct*0.3);
+  const g2=ctx.createLinearGradient(0,10,0,10+streamLen*1.7);
+  g2.addColorStop(0,'rgba(0,140,255,0.6)');g2.addColorStop(1,'transparent');
+  ctx.fillStyle=g2;
+  ctx.beginPath();ctx.moveTo(-22,10);ctx.lineTo(22,10);ctx.lineTo(0,10+streamLen*1.7);ctx.fill();
+
+  // Pulzující aura u motoru
+  ctx.globalAlpha=1;
+  const aR=18+pct*50+Math.sin(t*11)*8;
+  const ag=ctx.createRadialGradient(0,18,0,0,18,aR);
+  ag.addColorStop(0,'rgba(40,160,255,'+(0.45*pct)+')');ag.addColorStop(1,'transparent');
+  ctx.fillStyle=ag;ctx.beginPath();ctx.arc(0,18,aR,0,Math.PI*2);ctx.fill();
+
+  ctx.restore();
+}
+
+// ---- Warp flicker: problikávání planet při vysoké rychlosti ----
+function renderWarpFlicker(intensity,t){
+  ctx.save();
+  const frame=Math.floor(t*22);
+  const r=makeRng(frame*4919+333);
+
+  // Náhodné barevné planety/mlhoviny bleskující kolem
+  const blobs=Math.floor(4+intensity*28);
+  for(let i=0;i<blobs;i++){
+    const x=r()*W,y=r()*H;
+    const sz=8+r()*160;
+    const a=r()*intensity*0.55;
+    const cols=['rgba(255,90,40,','rgba(80,140,255,','rgba(40,200,80,','rgba(255,210,60,','rgba(180,80,255,','rgba(200,220,255,'];
+    const col=cols[Math.floor(r()*cols.length)];
+    ctx.globalAlpha=a;
+    ctx.fillStyle=col+a+')';
+    ctx.beginPath();ctx.arc(x,y,sz,0,Math.PI*2);ctx.fill();
+  }
+
+  // Horizontální rychlostní pruhy
+  const streaks=Math.floor(intensity*70);
+  for(let i=0;i<streaks;i++){
+    const x1=r()*W,y=r()*H;
+    const len=20+r()*W*0.7;
+    ctx.globalAlpha=r()*intensity*0.55;
+    ctx.strokeStyle='rgba(230,240,255,'+(r()*0.6)+')';
+    ctx.lineWidth=0.3+r()*1.8;
+    ctx.beginPath();ctx.moveTo(x1,y);ctx.lineTo(x1+len,y);ctx.stroke();
+  }
+
+  // Občasný záblesk celé obrazovky
+  const flash=Math.max(0,Math.sin(t*9.1)*Math.sin(t*4.3)*intensity*0.22);
+  if(flash>0){ctx.globalAlpha=flash;ctx.fillStyle='rgba(180,220,255,1)';ctx.fillRect(0,0,W,H);}
+
+  ctx.globalAlpha=1;
+  ctx.restore();
+}
+
+// ---- Warp vizuál (hyperspace) — zachováno pro případ potřeby ----
 function renderWarp(elapsed,duration,destName,t){
   const progress=Math.min(1,elapsed/duration);
   ctx.save();
