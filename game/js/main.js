@@ -9,11 +9,72 @@ let last = 0, frameCount = 0;
 // Warp systém
 window.currentGalaxy = 'sol';
 window.warpTarget = null;
-let warpPhase = null;   // null | 'countdown' | 'warping'
+let warpPhase = null;
 let warpTimer = 0;
 let warpElapsed = 0;
 let parkingMode = false;
 Object.defineProperty(window,'parkingMode',{get:()=>parkingMode});
+
+// ===== Systém klávesových zkratek =====
+const DEFAULT_BINDINGS = {
+  thrust:  'KeyW',
+  rotLeft: 'KeyA',
+  rotRight:'KeyD',
+  strafeL: 'KeyQ',
+  strafeR: 'KeyE',
+  boost:   'ShiftLeft',
+  shoot:   'Space',
+  dock:    'KeyF',
+  sysMap:  'KeyM',
+  galaxy:  'KeyN',
+  warp:    'KeyR',
+  parking: 'KeyP',
+  pause:   'Escape',
+};
+const BINDING_ALIASES = {
+  thrust:  ['ArrowUp'],
+  rotLeft: ['ArrowLeft'],
+  rotRight:['ArrowRight'],
+  boost:   ['ShiftRight'],
+};
+const BINDING_LABELS = {
+  thrust:  'Zrychlení (dopředu)',
+  rotLeft: 'Otočení vlevo',
+  rotRight:'Otočení vpravo',
+  strafeL: 'Boční let vlevo',
+  strafeR: 'Boční let vpravo',
+  boost:   'Boost',
+  shoot:   'Střelba',
+  dock:    'Přistání / Vzlet',
+  sysMap:  'Mapa soustavy',
+  galaxy:  'Mapa galaxií',
+  warp:    'Warpové motory',
+  parking: 'Parkovací režim',
+  pause:   'Menu / Pauza',
+};
+let bindings = {...DEFAULT_BINDINGS};
+
+function keyLabel(code){
+  const M={Space:'Mezerník',Escape:'ESC',ArrowUp:'↑',ArrowDown:'↓',
+    ArrowLeft:'←',ArrowRight:'→',ShiftLeft:'Shift L',ShiftRight:'Shift R',
+    ControlLeft:'Ctrl L',ControlRight:'Ctrl R',AltLeft:'Alt L',AltRight:'Alt R',
+    Enter:'Enter',Tab:'Tab',Backspace:'Backspace',Delete:'Del'};
+  if(M[code])return M[code];
+  if(code.startsWith('Key'))return code.slice(3);
+  if(code.startsWith('Digit'))return code.slice(5);
+  if(code.startsWith('Numpad'))return 'Num'+code.slice(6);
+  return code;
+}
+function isAction(action){
+  const k=bindings[action];
+  if(keys[k])return true;
+  return(BINDING_ALIASES[action]||[]).some(a=>keys[a]);
+}
+function codeMatchesAction(code,action){
+  return bindings[action]===code||(BINDING_ALIASES[action]||[]).includes(code);
+}
+function saveBindings(){try{localStorage.setItem('st_bindings',JSON.stringify(bindings));}catch(e){}}
+function loadBindings(){try{const s=JSON.parse(localStorage.getItem('st_bindings'));if(s)bindings={...DEFAULT_BINDINGS,...s};}catch(e){}}
 
 // Globální zpráva
 window.msgText=''; window.msgTimer=0;
@@ -25,28 +86,31 @@ document.addEventListener('keydown',e=>{
   if(keys[e.code])return;
   keys[e.code]=true;
 
+  // Blokuj herní klávesy pokud je otevřeno nastavení
+  if(document.getElementById('settings-overlay').style.display!=='none')return;
+
   // Warp countdown — intercept first
   if(warpPhase==='countdown'){
-    if(e.key==='Escape'){e.preventDefault();cancelWarp();return;}
+    if(codeMatchesAction(e.code,'pause')){e.preventDefault();cancelWarp();return;}
     return;
   }
 
   if(state==='playing'){
-    if(e.key===' '){e.preventDefault();tryShoot();}
-    if(e.key==='m'||e.key==='M'){e.preventDefault();openMap();}
-    if(e.key==='n'||e.key==='N'){e.preventDefault();openGalaxyMap();}
-    if(e.key==='r'||e.key==='R'){e.preventDefault();startWarpCountdown();}
-    if(e.key==='f'||e.key==='F'){e.preventDefault();tryDock();}
-    if(e.key==='p'||e.key==='P'){parkingMode=!parkingMode;setMsg(parkingMode?'⚓ PARKOVACÍ REŽIM AKTIVNÍ':'Parkovací režim vypnut.',2500);}
-    if(e.key==='Escape'){e.preventDefault();openPause();}
+    if(codeMatchesAction(e.code,'shoot')){e.preventDefault();tryShoot();}
+    if(codeMatchesAction(e.code,'sysMap')){e.preventDefault();openMap();}
+    if(codeMatchesAction(e.code,'galaxy')){e.preventDefault();openGalaxyMap();}
+    if(codeMatchesAction(e.code,'warp')){e.preventDefault();startWarpCountdown();}
+    if(codeMatchesAction(e.code,'dock')){e.preventDefault();tryDock();}
+    if(codeMatchesAction(e.code,'parking')){parkingMode=!parkingMode;setMsg(parkingMode?'⚓ PARKOVACÍ REŽIM AKTIVNÍ':'Parkovací režim vypnut.',2500);}
+    if(codeMatchesAction(e.code,'pause')){e.preventDefault();openPause();}
   } else if(state==='paused'){
-    if(e.key==='Escape'){e.preventDefault();closePause();}
+    if(codeMatchesAction(e.code,'pause')){e.preventDefault();closePause();}
   } else if(state==='map'){
-    if(e.key==='m'||e.key==='M'||e.key==='Escape'){e.preventDefault();closeMap();}
+    if(codeMatchesAction(e.code,'sysMap')||codeMatchesAction(e.code,'pause')){e.preventDefault();closeMap();}
   } else if(state==='galaxy'){
-    if(e.key==='n'||e.key==='N'||e.key==='Escape'){e.preventDefault();closeGalaxyMap();}
+    if(codeMatchesAction(e.code,'galaxy')||codeMatchesAction(e.code,'pause')){e.preventDefault();closeGalaxyMap();}
   } else if(state==='docked'){
-    if(e.key==='f'||e.key==='F'||e.key==='Escape'){e.preventDefault();undock();}
+    if(codeMatchesAction(e.code,'dock')||codeMatchesAction(e.code,'pause')){e.preventDefault();undock();}
   }
 });
 document.addEventListener('keyup',e=>{keys[e.code]=false;});
@@ -385,8 +449,6 @@ function openPause(){
 function closePause(){
   state='playing';
   document.getElementById('pause-screen').style.display='none';
-  document.getElementById('esc-settings-panel').style.display='none';
-  document.getElementById('btn-pause-settings').classList.remove('active');
   _stopPauseShipAnim();
 }
 
@@ -589,8 +651,8 @@ function spawnExplosion(x,y,big=false){
 // ---- Engine trails ----
 let engineTrails=[];
 function spawnTrail(p){
-  if(!isKey('KeyW','ArrowUp'))return;
-  const boost=isKey('ShiftLeft','ShiftRight')&&p.fuel>0;
+  if(!isAction('thrust'))return;
+  const boost=isAction('boost')&&p.fuel>0;
   const n=boost?4:2;
   for(let i=0;i<n;i++){
     const spread=(Math.random()-.5)*0.3;
@@ -631,13 +693,13 @@ function update(dt){
   if(window.msgTimer>0)window.msgTimer=Math.max(0,window.msgTimer-dt*1000);
 
   // Pohyb hráče
-  const thrusting=isKey('KeyW','ArrowUp');
-  const rotL=isKey('KeyA','ArrowLeft');
-  const rotR=isKey('KeyD','ArrowRight');
-  const strafeL=isKey('KeyQ');
-  const strafeR=isKey('KeyE');
+  const thrusting=isAction('thrust');
+  const rotL=isAction('rotLeft');
+  const rotR=isAction('rotRight');
+  const strafeL=isAction('strafeL');
+  const strafeR=isAction('strafeR');
   const warpBoosting=warpPhase==='boosting'&&thrusting;
-  const normalBoost=!warpBoosting&&isKey('ShiftLeft','ShiftRight')&&thrusting&&p.fuel>0;
+  const normalBoost=!warpBoosting&&isAction('boost')&&thrusting&&p.fuel>0;
   const boost=normalBoost||warpBoosting;
   window._strafeL=strafeL; window._strafeR=strafeR;
   window._warpBoosting=warpBoosting;
@@ -1058,6 +1120,93 @@ function initMenuStars(){
   })(0);
 }
 
+// ===== Nastavení — přebindování kláves =====
+let _rebindingAction=null;
+let _rebindListener=null;
+
+function openSettings(){
+  for(const k in keys)keys[k]=false;
+  _renderKeybindings();
+  document.getElementById('settings-overlay').style.display='flex';
+  switchSettingsTab('keys');
+}
+function closeSettings(){
+  _stopRebind();
+  saveBindings();
+  document.getElementById('settings-overlay').style.display='none';
+}
+function switchSettingsTab(tab){
+  ['keys','sounds'].forEach(t=>{
+    document.getElementById('stab-'+t+'-panel').style.display=t===tab?'block':'none';
+    document.getElementById('stab-'+t).classList.toggle('active',t===tab);
+  });
+}
+function _renderKeybindings(){
+  const list=document.getElementById('keybind-list');
+  if(!list)return;
+  list.innerHTML='';
+  Object.keys(DEFAULT_BINDINGS).forEach(action=>{
+    const row=document.createElement('div');
+    row.className='keybind-row';
+    row.id='kbrow-'+action;
+
+    const lbl=document.createElement('span');
+    lbl.className='kb-label';
+    lbl.textContent=BINDING_LABELS[action];
+
+    const btn=document.createElement('button');
+    btn.className='kb-key';
+    btn.id='kbkey-'+action;
+    btn.textContent=keyLabel(bindings[action]);
+    btn.onclick=()=>_startRebind(action);
+
+    row.appendChild(lbl);
+    row.appendChild(btn);
+
+    const aliases=BINDING_ALIASES[action];
+    if(aliases&&aliases.length){
+      const al=document.createElement('span');
+      al.className='kb-alias';
+      al.textContent='+ '+aliases.map(keyLabel).join(', ');
+      row.appendChild(al);
+    }
+    list.appendChild(row);
+  });
+}
+function _startRebind(action){
+  _stopRebind();
+  _rebindingAction=action;
+  const btn=document.getElementById('kbkey-'+action);
+  if(btn){btn.textContent='— stiskni klávesu —';btn.classList.add('listening');}
+  _rebindListener=(e)=>{
+    e.preventDefault();e.stopPropagation();
+    if(e.code==='Escape'){_stopRebind();return;}
+    // Swap pokud klávesa již použita
+    Object.keys(bindings).forEach(a=>{if(a!==action&&bindings[a]===e.code)bindings[a]=bindings[action];});
+    bindings[action]=e.code;
+    _stopRebind();
+    _renderKeybindings();
+  };
+  document.addEventListener('keydown',_rebindListener,{capture:true});
+}
+function _stopRebind(){
+  if(_rebindingAction){
+    const btn=document.getElementById('kbkey-'+_rebindingAction);
+    if(btn){btn.classList.remove('listening');btn.textContent=keyLabel(bindings[_rebindingAction]);}
+    _rebindingAction=null;
+  }
+  if(_rebindListener){document.removeEventListener('keydown',_rebindListener,{capture:true});_rebindListener=null;}
+}
+function resetBindings(){
+  bindings={...DEFAULT_BINDINGS};
+  _stopRebind();
+  _renderKeybindings();
+}
+
+// ===== Nápověda =====
+function openHelp(){document.getElementById('help-overlay').style.display='flex';}
+function closeHelp(){document.getElementById('help-overlay').style.display='none';}
+
 // ---- Init ----
 window.addEventListener('load',()=>{
   canvas=document.getElementById('c');
@@ -1067,6 +1216,7 @@ window.addEventListener('load',()=>{
   W2=W;H2=H;
   window.addEventListener('resize',()=>{W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight;});
 
+  loadBindings();
   initMinimap();
   initMapCanvas();
   initGalaxyCanvas();
@@ -1075,7 +1225,8 @@ window.addEventListener('load',()=>{
   // Menu tlačítka
   document.getElementById('btn-new').onclick=()=>startGame(false);
   document.getElementById('btn-load').onclick=()=>{if(hasSave())startGame(true);else setMsg('Žádná uložená hra',2000);};
-  document.getElementById('btn-settings').onclick=()=>{document.getElementById('settings-panel').style.display=document.getElementById('settings-panel').style.display==='block'?'none':'block';};
+  document.getElementById('btn-help').onclick=()=>openHelp();
+  document.getElementById('btn-help-close').onclick=()=>closeHelp();
   document.getElementById('btn-restart').onclick=()=>{document.getElementById('death-screen').style.display='none';startGame(false);};
   document.getElementById('btn-menu').onclick=()=>{document.getElementById('death-screen').style.display='none';document.getElementById('menu').style.display='flex';document.getElementById('hud').style.display='none';state='menu';gameState=null;initMenuStars();};
   document.getElementById('btn-close-map').onclick=()=>closeMap();
@@ -1085,13 +1236,11 @@ window.addEventListener('load',()=>{
 
   // Pause menu
   document.getElementById('btn-resume').onclick=()=>closePause();
-  document.getElementById('btn-pause-settings').onclick=()=>{
-    const p=document.getElementById('esc-settings-panel');
-    const btn=document.getElementById('btn-pause-settings');
-    const visible=p.style.display==='block';
-    p.style.display=visible?'none':'block';
-    btn.classList.toggle('active',!visible);
-  };
+  document.getElementById('btn-pause-settings').onclick=()=>openSettings();
+  document.getElementById('btn-settings-close').onclick=()=>closeSettings();
+  document.getElementById('stab-keys').onclick=()=>switchSettingsTab('keys');
+  document.getElementById('stab-sounds').onclick=()=>switchSettingsTab('sounds');
+  document.getElementById('btn-settings-reset').onclick=()=>resetBindings();
   document.getElementById('btn-pause-radio').onclick=()=>{};
   document.getElementById('btn-pause-map').onclick=()=>{
     closePause();
