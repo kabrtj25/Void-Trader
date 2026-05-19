@@ -12,6 +12,8 @@ window.warpTarget = null;
 let warpPhase = null;   // null | 'countdown' | 'warping'
 let warpTimer = 0;
 let warpElapsed = 0;
+let parkingMode = false;
+Object.defineProperty(window,'parkingMode',{get:()=>parkingMode});
 
 // Globální zpráva
 window.msgText=''; window.msgTimer=0;
@@ -32,19 +34,19 @@ document.addEventListener('keydown',e=>{
   if(state==='playing'){
     if(e.key===' '){e.preventDefault();tryShoot();}
     if(e.key==='m'||e.key==='M'){e.preventDefault();openMap();}
-    if(e.key==='r'||e.key==='R'){e.preventDefault();openGalaxyMap();}
-    if(e.key==='q'||e.key==='Q'){e.preventDefault();startWarpCountdown();}
-    if(e.key==='e'||e.key==='E'){e.preventDefault();tryDock();}
+    if(e.key==='n'||e.key==='N'){e.preventDefault();openGalaxyMap();}
+    if(e.key==='r'||e.key==='R'){e.preventDefault();startWarpCountdown();}
+    if(e.key==='f'||e.key==='F'){e.preventDefault();tryDock();}
+    if(e.key==='p'||e.key==='P'){parkingMode=!parkingMode;setMsg(parkingMode?'⚓ PARKOVACÍ REŽIM AKTIVNÍ':'Parkovací režim vypnut.',2500);}
     if(e.key==='Escape'){e.preventDefault();openPause();}
-    if(e.key==='n'||e.key==='N'){clearNav();}
   } else if(state==='paused'){
     if(e.key==='Escape'){e.preventDefault();closePause();}
   } else if(state==='map'){
     if(e.key==='m'||e.key==='M'||e.key==='Escape'){e.preventDefault();closeMap();}
   } else if(state==='galaxy'){
-    if(e.key==='r'||e.key==='R'||e.key==='Escape'){e.preventDefault();closeGalaxyMap();}
+    if(e.key==='n'||e.key==='N'||e.key==='Escape'){e.preventDefault();closeGalaxyMap();}
   } else if(state==='docked'){
-    if(e.key==='e'||e.key==='E'||e.key==='Escape'){e.preventDefault();undock();}
+    if(e.key==='f'||e.key==='F'||e.key==='Escape'){e.preventDefault();undock();}
   }
 });
 document.addEventListener('keyup',e=>{keys[e.code]=false;});
@@ -59,7 +61,7 @@ function startGame(fromSave=false){
   window.currentGalaxy='sol';
   window.warpTarget=null;
   window._warpArrival=0;
-  warpPhase=null;warpTimer=0;warpElapsed=0;
+  warpPhase=null;warpTimer=0;warpElapsed=0;parkingMode=false;
 
   const save=fromSave?loadSave():null;
 
@@ -68,7 +70,7 @@ function startGame(fromSave=false){
   const EARTH_X=-2034, EARTH_Y=7542;
   const player={
     x:save?.x||EARTH_X, y:save?.y||EARTH_Y,
-    vx:0, vy:0, angle:save?.angle||-Math.PI/2,
+    vx:0, vy:0, angle:-Math.PI/2,
     hull:save?.hull||100, hullMax:100,
     shield:save?.shield||100, shieldMax:100,
     fuel:save?.fuel||C.FUEL_MAX, fuelMax:C.FUEL_MAX,
@@ -100,7 +102,7 @@ function startGame(fromSave=false){
   spawnInitialEnemies();
 
   state='playing';
-  setMsg('Vítejte ve Space Trader! [WASD] let  [BOOST] Shift+W  [E] přistání  [M] mapa  [R] galaxie  [Q] warp',7000);
+  setMsg('Vítejte! [W] thrust  [AD] otočení  [QE] strafe  [F] přistání  [M] mapa  [N] galaxie  [R] warp',7000);
 }
 
 function spawnInitialEnemies(){
@@ -257,6 +259,7 @@ function startDocking(station){
   const gs=gameState;
   gs.player.vx=0;gs.player.vy=0;
   gs.dockStation=station;
+  parkingMode=false;
   state='docked';
   document.getElementById('hud').style.display='none';
   renderDockPanel(gs.player,station);
@@ -314,7 +317,7 @@ function closeGalaxyMap(){
 
 // ---- Warp systém ----
 function startWarpCountdown(){
-  if(!window.warpTarget){setMsg('Nejdřív nastav kurz — stiskni [R] pro mapu galaxií.',3500);return;}
+  if(!window.warpTarget){setMsg('Nejdřív nastav kurz — stiskni [N] pro mapu galaxií.',3500);return;}
   const p=gameState.player;
   const g=window.warpTarget;
   const hullPct=p.hull/p.hullMax*100;
@@ -341,7 +344,7 @@ function beginWarp(){
   warpPhase='boosting';
   warpElapsed=0;
   document.getElementById('warp-overlay').style.display='none';
-  setMsg('TERMOJETOVÉ MOTORY NASTARTOVÁNY — drž [W] pro warp!',6000);
+  setMsg('TERMOHMOTOVÉ MOTORY NASTARTOVÁNY — drž [W] pro warp!',6000);
 }
 function completeWarp(){
   const g=window.warpTarget;
@@ -627,11 +630,12 @@ function update(dt){
   if(shootCd>0)shootCd=Math.max(0,shootCd-dt);
   if(window.msgTimer>0)window.msgTimer=Math.max(0,window.msgTimer-dt*1000);
 
-  // Pohyb hráče — boční trysky místo rotace
+  // Pohyb hráče
   const thrusting=isKey('KeyW','ArrowUp');
-  const braking=isKey('KeyS','ArrowDown');
-  const strafeL=isKey('KeyA','ArrowLeft');
-  const strafeR=isKey('KeyD','ArrowRight');
+  const rotL=isKey('KeyA','ArrowLeft');
+  const rotR=isKey('KeyD','ArrowRight');
+  const strafeL=isKey('KeyQ');
+  const strafeR=isKey('KeyE');
   const warpBoosting=warpPhase==='boosting'&&thrusting;
   const normalBoost=!warpBoosting&&isKey('ShiftLeft','ShiftRight')&&thrusting&&p.fuel>0;
   const boost=normalBoost||warpBoosting;
@@ -639,10 +643,11 @@ function update(dt){
   window._warpBoosting=warpBoosting;
 
   const engMult=1+0.15*(p.upgrades.engine||0);
+  const parkMult=parkingMode?0.28:1;
 
-  // Hlavní motor — warp má mnohem větší tah
+  // Hlavní motor — warp má mnohem větší tah, parking má nízký tah
   if(thrusting){
-    const thrust=warpBoosting?C.WARP_THRUST:(boost?C.BOOST_THRUST:C.THRUST)*engMult;
+    const thrust=warpBoosting?C.WARP_THRUST:(boost?C.BOOST_THRUST:C.THRUST)*engMult*parkMult;
     p.vx+=Math.cos(p.angle)*thrust;p.vy+=Math.sin(p.angle)*thrust;
     if(!warpBoosting)p.fuel=Math.max(0,p.fuel-(boost?C.FUEL_BOOST:C.FUEL_THRUST));
     spawnTrail(p);
@@ -650,43 +655,33 @@ function update(dt){
 
   // Boční trysky — strafe (zakázáno při warpu)
   if(warpPhase!=='boosting'){
-    const sideThr=C.SIDE_THRUST*engMult;
+    const sideThr=C.SIDE_THRUST*engMult*parkMult;
     if(strafeL){p.vx+=Math.sin(p.angle)*sideThr;p.vy-=Math.cos(p.angle)*sideThr;p.fuel=Math.max(0,p.fuel-C.FUEL_THRUST*0.4);}
     if(strafeR){p.vx-=Math.sin(p.angle)*sideThr;p.vy+=Math.cos(p.angle)*sideThr;p.fuel=Math.max(0,p.fuel-C.FUEL_THRUST*0.4);}
   }
 
-  // Brzdění — zakázáno při warp boostu
-  if(braking&&warpPhase!=='boosting'){
-    const spd=Math.hypot(p.vx,p.vy);
-    if(spd>0.01){
-      const brakePow=C.THRUST*C.BRAKE_MULT*engMult;
-      const newSpd=Math.max(0,spd-brakePow);
-      p.vx=p.vx/spd*newSpd;p.vy=p.vy/spd*newSpd;
-    }else{p.vx=0;p.vy=0;}
-  }
-
-  // Speed cap — žádný při boost nebo warpu
+  // Speed cap — v parkovacím režimu velmi nízký, žádný při boost nebo warpu
   if(!boost){
     const spd=Math.hypot(p.vx,p.vy);
-    const maxSpd=C.MAX_SPD*engMult;
+    const maxSpd=parkingMode?3.5:C.MAX_SPD*engMult;
     if(spd>maxSpd){p.vx*=maxSpd/spd;p.vy*=maxSpd/spd;}
   }
 
-  // Drag — warp má nejmenší drag (loď se nepřestává zrychlovat)
-  const drag=warpBoosting?C.DRAG_WARP:(boost?C.DRAG_BOOST:C.DRAG);
+  // Drag — parking má vysoký drag (loď přirozeně zpomaluje), warp minimální
+  const drag=warpBoosting?C.DRAG_WARP:parkingMode?0.90:(boost?C.DRAG_BOOST:C.DRAG);
   p.vx*=drag;p.vy*=drag;
   p.x+=p.vx;p.y+=p.vy;
-  p.thrusting=thrusting;p.boosting=boost;
 
-  // Auto-rotate: loď se pomalu natáčí ve směru pohybu
-  const spd=Math.hypot(p.vx,p.vy);
-  if(spd>0.8){
-    const targetAngle=Math.atan2(p.vy,p.vx);
-    const da=angleDiff(targetAngle,p.angle);
-    p.angle+=da*Math.min(0.18,dt*2.2);
+  // Rotace A/D (zakázáno při warpu)
+  if(warpPhase!=='boosting'){
+    if(rotL)p.angle-=C.ROT_SPD*dt;
+    if(rotR)p.angle+=C.ROT_SPD*dt;
   }
 
+  p.thrusting=thrusting;p.boosting=boost;
+
   // Camera zoom — oddaluje se s rychlostí
+  const spd=Math.hypot(p.vx,p.vy);
   const targetZoom=Math.max(0.08,1/(1+spd*0.026));
   camZoom+=(targetZoom-camZoom)*Math.min(1,dt*2.8);
 
@@ -1097,6 +1092,7 @@ window.addEventListener('load',()=>{
     p.style.display=visible?'none':'block';
     btn.classList.toggle('active',!visible);
   };
+  document.getElementById('btn-pause-radio').onclick=()=>{};
   document.getElementById('btn-pause-map').onclick=()=>{
     closePause();
     openMap();

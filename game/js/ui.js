@@ -90,6 +90,16 @@ function renderHUD(player,nearStation,dockingState,t){
     ctx.fillText('⚡ BOOST AKTIVNÍ',W/2,H-110);
     ctx.restore();
   }
+
+  // Parkovací režim indikátor
+  if(window.parkingMode){
+    ctx.save();
+    const pa=0.75+Math.sin(t*3)*0.25;
+    ctx.globalAlpha=pa;ctx.textAlign='center';ctx.font='bold 14px "Courier New", monospace';
+    ctx.fillStyle='#ffcc00';ctx.shadowColor='#ffcc00';ctx.shadowBlur=18;
+    ctx.fillText('⚓ PARKOVACÍ REŽIM',W/2,H-130);
+    ctx.restore();
+  }
   if(player.fuel<10){
     ctx.save();
     const fa=0.5+Math.sin(t*6)*0.5;
@@ -722,7 +732,7 @@ function updateGalaxyInfoPanel(ga){
   btn.onclick=isCurrent?null:()=>{
     window.warpTarget=ga;
     if(typeof closeGalaxyMap==='function')closeGalaxyMap();
-    setMsg(`Kurz nastaven: ${ga.name}. Stiskni [Q] pro spuštění warpových motorů.`,6000);
+    setMsg(`Kurz nastaven: ${ga.name}. Stiskni [R] pro spuštění warpových motorů.`,6000);
   };
 }
 function getCargoMax(p){return 10+5*(p.upgrades.cargo||0);}

@@ -30,15 +30,15 @@
         <span>Ovládání:</span>
         <div class="ctrl-grid">
           <span class="ck">W / ↑</span><span class="cd">Zrychlení (thrust)</span>
-          <span class="ck">A/D ← →</span><span class="cd">Otočení</span>
-          <span class="ck">S / ↓</span><span class="cd">Brzdění (retro)</span>
+          <span class="ck">A / D</span><span class="cd">Otočení lodě</span>
+          <span class="ck">Q / E</span><span class="cd">Boční let (strafe)</span>
           <span class="ck">SHIFT + W</span><span class="cd">Boost (spotřebuje palivo)</span>
+          <span class="ck">P</span><span class="cd">Parkovací režim (pomalé přistávání)</span>
           <span class="ck">MEZERNÍK</span><span class="cd">Střelba</span>
-          <span class="ck">E</span><span class="cd">Přistání na stanici</span>
+          <span class="ck">F</span><span class="cd">Přistání na stanici</span>
           <span class="ck">M</span><span class="cd">Otevřít mapu hvězdné soustavy</span>
-          <span class="ck">R</span><span class="cd">Mapa galaxií (warp)</span>
-          <span class="ck">Q</span><span class="cd">Spustit warpové motory</span>
-          <span class="ck">N</span><span class="cd">Zrušit navigaci</span>
+          <span class="ck">N</span><span class="cd">Mapa galaxií</span>
+          <span class="ck">R</span><span class="cd">Spustit warpové motory</span>
           <span class="ck">ESC</span><span class="cd">Mapa / Pauza</span>
         </div>
       </div>
@@ -68,12 +68,12 @@
   </div>
 </div>
 
-<!-- GALAXY MAPA (klávesa R) -->
+<!-- GALAXY MAPA (klávesa N) -->
 <div id="galaxy-overlay" style="display:none">
   <div id="galaxy-header">
     <span id="galaxy-title">// MAPA GALAXIÍ</span>
-    <span id="galaxy-hint">Klikni na galaxii · [R] nebo [ESC] zavřít</span>
-    <button id="btn-close-galaxy">✕ Zavřít [R]</button>
+    <span id="galaxy-hint">Klikni na galaxii · [N] nebo [ESC] zavřít</span>
+    <button id="btn-close-galaxy">✕ Zavřít [N]</button>
   </div>
   <div id="galaxy-main">
     <canvas id="galaxy-canvas"></canvas>
@@ -86,9 +86,9 @@
   </div>
 </div>
 
-<!-- WARP ODPOČET (klávesa Q spustí) -->
+<!-- WARP ODPOČET (klávesa R spustí) -->
 <div id="warp-overlay" style="display:none">
-  <div id="warp-title">TERMOJETOVÉ MOTORY STARTUJÍ</div>
+  <div id="warp-title">TERMOHMOTOVÉ MOTORY STARTUJÍ</div>
   <div id="warp-destination">KURZ: <span id="warp-dest-name">—</span></div>
   <div id="warp-countdown-num">20</div>
   <div id="warp-hint-text">[ ESC ] — přerušit odpočet</div>
@@ -101,7 +101,7 @@
   <div id="dock-header">
     <div id="dock-name">STANICE</div>
     <div id="dock-tier"></div>
-    <button id="btn-undock">↑ Vzlétnout [E]</button>
+    <button id="btn-undock">↑ Vzlétnout [F]</button>
   </div>
   <div id="dock-tabs">
     <button class="dtab active" onclick="switchDockTab('services')">SERVIS</button>
@@ -231,15 +231,15 @@
     <div class="esc-settings-title">OVLÁDÁNÍ</div>
     <div class="esc-ctrl-grid">
       <span class="ck">W / ↑</span><span class="cd">Zrychlení (thrust)</span>
-      <span class="ck">A / D / ← →</span><span class="cd">Otočení lodě</span>
-      <span class="ck">S / ↓</span><span class="cd">Brzdění (retro trysky)</span>
+      <span class="ck">A / D</span><span class="cd">Otočení lodě</span>
+      <span class="ck">Q / E</span><span class="cd">Boční let (strafe)</span>
       <span class="ck">SHIFT + W</span><span class="cd">Boost (spotřebuje palivo)</span>
+      <span class="ck">P</span><span class="cd">Parkovací režim (pomalé přistávání)</span>
       <span class="ck">MEZERNÍK</span><span class="cd">Střelba</span>
-      <span class="ck">E</span><span class="cd">Přistání na stanici</span>
+      <span class="ck">F</span><span class="cd">Přistání na stanici</span>
       <span class="ck">M</span><span class="cd">Otevřít mapu hvězdné soustavy</span>
-      <span class="ck">R</span><span class="cd">Mapa galaxií (warp)</span>
-      <span class="ck">Q</span><span class="cd">Spustit warpové motory</span>
-      <span class="ck">N</span><span class="cd">Zrušit navigaci</span>
+      <span class="ck">N</span><span class="cd">Mapa galaxií</span>
+      <span class="ck">R</span><span class="cd">Spustit warpové motory</span>
       <span class="ck">ESC</span><span class="cd">Herní menu / Pokračovat</span>
     </div>
   </div>
@@ -254,6 +254,10 @@
     <button class="esc-btn" id="btn-pause-settings">
       <span class="esc-btn-icon">⚙</span>
       <span class="esc-btn-label">NASTAVENÍ</span>
+    </button>
+    <button class="esc-btn" id="btn-pause-radio">
+      <span class="esc-btn-icon">📻</span>
+      <span class="esc-btn-label">RÁDIO</span>
     </button>
     <button class="esc-btn" id="btn-pause-map">
       <span class="esc-btn-icon">◉</span>

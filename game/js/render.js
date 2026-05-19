@@ -875,7 +875,7 @@ function renderDockingIndicator(align,speed,dockable){
   ctx.globalAlpha=0.15;ctx.fillStyle=dockable?'#00ff88':'#ff8800';
   ctx.fillRect(x-120,y-16,240,32);ctx.globalAlpha=1;
   ctx.font='12px "Courier New", monospace';ctx.fillStyle=dockable?'#00ff88':'#ffaa00';
-  const txt=dockable?'[ ZAROVNÁNO — PŘISTÁT: E ]':`KORIDOR: ${Math.round(align)}°  SPD: ${Math.round(speed)}`;
+  const txt=dockable?'[ ZAROVNÁNO — PŘISTÁT: F ]':`KORIDOR: ${Math.round(align)}°  SPD: ${Math.round(speed)}`;
   ctx.fillText(txt,x,y+5);
   ctx.restore();
 }
