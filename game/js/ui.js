@@ -24,12 +24,14 @@ function renderHUD(player,nearStation,dockingState,t){
   const fuelPct=player.fuel/player.fuelMax;
   hudBar(lx+10,ly+74,lw-20,10,'PALIVO',fuelPct,fuelPct<0.2?'#ff4400':'#ff9500');
 
-  // Rychlost
-  const spd=Math.round(Math.hypot(player.vx,player.vy));
+  // Rychlost v km/s
+  const spdRaw=Math.hypot(player.vx,player.vy);
+  const spdKms=spdRaw*C.SPEED_KMS_FACTOR;
+  const spdText=spdKms>=1000?Math.round(spdKms).toLocaleString('cs')+' km/s':spdKms.toFixed(1)+' km/s';
   ctx.font='10px "Courier New", monospace';ctx.fillStyle='rgba(255,149,0,0.7)';
   ctx.fillText('RYCHLOST',lx+10,ly+102);
-  ctx.font='bold 18px "Courier New", monospace';ctx.fillStyle='#ffaa00';
-  ctx.fillText(spd+' m/s',lx+10,ly+120);
+  ctx.font='bold 16px "Courier New", monospace';ctx.fillStyle='#ffaa00';
+  ctx.fillText(spdText,lx+10,ly+120);
 
   // Souřadnice
   ctx.font='9px "Courier New", monospace';ctx.fillStyle='rgba(255,149,0,0.5)';
@@ -210,7 +212,23 @@ function renderMinimap(player,chunks,navTarget,t){
 let mapCanvas,mapCtx,mapZoom=1,mapPan={x:0,y:0},mapDragStart=null;
 function initMapCanvas(){
   mapCanvas=document.getElementById('map-canvas');mapCtx=mapCanvas.getContext('2d');
-  mapCanvas.addEventListener('wheel',e=>{e.preventDefault();mapZoom=clamp(mapZoom*(e.deltaY<0?1.2:0.83),0.1,6);drawBigMap();},{passive:false});
+  // Fullscreen canvas — celé okno minus header
+  const hdr=document.getElementById('map-header');
+  const hdrH=hdr?hdr.offsetHeight||48:48;
+  mapCanvas.width=window.innerWidth;
+  mapCanvas.height=Math.max(300,window.innerHeight-hdrH);
+  mapCanvas.addEventListener('wheel',e=>{
+    e.preventDefault();
+    // Zoom centrovaný na pozici myši
+    const rect=mapCanvas.getBoundingClientRect();
+    const mx=e.clientX-rect.left-mapCanvas.width/2-mapPan.x;
+    const my=e.clientY-rect.top-mapCanvas.height/2-mapPan.y;
+    const factor=e.deltaY<0?1.25:0.80;
+    mapPan.x-=mx*(factor-1);
+    mapPan.y-=my*(factor-1);
+    mapZoom=clamp(mapZoom*factor,0.002,500);
+    drawBigMap();
+  },{passive:false});
   mapCanvas.addEventListener('mousedown',e=>{mapDragStart={x:e.clientX-mapPan.x,y:e.clientY-mapPan.y};mapCanvas.style.cursor='grabbing';});
   mapCanvas.addEventListener('mousemove',e=>{if(mapDragStart){mapPan.x=e.clientX-mapDragStart.x;mapPan.y=e.clientY-mapDragStart.y;drawBigMap();}});
   mapCanvas.addEventListener('mouseup',()=>{mapDragStart=null;mapCanvas.style.cursor='grab';});
@@ -222,14 +240,16 @@ function initMapCanvas(){
 function drawBigMap(){
   if(!mapCtx||!window.gameState)return;
   const player=window.gameState.player;
-  const S=mapCanvas.width,cx=S/2+mapPan.x,cy=S/2+mapPan.y;
-  const baseScale=S/8000*mapZoom;
-  mapCtx.clearRect(0,0,S,S);
-  mapCtx.fillStyle='#000408';mapCtx.fillRect(0,0,S,S);
-  // Grid
-  mapCtx.strokeStyle='rgba(255,149,0,0.06)';mapCtx.lineWidth=0.5;
-  for(let x=0;x<S;x+=40){mapCtx.beginPath();mapCtx.moveTo(x,0);mapCtx.lineTo(x,S);mapCtx.stroke();}
-  for(let y=0;y<S;y+=40){mapCtx.beginPath();mapCtx.moveTo(0,y);mapCtx.lineTo(S,y);mapCtx.stroke();}
+  const MW=mapCanvas.width,MH=mapCanvas.height;
+  const cx=MW/2+mapPan.x,cy=MH/2+mapPan.y;
+  const baseScale=Math.min(MW,MH)/8000*mapZoom;
+  mapCtx.clearRect(0,0,MW,MH);
+  mapCtx.fillStyle='#000408';mapCtx.fillRect(0,0,MW,MH);
+  // Grid — hustota podle zoomu
+  const gridSpacing=Math.max(8,Math.min(80,40*mapZoom));
+  mapCtx.strokeStyle='rgba(255,149,0,0.05)';mapCtx.lineWidth=0.5;
+  for(let x=0;x<MW;x+=gridSpacing){mapCtx.beginPath();mapCtx.moveTo(x,0);mapCtx.lineTo(x,MH);mapCtx.stroke();}
+  for(let y=0;y<MH;y+=gridSpacing){mapCtx.beginPath();mapCtx.moveTo(0,y);mapCtx.lineTo(MW,y);mapCtx.stroke();}
 
   function wp(wx,wy){return{x:cx+wx*baseScale,y:cy+wy*baseScale};}
 
@@ -297,33 +317,46 @@ function drawBigMap(){
     mapCtx.restore();
   }
 
-  // Planety sluneční soustavy (vždy — force-load chunku)
+  // Planety sluneční soustavy (vždy — bez culling limitu)
   {
     const solCh=getChunk(C.SOLAR_CHUNK.cx,C.SOLAR_CHUNK.cy);
     if(solCh?.system){
       const sys=solCh.system;
       const gt=window.gameState.t||0;
+      // Orbit kroužky (při dostatečném zoomu)
+      if(mapZoom>0.05){
+        const{x:sx2,y:sy2}=wp(sys.sx-player.x,sys.sy-player.y);
+        mapCtx.save();
+        mapCtx.strokeStyle='rgba(255,149,0,0.06)';mapCtx.lineWidth=0.5;
+        solCh.system.planets.forEach(pl=>{
+          mapCtx.beginPath();mapCtx.arc(sx2,sy2,pl.orbit*baseScale,0,Math.PI*2);mapCtx.stroke();
+        });
+        mapCtx.restore();
+      }
       solCh.system.planets.forEach(pl=>{
         const pos=getPlanetPos(pl,sys.sx,sys.sy,gt);
         const{x:ppx,y:ppy}=wp(pos.x-player.x,pos.y-player.y);
-        if(ppx<-20||ppx>S+20||ppy<-20||ppy>S+20)return;
-        // Planeta
-        const pr=Math.max(4,pl.r*baseScale*0.6);
+        // Zobraz i když je mimo canvas (při velkém zoomu) — ale ušetři výkon
+        if(ppx<-200||ppx>MW+200||ppy<-200||ppy>MH+200)return;
+        const pr=Math.max(3,pl.r*baseScale*0.6);
         mapCtx.save();
         const pg=mapCtx.createRadialGradient(ppx-pr*0.3,ppy-pr*0.3,0,ppx,ppy,pr);
         pg.addColorStop(0,'#ffffff88');pg.addColorStop(0.3,pl.color);pg.addColorStop(1,pl.color+'88');
         mapCtx.fillStyle=pg;mapCtx.beginPath();mapCtx.arc(ppx,ppy,pr,0,Math.PI*2);mapCtx.fill();
-        // Název
-        mapCtx.font=`bold ${8+Math.floor(pr*0.3)}px "Courier New", monospace`;
-        mapCtx.textAlign='center';mapCtx.fillStyle='#ffd080';mapCtx.globalAlpha=0.85;
-        mapCtx.fillText(pl.name,ppx,ppy-pr-5);
+        // Název — jen při dostatečné velikosti
+        if(pr>3){
+          const fs=clamp(8+Math.floor(pr*0.3),8,16);
+          mapCtx.font=`bold ${fs}px "Courier New", monospace`;
+          mapCtx.textAlign='center';mapCtx.fillStyle='#ffd080';mapCtx.globalAlpha=0.85;
+          mapCtx.fillText(pl.name,ppx,ppy-Math.max(pr,5)-3);
+        }
         // Stanice hexagon
-        if(pl.station){
+        if(pl.station&&pr>2){
           const isNav=window.gameState.navTarget===pl.station;
-          const stx=ppx+pr+8,sty=ppy;
+          const stx=ppx+Math.max(pr,5)+6,sty=ppy;
           mapCtx.strokeStyle=isNav?'#00ff88':pl.color;mapCtx.lineWidth=isNav?2:1;
           mapCtx.fillStyle='rgba(0,4,14,0.9)';mapCtx.globalAlpha=0.9;
-          const sr=4+pl.station.tier*1.5;
+          const sr=Math.max(3,4+pl.station.tier*1.5);
           mapCtx.beginPath();
           for(let i=0;i<6;i++){const a=i*Math.PI/3;mapCtx.lineTo(stx+Math.cos(a)*sr,sty+Math.sin(a)*sr);}
           mapCtx.closePath();mapCtx.fill();mapCtx.stroke();
@@ -333,28 +366,29 @@ function drawBigMap(){
     }
   }
 
-  // SOL — střed sluneční soustavy (vždy viditelný, force-load)
+  // SOL — střed sluneční soustavy (vždy viditelný)
   {
     const solSys=getChunk(C.SOLAR_CHUNK.cx,C.SOLAR_CHUNK.cy)?.system;
     if(solSys){
       const{x:spx,y:spy}=wp(solSys.sx-player.x,solSys.sy-player.y);
       mapCtx.save();
-      const sg=mapCtx.createRadialGradient(spx,spy,0,spx,spy,28);
+      const solR=Math.max(8,155*baseScale);
+      const sg=mapCtx.createRadialGradient(spx,spy,0,spx,spy,solR*3);
       sg.addColorStop(0,'rgba(255,240,100,0.55)');sg.addColorStop(1,'rgba(255,240,100,0)');
-      mapCtx.fillStyle=sg;mapCtx.beginPath();mapCtx.arc(spx,spy,28,0,Math.PI*2);mapCtx.fill();
-      mapCtx.fillStyle='#fff8c0';mapCtx.beginPath();mapCtx.arc(spx,spy,8,0,Math.PI*2);mapCtx.fill();
+      mapCtx.fillStyle=sg;mapCtx.beginPath();mapCtx.arc(spx,spy,solR*3,0,Math.PI*2);mapCtx.fill();
+      mapCtx.fillStyle='#fff8c0';mapCtx.beginPath();mapCtx.arc(spx,spy,Math.max(5,solR),0,Math.PI*2);mapCtx.fill();
       mapCtx.font='bold 11px "Courier New", monospace';mapCtx.textAlign='center';
-      mapCtx.fillStyle='#ffee88';mapCtx.fillText('☀ SOL',spx,spy-14);
+      mapCtx.fillStyle='#ffee88';mapCtx.fillText('☀ SOL',spx,spy-Math.max(14,solR+5));
       mapCtx.restore();
     }
   }
 
   // Zoom label
   mapCtx.fillStyle='rgba(255,149,0,0.5)';mapCtx.font='9px "Courier New", monospace';mapCtx.textAlign='left';
-  mapCtx.fillText(`ZOOM: ${mapZoom.toFixed(1)}×  |  ${Math.round(player.x/100)}, ${Math.round(player.y/100)} AU`,8,S-8);
+  mapCtx.fillText(`ZOOM: ${mapZoom.toFixed(1)}×  |  ${Math.round(player.x/100)}, ${Math.round(player.y/100)} AU`,8,MH-8);
   // Legenda
   mapCtx.textAlign='right';
-  mapCtx.fillText('● Hvězda  ◆ Stanice  ☀ Sol  [KLIK] = Nastavit navigaci',S-8,S-8);
+  mapCtx.fillText('● Hvězda  ◆ Stanice  ☀ Sol  [KLIK] = Nastavit navigaci',MW-8,MH-8);
 }
 
 function handleMapClick(e){
@@ -362,8 +396,8 @@ function handleMapClick(e){
   const player=window.gameState.player;
   const rect=mapCanvas.getBoundingClientRect();
   const mx=e.clientX-rect.left,my=e.clientY-rect.top;
-  const S=mapCanvas.width,baseScale=S/8000*mapZoom;
-  const cx=S/2+mapPan.x,cy=S/2+mapPan.y;
+  const MW=mapCanvas.width,MH=mapCanvas.height,baseScale=Math.min(MW,MH)/8000*mapZoom;
+  const cx=MW/2+mapPan.x,cy=MH/2+mapPan.y;
   let closest=null,closestD=30;
   chunkCache.forEach(ch=>{
     if(!ch.system)return;

@@ -3,9 +3,13 @@
 
 // Globální reference
 let ctx,W,H,camX=0,camY=0,shakeX=0,shakeY=0;
+let camZoom=1.0;
 
 function toScreen(wx,wy){return{x:wx-camX+shakeX,y:wy-camY+shakeY};}
-function inView(sx,sy,pad=200){return sx>-pad&&sx<W+pad&&sy>-pad&&sy<H+pad;}
+function inView(sx,sy,pad=200){
+  const p=pad*Math.max(1,1/Math.max(camZoom,0.05));
+  return sx>-p&&sx<W+p&&sy>-p&&sy<H+p;
+}
 
 // ---- Pozadí ----
 function renderBackground(chunks,t){
@@ -554,52 +558,109 @@ function renderEnemy(e,t){
   }
 }
 
-// ---- Loď hráče ----
+// ---- Loď hráče (s bočními tryskami) ----
 function renderPlayerShip(player,t,sx,sy){
   if(sx===undefined)sx=W/2;
   if(sy===undefined)sy=H/2;
+
+  const strafeL=window._strafeL||false;
+  const strafeR=window._strafeR||false;
+
   ctx.save();
   ctx.translate(sx,sy);ctx.rotate(player.angle+Math.PI/2);
-  // Motor flame
-  if(player.thrusting||player.boosting){
-    const isBst=player.boosting;
-    const fl=isBst?32:18;
-    const flicker=0.8+Math.random()*0.2;
-    ctx.globalAlpha=0.85;
-    const eg=ctx.createLinearGradient(0,14,0,14+fl*flicker);
-    eg.addColorStop(0,isBst?'rgba(0,180,255,0.95)':'rgba(255,140,0,0.9)');
-    eg.addColorStop(0.4,isBst?'rgba(0,80,255,0.5)':'rgba(255,60,0,0.5)');
-    eg.addColorStop(1,'transparent');
-    ctx.fillStyle=eg;ctx.beginPath();ctx.moveTo(-5,12);ctx.lineTo(5,12);ctx.lineTo(0,14+fl*flicker);ctx.fill();
-    ctx.globalAlpha=1;
-    // Druhý malý trysk
-    ctx.globalAlpha=0.5;
-    const eg2=ctx.createLinearGradient(0,14,0,20);
-    eg2.addColorStop(0,isBst?'rgba(120,220,255,0.8)':'rgba(255,180,60,0.7)');eg2.addColorStop(1,'transparent');
-    ctx.fillStyle=eg2;ctx.beginPath();ctx.moveTo(-2,12);ctx.lineTo(2,12);ctx.lineTo(0,20);ctx.fill();
+
+  // === BOČNÍ TRYSKY — plameny ===
+  // Strafe vlevo → pravá tryska (výfuk doprava = loď jde doleva)
+  if(strafeL){
+    const fl=7+Math.random()*5;
+    ctx.globalAlpha=0.75+Math.random()*0.2;
+    const eg=ctx.createLinearGradient(14,2,14+fl,2);
+    eg.addColorStop(0,'rgba(80,200,255,0.95)');eg.addColorStop(0.5,'rgba(40,100,255,0.5)');eg.addColorStop(1,'transparent');
+    ctx.fillStyle=eg;
+    ctx.beginPath();ctx.moveTo(14,-3);ctx.lineTo(14,5);ctx.lineTo(14+fl,1);ctx.fill();
     ctx.globalAlpha=1;
   }
-  // Trup
-  ctx.fillStyle='#050c1c';ctx.strokeStyle='#ff9500';ctx.lineWidth=1.5;
+  // Strafe vpravo → levá tryska (výfuk doleva = loď jde doprava)
+  if(strafeR){
+    const fl=7+Math.random()*5;
+    ctx.globalAlpha=0.75+Math.random()*0.2;
+    const eg=ctx.createLinearGradient(-14,2,-14-fl,2);
+    eg.addColorStop(0,'rgba(80,200,255,0.95)');eg.addColorStop(0.5,'rgba(40,100,255,0.5)');eg.addColorStop(1,'transparent');
+    ctx.fillStyle=eg;
+    ctx.beginPath();ctx.moveTo(-14,-3);ctx.lineTo(-14,5);ctx.lineTo(-14-fl,1);ctx.fill();
+    ctx.globalAlpha=1;
+  }
+
+  // === HLAVNÍ MOTOR ===
+  if(player.thrusting||player.boosting){
+    const isBst=player.boosting;
+    const fl=isBst?34:20;
+    const flicker=0.8+Math.random()*0.2;
+    ctx.globalAlpha=0.88;
+    const eg=ctx.createLinearGradient(0,14,0,14+fl*flicker);
+    eg.addColorStop(0,isBst?'rgba(0,180,255,0.98)':'rgba(255,150,0,0.92)');
+    eg.addColorStop(0.35,isBst?'rgba(0,80,255,0.55)':'rgba(255,60,0,0.55)');
+    eg.addColorStop(1,'transparent');
+    ctx.fillStyle=eg;ctx.beginPath();ctx.moveTo(-5,12);ctx.lineTo(5,12);ctx.lineTo(0,14+fl*flicker);ctx.fill();
+    ctx.globalAlpha=0.5;
+    const eg2=ctx.createLinearGradient(0,12,0,22);
+    eg2.addColorStop(0,isBst?'rgba(150,230,255,0.85)':'rgba(255,200,60,0.8)');eg2.addColorStop(1,'transparent');
+    ctx.fillStyle=eg2;ctx.beginPath();ctx.moveTo(-2,12);ctx.lineTo(2,12);ctx.lineTo(0,22);ctx.fill();
+    ctx.globalAlpha=1;
+  }
+
+  // === TRUP ===
+  ctx.fillStyle='#060e22';ctx.strokeStyle='#ff9500';ctx.lineWidth=1.5;
+  ctx.shadowColor='rgba(255,149,0,0.4)';ctx.shadowBlur=4;
   ctx.beginPath();ctx.moveTo(0,-16);ctx.lineTo(10,10);ctx.lineTo(5,7);ctx.lineTo(-5,7);ctx.lineTo(-10,10);ctx.closePath();ctx.fill();ctx.stroke();
-  // Detail — přední okno
-  ctx.fillStyle='rgba(100,200,255,0.4)';ctx.beginPath();ctx.ellipse(0,-5,3,5,0,0,Math.PI*2);ctx.fill();
-  // Wingtipy
-  ctx.strokeStyle='#ff9500';ctx.lineWidth=1;
+  ctx.shadowBlur=0;
+
+  // Detaily na trupu — žebra
+  ctx.strokeStyle='rgba(255,149,0,0.25)';ctx.lineWidth=0.7;
+  ctx.beginPath();ctx.moveTo(0,-11);ctx.lineTo(5,5);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(0,-11);ctx.lineTo(-5,5);ctx.stroke();
+
+  // Přední okno — svítí modře
+  ctx.shadowColor='rgba(100,200,255,0.8)';ctx.shadowBlur=5;
+  ctx.fillStyle='rgba(100,200,255,0.5)';ctx.beginPath();ctx.ellipse(0,-5,3,5,0,0,Math.PI*2);ctx.fill();
+  ctx.shadowBlur=0;
+
+  // === WINGTIPY ===
+  ctx.strokeStyle='#ff9500';ctx.lineWidth=1.1;
   ctx.beginPath();ctx.moveTo(-10,10);ctx.lineTo(-14,14);ctx.stroke();
   ctx.beginPath();ctx.moveTo(10,10);ctx.lineTo(14,14);ctx.stroke();
+  // Wingtip navigační světla (červená/zelená)
+  ctx.fillStyle='#ff2020';ctx.shadowColor='#ff4040';ctx.shadowBlur=4;
+  ctx.beginPath();ctx.arc(-14,14,1.5,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#00cc44';ctx.shadowColor='#00ff66';
+  ctx.beginPath();ctx.arc(14,14,1.5,0,Math.PI*2);ctx.fill();
+  ctx.shadowBlur=0;
+
+  // === BOČNÍ TRYSKOVÉ PODY ===
+  ctx.strokeStyle='rgba(255,149,0,0.45)';ctx.lineWidth=0.8;
+  ctx.fillStyle='rgba(10,20,40,0.9)';
+  // Pravý pod (vystupuje ze zádi pravého křídla)
+  ctx.beginPath();ctx.rect(11,-4,8,7);ctx.fill();ctx.stroke();
+  // Levý pod
+  ctx.beginPath();ctx.rect(-19,-4,8,7);ctx.fill();ctx.stroke();
+  // Výfukový otvor — bílá tečka
+  ctx.fillStyle='rgba(200,220,255,0.3)';
+  ctx.beginPath();ctx.arc(19,0,1.5,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(-19,0,1.5,0,Math.PI*2);ctx.fill();
+
   ctx.restore();
 
-  // Štít kruh
+  // === ŠTÍT (v screen coords) ===
   if(player.shield>0){
-    const shA=player.invTimer>0?0.45:0.04+player.shield/player.shieldMax*0.12;
+    const shA=player.invTimer>0?0.5:0.04+player.shield/player.shieldMax*0.14;
     ctx.save();ctx.globalAlpha=shA;ctx.strokeStyle='#4080ff';ctx.lineWidth=1.5;
-    ctx.beginPath();ctx.arc(sx,sy,22,0,Math.PI*2);ctx.stroke();ctx.restore();
+    ctx.shadowColor='#4080ff';ctx.shadowBlur=8;
+    ctx.beginPath();ctx.arc(sx,sy,24,0,Math.PI*2);ctx.stroke();ctx.restore();
   }
   // Blikání při zásahu
   if(player.invTimer>0&&Math.floor(player.invTimer*10)%2===0){
-    ctx.save();ctx.globalAlpha=0.22;ctx.fillStyle='#ffffff';
-    ctx.beginPath();ctx.arc(sx,sy,22,0,Math.PI*2);ctx.fill();ctx.restore();
+    ctx.save();ctx.globalAlpha=0.2;ctx.fillStyle='#ffffff';
+    ctx.beginPath();ctx.arc(sx,sy,24,0,Math.PI*2);ctx.fill();ctx.restore();
   }
 }
 

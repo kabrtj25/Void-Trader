@@ -5,14 +5,16 @@ const C = {
   VIEW_R:       5,
   SAFE_ZONE:    4000,
 
-  // Let — pomalejší, realistické
-  THRUST:       0.30,
-  BRAKE_MULT:   0.80,
-  DRAG:         0.980,
-  MAX_SPD:      15,
-  BOOST_SPD:    35,
-  BOOST_THRUST: 0.50,
-  ROT_SPD:      2.0,
+  // Let — tryskový pohon s bočními tryskami
+  THRUST:           0.32,
+  SIDE_THRUST:      0.20,
+  BRAKE_MULT:       0.80,
+  DRAG:             0.984,
+  DRAG_BOOST:       0.9985,
+  MAX_SPD:          28,
+  BOOST_THRUST:     0.90,
+  ROT_SPD:          2.0,
+  SPEED_KMS_FACTOR: 50,
 
   // Palivo
   FUEL_MAX:     100,
@@ -64,27 +66,51 @@ const UPGRADES = [
   {id:'fuel',    name:'Nádrž',           max:3, cost:700,  desc:'Nádrž +25%'},
 ];
 
-// Fixní stanice (garantované při spuštění)
-// Poznámka: chunk (0,0) je vyhrazen pro Sluneční soustavu, Stanice Alfa přesunuta
+// Fixní stanice rovnoměrně rozložené po celé mapě
 const FIXED_STATIONS = [
-  {cx:2,  cy:0,  name:'Stanice Alfa',      tier:3, color:'#ff9500'},
-  {cx:3,  cy:1,  name:'Základna Beta',     tier:2, color:'#ff6a00'},
-  {cx:-2, cy:3,  name:'Port Gamma',        tier:2, color:'#ffbb00'},
-  {cx:4,  cy:-2, name:'Stanice Delta',     tier:1, color:'#ff8c00'},
-  {cx:-3, cy:-2, name:'Věž Epsilon',       tier:2, color:'#ff7700'},
-  {cx:2,  cy:5,  name:'Základna Zeta',     tier:3, color:'#ffaa00'},
-  {cx:-5, cy:2,  name:'Port Eta',          tier:1, color:'#ff9500'},
-  {cx:1,  cy:-4, name:'Stanice Theta',     tier:2, color:'#ffcc00'},
-  {cx:6,  cy:-1, name:'Nexus Hub',         tier:2, color:'#ffaa00'},
-  {cx:-1, cy:6,  name:'Frontier Post',     tier:1, color:'#ff8c00'},
-  {cx:7,  cy:3,  name:'Colonia Bravo',     tier:2, color:'#ffcc00'},
-  {cx:-6, cy:-4, name:'Deep Space Alpha',  tier:3, color:'#ff9500'},
-  {cx:0,  cy:-5, name:'Polární Stanice',   tier:1, color:'#ffbb00'},
-  {cx:8,  cy:-5, name:'Port Iota',         tier:2, color:'#ff7700'},
-  {cx:-4, cy:7,  name:'Stanice Lambda',    tier:1, color:'#ff9500'},
-  {cx:3,  cy:-7, name:'Kepler Station',    tier:3, color:'#ffaa00'},
-  {cx:-7, cy:1,  name:'Outer Rim Post',    tier:1, color:'#ff8c00'},
-  {cx:5,  cy:6,  name:'Meridian Hub',      tier:2, color:'#ffcc00'},
+  // Vnitřní oblast (1-4 chunky od středu)
+  {cx:2,  cy:0,  name:'Stanice Alfa',       tier:3, color:'#ff9500'},
+  {cx:3,  cy:1,  name:'Základna Beta',      tier:2, color:'#ff6a00'},
+  {cx:-2, cy:3,  name:'Port Gamma',         tier:2, color:'#ffbb00'},
+  {cx:4,  cy:-2, name:'Stanice Delta',      tier:1, color:'#ff8c00'},
+  {cx:-3, cy:-2, name:'Věž Epsilon',        tier:2, color:'#ff7700'},
+  {cx:-1, cy:2,  name:'Orbit Outpost',      tier:1, color:'#ff9500'},
+  {cx:1,  cy:-2, name:'Helion Base',        tier:1, color:'#ffaa00'},
+  {cx:-2, cy:-4, name:'Voidreach Post',     tier:2, color:'#ffcc00'},
+  {cx:4,  cy:3,  name:'Stellar Junction',   tier:2, color:'#ff9500'},
+  {cx:-4, cy:-1, name:'Darkside Hub',       tier:1, color:'#ff8c00'},
+  {cx:0,  cy:3,  name:'Apex Station',       tier:2, color:'#ffbb00'},
+  // Střední oblast (5-7 chunků)
+  {cx:2,  cy:5,  name:'Základna Zeta',      tier:3, color:'#ffaa00'},
+  {cx:-5, cy:2,  name:'Port Eta',           tier:1, color:'#ff9500'},
+  {cx:1,  cy:-4, name:'Stanice Theta',      tier:2, color:'#ffcc00'},
+  {cx:6,  cy:-1, name:'Nexus Hub',          tier:2, color:'#ffaa00'},
+  {cx:-1, cy:6,  name:'Frontier Post',      tier:1, color:'#ff8c00'},
+  {cx:7,  cy:3,  name:'Colonia Bravo',      tier:2, color:'#ffcc00'},
+  {cx:-6, cy:-4, name:'Deep Space Alpha',   tier:3, color:'#ff9500'},
+  {cx:0,  cy:-5, name:'Polární Stanice',    tier:1, color:'#ffbb00'},
+  {cx:6,  cy:0,  name:'Rimward Post',       tier:1, color:'#ff9500'},
+  {cx:-5, cy:4,  name:'Nebula Drift',       tier:1, color:'#ff9500'},
+  {cx:2,  cy:-5, name:'Binary Station',     tier:2, color:'#ffcc00'},
+  {cx:-3, cy:5,  name:'Crescent Station',   tier:2, color:'#ffbb00'},
+  // Vnější oblast (8-11 chunků)
+  {cx:8,  cy:-5, name:'Port Iota',          tier:2, color:'#ff7700'},
+  {cx:-4, cy:7,  name:'Stanice Lambda',     tier:1, color:'#ff9500'},
+  {cx:3,  cy:-7, name:'Kepler Station',     tier:3, color:'#ffaa00'},
+  {cx:-7, cy:1,  name:'Outer Rim Post',     tier:1, color:'#ff8c00'},
+  {cx:5,  cy:6,  name:'Meridian Hub',       tier:2, color:'#ffcc00'},
+  {cx:9,  cy:2,  name:'Far Reach Hub',      tier:1, color:'#ff9500'},
+  {cx:-8, cy:-1, name:'Void Gate Alpha',    tier:2, color:'#ff9500'},
+  {cx:4,  cy:-8, name:'Nova Outpost',       tier:1, color:'#ff8c00'},
+  {cx:10, cy:-3, name:'Edge Station',       tier:1, color:'#ff9500'},
+  {cx:-9, cy:3,  name:'Horizon Post',       tier:1, color:'#ff9500'},
+  {cx:6,  cy:7,  name:'Outer Reach Station',tier:2, color:'#ffcc00'},
+  {cx:8,  cy:-8, name:'Deep Space Beta',    tier:2, color:'#ff9500'},
+  {cx:-6, cy:6,  name:'Frontier Alpha',     tier:1, color:'#ff8c00'},
+  {cx:11, cy:5,  name:'Outer Rim Gamma',    tier:1, color:'#ff9500'},
+  {cx:-10,cy:-5, name:'Abyss Station',      tier:2, color:'#ffaa00'},
+  {cx:7,  cy:-6, name:'Crossroads Hub',     tier:2, color:'#ff9500'},
+  {cx:-7, cy:8,  name:'Polar Reach',        tier:1, color:'#ffbb00'},
   // Speciální — Sluneční soustava je v SOLAR_CHUNK, stanice se generuje separátně
 ];
 

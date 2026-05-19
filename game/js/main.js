@@ -263,6 +263,13 @@ function undock(){
 function openMap(){
   state='map';
   document.getElementById('map-overlay').style.display='flex';
+  // Přizpůsob canvas aktuální velikosti okna
+  if(mapCanvas){
+    const hdr=document.getElementById('map-header');
+    const hdrH=hdr?hdr.offsetHeight||48:48;
+    mapCanvas.width=window.innerWidth;
+    mapCanvas.height=Math.max(300,window.innerHeight-hdrH);
+  }
   drawBigMap();
 }
 function closeMap(){
@@ -432,8 +439,20 @@ function _drawPauseShip(canvas,t){
   // Wingtip navigační světla
   pc.fillStyle='#ff3300';pc.shadowColor='#ff4400';pc.shadowBlur=3;
   pc.beginPath();pc.arc(-14,14,1.1,0,Math.PI*2);pc.fill();
-  pc.fillStyle='#3366ff';pc.shadowColor='#4488ff';
+  pc.fillStyle='#00cc44';pc.shadowColor='#00ff66';
   pc.beginPath();pc.arc(14,14,1.1,0,Math.PI*2);pc.fill();
+  pc.shadowBlur=0;
+
+  // Boční tryskové pody
+  pc.strokeStyle='rgba(255,149,0,0.45)';pc.lineWidth=0.28;
+  pc.fillStyle='rgba(10,20,40,0.9)';
+  pc.beginPath();pc.rect(11,-4,8,7);pc.fill();pc.stroke();
+  pc.beginPath();pc.rect(-19,-4,8,7);pc.fill();pc.stroke();
+  // Výfukové otvory — idle záře
+  const idleSide=0.15+Math.sin(t*6)*0.1;
+  pc.fillStyle=`rgba(80,180,255,${idleSide})`;pc.shadowColor='#4488ff';pc.shadowBlur=4;
+  pc.beginPath();pc.arc(19,0,2,0,Math.PI*2);pc.fill();
+  pc.beginPath();pc.arc(-19,0,2,0,Math.PI*2);pc.fill();
   pc.shadowBlur=0;
 
   pc.restore();
@@ -509,25 +528,41 @@ function update(dt){
   if(shootCd>0)shootCd=Math.max(0,shootCd-dt);
   if(window.msgTimer>0)window.msgTimer=Math.max(0,window.msgTimer-dt*1000);
 
-  // Pohyb hráče
+  // Pohyb hráče — boční trysky místo rotace
   const thrusting=isKey('KeyW','ArrowUp');
   const braking=isKey('KeyS','ArrowDown');
-  const turnL=isKey('KeyA','ArrowLeft');
-  const turnR=isKey('KeyD','ArrowRight');
+  const strafeL=isKey('KeyA','ArrowLeft');
+  const strafeR=isKey('KeyD','ArrowRight');
   const boost=isKey('ShiftLeft','ShiftRight')&&thrusting&&p.fuel>0;
-
-  if(turnL)p.angle-=C.ROT_SPD*dt;
-  if(turnR)p.angle+=C.ROT_SPD*dt;
+  window._strafeL=strafeL; window._strafeR=strafeR;
 
   const engMult=1+0.15*(p.upgrades.engine||0);
+
+  // Hlavní motor (dopředu)
   if(thrusting){
     const thrust=(boost?C.BOOST_THRUST:C.THRUST)*engMult;
     p.vx+=Math.cos(p.angle)*thrust;p.vy+=Math.sin(p.angle)*thrust;
     p.fuel=Math.max(0,p.fuel-(boost?C.FUEL_BOOST:C.FUEL_THRUST));
     spawnTrail(p);
   }
+
+  // Boční trysky — strafe (kolmo na osu lodi)
+  const sideThr=C.SIDE_THRUST*engMult;
+  if(strafeL){
+    // Levá tryska (pushes ship LEFT in ship-local space)
+    p.vx+=Math.sin(p.angle)*sideThr;
+    p.vy-=Math.cos(p.angle)*sideThr;
+    p.fuel=Math.max(0,p.fuel-C.FUEL_THRUST*0.4);
+  }
+  if(strafeR){
+    // Pravá tryska
+    p.vx-=Math.sin(p.angle)*sideThr;
+    p.vy+=Math.cos(p.angle)*sideThr;
+    p.fuel=Math.max(0,p.fuel-C.FUEL_THRUST*0.4);
+  }
+
+  // Brzdění (retro trysky)
   if(braking){
-    // Retro trysky — zpomalení ke 0, loď necouvá
     const spd=Math.hypot(p.vx,p.vy);
     if(spd>0.01){
       const brakePow=C.THRUST*C.BRAKE_MULT*engMult;
@@ -536,15 +571,30 @@ function update(dt){
     }else{p.vx=0;p.vy=0;}
   }
 
-  // Speed cap
-  const spd=Math.hypot(p.vx,p.vy);
-  const maxSpd=(boost?C.BOOST_SPD:C.MAX_SPD)*engMult;
-  if(spd>maxSpd){p.vx*=maxSpd/spd;p.vy*=maxSpd/spd;}
+  // Speed cap jen pro normální let (boost nemá cap → kontinuální akcelerace)
+  if(!boost){
+    const spd=Math.hypot(p.vx,p.vy);
+    const maxSpd=C.MAX_SPD*engMult;
+    if(spd>maxSpd){p.vx*=maxSpd/spd;p.vy*=maxSpd/spd;}
+  }
 
-  // Drag
-  p.vx*=C.DRAG;p.vy*=C.DRAG;
+  // Drag (boost má mnohem menší drag → loď se stále zrychluje)
+  const drag=boost?C.DRAG_BOOST:C.DRAG;
+  p.vx*=drag;p.vy*=drag;
   p.x+=p.vx;p.y+=p.vy;
   p.thrusting=thrusting;p.boosting=boost;
+
+  // Auto-rotate: loď se pomalu natáčí ve směru pohybu
+  const spd=Math.hypot(p.vx,p.vy);
+  if(spd>0.8){
+    const targetAngle=Math.atan2(p.vy,p.vx);
+    const da=angleDiff(targetAngle,p.angle);
+    p.angle+=da*Math.min(0.18,dt*2.2);
+  }
+
+  // Camera zoom — oddaluje se s rychlostí (efekt startu)
+  const targetZoom=Math.max(0.08,1/(1+spd*0.026));
+  camZoom+=(targetZoom-camZoom)*Math.min(1,dt*2.8);
 
   // Idle fuel
   p.fuel=Math.max(0,p.fuel-C.FUEL_IDLE);
@@ -766,30 +816,27 @@ function render(dt,t){
     return;
   }
 
-  // Absolutní reset canvas
+  // Reset + pauza → zoom se vrací na 1
   ctx.setTransform(1,0,0,1,0,0);
   ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.setLineDash([]);ctx.shadowBlur=0;
+  if(state==='paused') camZoom+=(1.0-camZoom)*Math.min(1,dt*3);
 
-  // Pozadí + hvězdy + mlhoviny
+  // Pozadí — screen space (hvězdy s paralaxou nesmí být uvnitř zoom transformu)
   renderBackground(gs.chunks,t);
 
-  // Sluneční soustavy
+  // === SVĚTOVÁ VRSTVA se zoom transformem ===
+  ctx.save();
+  ctx.translate(W/2,H/2);
+  ctx.scale(camZoom,camZoom);
+  ctx.translate(-W/2,-H/2);
+
   renderSystems(gs.chunks,t);
-
-  // Asteroidy
   gs.chunks.forEach(ch=>ch.asteroids.forEach(a=>renderAsteroid(a,t)));
-
-  // Engine trails (jako částice)
   const allParts=[...engineTrails,...gs.particles];
   renderParticles(allParts);
-
-  // Loot
   gs.loots.forEach(l=>renderLoot(l));
-
-  // Nepřátelé
   gs.enemies.forEach(e=>renderEnemy(e,t));
 
-  // Stanice (systémové + planetární)
   gs.chunks.forEach(ch=>{
     if(!ch.system)return;
     const drawSt=(st)=>{
@@ -804,27 +851,25 @@ function render(dt,t){
     });
   });
 
-  // Střely
   gs.bullets.forEach(b=>renderBullet(b));
 
-  // Hráč (vždy nahoře, čistý stav)
+  ctx.restore(); // Reset zoom transformu
+
+  // === SCREEN VRSTVA (bez zoomu) ===
   ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.setLineDash([]);ctx.shadowBlur=0;
+
+  // Hráčova loď — vždy uprostřed, vždy stejně velká
   if(!p.dead)renderPlayerShip(p,t);
 
   // Vigneta
   renderVignette();
 
   // HUD
-  ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.setLineDash([]);ctx.shadowBlur=0;
   if(state==='playing'){
     renderHUD(p,gs.nearStation,gs.dockingState,t);
-
-    // Dokovací indikátor
     if(gs.nearStation&&gs.dockingState?.approaching){
       renderDockingIndicator(gs.dockingState.align,gs.dockingState.speed,gs.dockingState.dockable);
     }
-
-    // Navigační šipka
     if(gs.navTarget){
       renderNavArrow(gs.navTarget.x,gs.navTarget.y,p.x,p.y,gs.navTarget.name);
     }

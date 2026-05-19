@@ -36,7 +36,7 @@ function generateChunk(cx,cy){
 
   // Sluneční soustava (20% šance, nebo fixní)
   const fixed=FIXED_STATIONS.find(s=>s.cx===cx&&s.cy===cy);
-  const hasSystem=fixed||rng()<0.20;
+  const hasSystem=fixed||rng()<0.40;
   if(hasSystem){
     const sr=makeRng(chunkSeed(cx,cy)+99);
     const starX=wx+sc*0.3+sr()*sc*0.4;
@@ -69,7 +69,7 @@ function generateChunk(cx,cy){
         inv:generateInv(sr),
         fixed:true
       };
-    } else if(sr()<0.6){
+    } else if(sr()<0.88){
       const stNames=['Colonia Port','Kepler Hub','Orion Dock','Sirius Base','Vega Station','Tau Port','Ceti Hub','Nova Dock'];
       station={
         x:starX+200+sr()*400, y:starY+200+sr()*400,
