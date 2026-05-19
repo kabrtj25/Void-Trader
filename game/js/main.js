@@ -274,14 +274,192 @@ function clearNav(){
 }
 
 // ---- Pause ----
+let _pauseShipAnimId=null;
+let _pauseStars=null;
+
 function openPause(){
   if(state!=='playing')return;
   state='paused';
+  _updatePauseStats();
   document.getElementById('pause-screen').style.display='flex';
+  _startPauseShipAnim();
 }
+
 function closePause(){
   state='playing';
   document.getElementById('pause-screen').style.display='none';
+  document.getElementById('esc-settings-panel').style.display='none';
+  document.getElementById('btn-pause-settings').classList.remove('active');
+  _stopPauseShipAnim();
+}
+
+function _updatePauseStats(){
+  if(!gameState)return;
+  const p=gameState.player;
+  const cmax=getCargoMax(p);
+  const xpPct=Math.min(100,Math.round(p.xp/xpNeeded(p.level)*100));
+  document.getElementById('esc-credits-val').textContent=p.credits.toLocaleString()+' Cr';
+  document.getElementById('esc-level-val').textContent=p.level;
+  document.getElementById('esc-earned-val').textContent=(gameState.totalEarned||0).toLocaleString()+' Cr';
+  const hullPct=Math.round(p.hull/p.hullMax*100);
+  const shieldPct=Math.round(p.shield/p.shieldMax*100);
+  const fuelPct=Math.round(p.fuel/p.fuelMax*100);
+  document.getElementById('esc-hull-val').textContent=hullPct+'%';
+  document.getElementById('esc-shield-val').textContent=shieldPct+'%';
+  document.getElementById('esc-fuel-val').textContent=fuelPct+'%';
+  document.getElementById('esc-xp-val').textContent=xpPct+'%';
+  document.getElementById('esc-hull-bar').style.width=hullPct+'%';
+  document.getElementById('esc-shield-bar').style.width=shieldPct+'%';
+  document.getElementById('esc-fuel-bar').style.width=fuelPct+'%';
+  document.getElementById('esc-xp-bar').style.width=xpPct+'%';
+  document.getElementById('esc-cargo-val').textContent=p.cargoCount+' / '+cmax;
+  const upgCount=Object.values(p.upgrades).reduce((s,v)=>s+v,0);
+  document.getElementById('esc-upgrades-val').textContent=upgCount>0?upgCount+' instalováno':'žádné';
+}
+
+function _startPauseShipAnim(){
+  const canvas=document.getElementById('esc-ship-canvas');
+  if(!canvas)return;
+
+  function frame(ts){
+    if(state!=='paused'){_pauseShipAnimId=null;return;}
+    // Resize canvas na správnou velikost při každém framu (layout mohl ještě nebýt hotov)
+    const vp=document.getElementById('esc-ship-viewport');
+    const vpW=vp.clientWidth||600, vpH=vp.clientHeight||400;
+    if(canvas.width!==vpW||canvas.height!==vpH){
+      canvas.width=vpW;canvas.height=vpH;
+      _pauseStars=null; // Přegeneruj hvězdy pro novou velikost
+    }
+    // Vygeneruj hvězdy pokud ještě neexistují
+    if(!_pauseStars){
+      _pauseStars=Array.from({length:160},()=>({
+        x:Math.random()*vpW, y:Math.random()*vpH,
+        r:Math.random()*1.3+0.2,
+        bright:0.2+Math.random()*0.8,
+        speed:0.4+Math.random()*1.2,
+        phase:Math.random()*Math.PI*2,
+        color:['#e8eeff','#90b8ff','#ffeeaa','#ffd0a0'][Math.floor(Math.random()*4)]
+      }));
+    }
+    _drawPauseShip(canvas,ts/1000);
+    _pauseShipAnimId=requestAnimationFrame(frame);
+  }
+  _pauseShipAnimId=requestAnimationFrame(frame);
+}
+
+function _stopPauseShipAnim(){
+  if(_pauseShipAnimId)cancelAnimationFrame(_pauseShipAnimId);
+  _pauseShipAnimId=null;
+}
+
+function _drawPauseShip(canvas,t){
+  const pc=canvas.getContext('2d');
+  const pw=canvas.width, ph=canvas.height;
+  const cx=pw/2, cy=ph*0.48;
+  const scale=4.5;
+
+  // Pozadí
+  pc.clearRect(0,0,pw,ph);
+  pc.fillStyle='#000408';pc.fillRect(0,0,pw,ph);
+
+  // Hvězdy
+  _pauseStars.forEach(s=>{
+    const tw=0.55+Math.sin(t*s.speed+s.phase)*0.45;
+    pc.globalAlpha=s.bright*tw;
+    pc.fillStyle=s.color;
+    pc.beginPath();pc.arc(s.x,s.y,s.r,0,Math.PI*2);pc.fill();
+  });
+  pc.globalAlpha=1;
+
+  // Mlhovina za lodí
+  const neb=pc.createRadialGradient(cx,cy,0,cx,cy,Math.min(pw,ph)*0.45);
+  neb.addColorStop(0,'rgba(40,15,80,0.22)');
+  neb.addColorStop(0.5,'rgba(255,80,0,0.07)');
+  neb.addColorStop(1,'transparent');
+  pc.fillStyle=neb;pc.fillRect(0,0,pw,ph);
+
+  // Pulzující záře za lodí
+  const glowPulse=0.5+Math.sin(t*1.4)*0.5;
+  const glow=pc.createRadialGradient(cx,cy,0,cx,cy,scale*22);
+  glow.addColorStop(0,'rgba(255,120,0,'+(0.15+glowPulse*0.1)+')');
+  glow.addColorStop(1,'transparent');
+  pc.fillStyle=glow;pc.beginPath();pc.arc(cx,cy,scale*22,0,Math.PI*2);pc.fill();
+
+  // === Loď v scale space ===
+  pc.save();
+  pc.translate(cx,cy);
+  pc.scale(scale,scale);
+  // Nose points up: local (0,-16) → screen (cx, cy-16*scale)
+
+  // Motor — idle plamen (v native ship coords)
+  const fl=10+Math.sin(t*9)*5;
+  pc.globalAlpha=0.8+Math.sin(t*11)*0.1;
+  const eg=pc.createLinearGradient(0,12,0,14+fl);
+  eg.addColorStop(0,'rgba(255,150,0,0.95)');
+  eg.addColorStop(0.4,'rgba(255,50,0,0.55)');
+  eg.addColorStop(1,'transparent');
+  pc.fillStyle=eg;
+  pc.beginPath();pc.moveTo(-5,12);pc.lineTo(5,12);pc.lineTo(0,14+fl);pc.fill();
+  pc.globalAlpha=0.5;
+  const eg2=pc.createLinearGradient(0,12,0,14+fl*0.55);
+  eg2.addColorStop(0,'rgba(255,230,120,0.9)');eg2.addColorStop(1,'transparent');
+  pc.fillStyle=eg2;
+  pc.beginPath();pc.moveTo(-2,12);pc.lineTo(2,12);pc.lineTo(0,14+fl*0.55);pc.fill();
+  pc.globalAlpha=1;
+
+  // Trup
+  pc.shadowColor='rgba(255,149,0,0.55)';pc.shadowBlur=3;
+  pc.fillStyle='#060e22';
+  pc.strokeStyle='#ff9500';pc.lineWidth=0.35;
+  pc.beginPath();pc.moveTo(0,-16);pc.lineTo(10,10);pc.lineTo(5,7);pc.lineTo(-5,7);pc.lineTo(-10,10);pc.closePath();
+  pc.fill();pc.stroke();
+
+  // Panel detaily
+  pc.strokeStyle='rgba(255,149,0,0.28)';pc.lineWidth=0.22;
+  pc.beginPath();pc.moveTo(0,-12);pc.lineTo(4,4);pc.stroke();
+  pc.beginPath();pc.moveTo(0,-12);pc.lineTo(-4,4);pc.stroke();
+
+  // Přední okno
+  pc.shadowColor='rgba(100,200,255,0.9)';pc.shadowBlur=4;
+  pc.fillStyle='rgba(100,200,255,0.6)';
+  pc.beginPath();pc.ellipse(0,-5,3,5,0,0,Math.PI*2);pc.fill();
+  pc.shadowBlur=0;
+
+  // Wingtips
+  pc.strokeStyle='#ff9500';pc.lineWidth=0.28;
+  pc.beginPath();pc.moveTo(-10,10);pc.lineTo(-14,14);pc.stroke();
+  pc.beginPath();pc.moveTo(10,10);pc.lineTo(14,14);pc.stroke();
+  // Wingtip navigační světla
+  pc.fillStyle='#ff3300';pc.shadowColor='#ff4400';pc.shadowBlur=3;
+  pc.beginPath();pc.arc(-14,14,1.1,0,Math.PI*2);pc.fill();
+  pc.fillStyle='#3366ff';pc.shadowColor='#4488ff';
+  pc.beginPath();pc.arc(14,14,1.1,0,Math.PI*2);pc.fill();
+  pc.shadowBlur=0;
+
+  pc.restore();
+
+  // Štít (v screen coords, mimo scale blok)
+  if(gameState&&gameState.player.shield>0){
+    const shPct=gameState.player.shield/gameState.player.shieldMax;
+    pc.save();
+    pc.globalAlpha=0.04+shPct*0.18+Math.sin(t*2.2)*0.03;
+    pc.strokeStyle='#4488ff';pc.lineWidth=1.8;
+    pc.shadowColor='#4488ff';pc.shadowBlur=10;
+    pc.beginPath();pc.arc(cx,cy,scale*13.5,0,Math.PI*2);pc.stroke();
+    pc.restore();
+  }
+
+  // Engine glow aura (pod lodí, v screen coords)
+  const engY=cy+scale*14;
+  const engA=pc.createRadialGradient(cx,engY,0,cx,engY,scale*16);
+  engA.addColorStop(0,'rgba(255,110,0,'+(0.35+glowPulse*0.25)+')');
+  engA.addColorStop(1,'transparent');
+  pc.fillStyle=engA;pc.beginPath();pc.arc(cx,engY,scale*16,0,Math.PI*2);pc.fill();
+
+  // CRT scan lines
+  pc.globalAlpha=0.022;
+  for(let y2=0;y2<ph;y2+=4){pc.fillStyle='#000';pc.fillRect(0,y2,pw,2);}
+  pc.globalAlpha=1;
 }
 
 // ---- Částice ----
@@ -710,8 +888,24 @@ window.addEventListener('load',()=>{
 
   // Pause menu
   document.getElementById('btn-resume').onclick=()=>closePause();
-  document.getElementById('btn-pause-save').onclick=()=>{saveGame();document.getElementById('btn-pause-save').textContent='✓ ULOŽENO';setTimeout(()=>document.getElementById('btn-pause-save').textContent='↓ ULOŽIT HRU',1500);};
+  document.getElementById('btn-pause-settings').onclick=()=>{
+    const p=document.getElementById('esc-settings-panel');
+    const btn=document.getElementById('btn-pause-settings');
+    const visible=p.style.display==='block';
+    p.style.display=visible?'none':'block';
+    btn.classList.toggle('active',!visible);
+  };
+  document.getElementById('btn-pause-map').onclick=()=>{
+    closePause();
+    openMap();
+  };
+  document.getElementById('btn-pause-save').onclick=()=>{
+    saveGame();
+    const lbl=document.querySelector('#btn-pause-save .esc-btn-label');
+    if(lbl){lbl.textContent='ULOŽENO ✓';setTimeout(()=>{lbl.textContent='ULOŽIT HRU';},1800);}
+  };
   document.getElementById('btn-pause-menu').onclick=()=>{
+    _stopPauseShipAnim();
     document.getElementById('pause-screen').style.display='none';
     document.getElementById('hud').style.display='none';
     document.getElementById('dock-panel').style.display='none';

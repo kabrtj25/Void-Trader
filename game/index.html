@@ -113,15 +113,131 @@
   </div>
 </div>
 
-<!-- PAUZA -->
+<!-- ETS2 PAUZA -->
 <div id="pause-screen" style="display:none">
-  <div id="pause-box">
-    <div id="pause-title">// PAUZA</div>
-    <div id="pause-sub">HRA POZASTAVENA</div>
-    <button class="menu-btn primary" id="btn-resume">▶ POKRAČOVAT [ESC]</button>
-    <button class="menu-btn" id="btn-pause-save">↓ ULOŽIT HRU</button>
-    <button class="menu-btn" id="btn-pause-menu">↩ HLAVNÍ MENU</button>
+
+  <!-- Horní info bar -->
+  <div id="esc-topbar">
+    <div class="esc-topgroup">
+      <div class="esc-topstat">
+        <span class="esc-toplabel">KREDITY</span>
+        <span class="esc-topval" id="esc-credits-val">0 Cr</span>
+      </div>
+      <div class="esc-topstat">
+        <span class="esc-toplabel">LEVEL</span>
+        <span class="esc-topval" id="esc-level-val">1</span>
+      </div>
+    </div>
+    <div id="esc-center-title">// PAUZA //</div>
+    <div class="esc-topgroup right">
+      <div class="esc-topstat right">
+        <span class="esc-toplabel">CELKEM VYDĚLANO</span>
+        <span class="esc-topval" id="esc-earned-val">0 Cr</span>
+      </div>
+    </div>
   </div>
+
+  <!-- Hlavní obsah: loď + statistiky -->
+  <div id="esc-main">
+
+    <!-- Viewport lodě -->
+    <div id="esc-ship-viewport">
+      <canvas id="esc-ship-canvas"></canvas>
+      <div id="esc-ship-label">VIPER MK.I — HRÁČOVA LOĎ</div>
+    </div>
+
+    <!-- Statistiky lodě -->
+    <div id="esc-ship-stats">
+      <div class="esc-stats-title">STATUS LODĚ</div>
+
+      <div class="esc-bar-group">
+        <div class="esc-bar-head">
+          <span class="esc-bar-label">TRUP</span>
+          <span class="esc-bar-val" id="esc-hull-val">100%</span>
+        </div>
+        <div class="esc-bar-track"><div class="esc-bar-fill hull" id="esc-hull-bar" style="width:100%"></div></div>
+      </div>
+
+      <div class="esc-bar-group">
+        <div class="esc-bar-head">
+          <span class="esc-bar-label">ENERGETICKÝ ŠTÍT</span>
+          <span class="esc-bar-val" id="esc-shield-val">100%</span>
+        </div>
+        <div class="esc-bar-track"><div class="esc-bar-fill shield" id="esc-shield-bar" style="width:100%"></div></div>
+      </div>
+
+      <div class="esc-bar-group">
+        <div class="esc-bar-head">
+          <span class="esc-bar-label">PALIVO</span>
+          <span class="esc-bar-val" id="esc-fuel-val">100%</span>
+        </div>
+        <div class="esc-bar-track"><div class="esc-bar-fill fuel" id="esc-fuel-bar" style="width:100%"></div></div>
+      </div>
+
+      <div class="esc-bar-group">
+        <div class="esc-bar-head">
+          <span class="esc-bar-label">ZKUŠENOSTI</span>
+          <span class="esc-bar-val" id="esc-xp-val">0%</span>
+        </div>
+        <div class="esc-bar-track"><div class="esc-bar-fill xp" id="esc-xp-bar" style="width:0%"></div></div>
+      </div>
+
+      <div class="esc-divider"></div>
+
+      <div class="esc-info-row">
+        <span class="esc-info-label">NÁKLAD</span>
+        <span class="esc-info-val" id="esc-cargo-val">0 / 10</span>
+      </div>
+      <div class="esc-info-row">
+        <span class="esc-info-label">UPGRADES</span>
+        <span class="esc-info-val" id="esc-upgrades-val">—</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Nastavení (skryté, zobrazí se po kliknutí) -->
+  <div id="esc-settings-panel" style="display:none">
+    <div class="esc-settings-title">OVLÁDÁNÍ</div>
+    <div class="esc-ctrl-grid">
+      <span class="ck">W / ↑</span><span class="cd">Zrychlení (thrust)</span>
+      <span class="ck">A / D / ← →</span><span class="cd">Otočení lodě</span>
+      <span class="ck">S / ↓</span><span class="cd">Brzdění (retro trysky)</span>
+      <span class="ck">SHIFT + W</span><span class="cd">Boost (spotřebuje palivo)</span>
+      <span class="ck">MEZERNÍK</span><span class="cd">Střelba</span>
+      <span class="ck">E</span><span class="cd">Přistání na stanici</span>
+      <span class="ck">M</span><span class="cd">Otevřít mapu galaxie</span>
+      <span class="ck">N</span><span class="cd">Zrušit navigaci</span>
+      <span class="ck">ESC</span><span class="cd">Herní menu / Pokračovat</span>
+    </div>
+  </div>
+
+  <!-- Spodní panel tlačítek (ETS2 styl) -->
+  <div id="esc-bottombar">
+    <button class="esc-btn primary" id="btn-resume">
+      <span class="esc-btn-icon">▶</span>
+      <span class="esc-btn-label">ZPĚT DO HRY</span>
+      <span class="esc-btn-key">ESC</span>
+    </button>
+    <button class="esc-btn" id="btn-pause-settings">
+      <span class="esc-btn-icon">⚙</span>
+      <span class="esc-btn-label">NASTAVENÍ</span>
+    </button>
+    <button class="esc-btn" id="btn-pause-map">
+      <span class="esc-btn-icon">◉</span>
+      <span class="esc-btn-label">MAPA GALAXIE</span>
+      <span class="esc-btn-key">M</span>
+    </button>
+    <button class="esc-btn" id="btn-pause-save">
+      <span class="esc-btn-icon">↓</span>
+      <span class="esc-btn-label">ULOŽIT HRU</span>
+    </button>
+    <button class="esc-btn danger" id="btn-pause-menu">
+      <span class="esc-btn-icon">✕</span>
+      <span class="esc-btn-label">UKONČIT HRU</span>
+    </button>
+  </div>
+
 </div>
 
 <!-- SMRT -->
