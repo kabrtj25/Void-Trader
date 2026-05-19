@@ -11,11 +11,11 @@ const C = {
   BRAKE_MULT:       0.80,
   DRAG:             0.984,
   DRAG_BOOST:       0.9985,
-  DRAG_WARP:        0.9990,
+  DRAG_WARP:        0.997,
   MAX_SPD:          28,
   BOOST_THRUST:     0.90,
-  WARP_THRUST:      3.2,
-  WARP_SPEED_KMS:   20000,
+  WARP_THRUST:      3.0,
+  WARP_SPEED_KMS:   30000,
   ROT_SPD:          2.0,
   SPEED_KMS_FACTOR: 50,
 
@@ -128,7 +128,7 @@ const GALAXIES = [
   {id:'krynn',    name:'Krynn Nexus',       desc:'Rudý systém s červenou trpasličí hvězdou. Nebezpečný, ale výnosný obchod.',
    mapX:60,  mapY:310,  color:'#ff8844', glow:'rgba(255,136,68,',  fuelCost:40,  intReq:65, lightYears:3.1, warpSecs:10},
   {id:'voidreach',name:'Void Reach',        desc:'Záhyb temného prostoru na hranici poznatelného vesmíru. Přežití není zaručeno.',
-   mapX:-220,mapY:-260, color:'#cc88ff', glow:'rgba(204,136,255,', fuelCost:110, intReq:35, lightYears:9.4, warpSecs:20},
+   mapX:-220,mapY:-260, color:'#cc88ff', glow:'rgba(204,136,255,', fuelCost:90,  intReq:35, lightYears:9.4, warpSecs:20},
 ];
 
 const XP_TABLE = [0,100,250,450,700,1000,1400,1900,2500,3200,4500];

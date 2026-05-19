@@ -741,19 +741,6 @@ function renderWarpFlicker(intensity,t){
   const frame=Math.floor(t*22);
   const r=makeRng(frame*4919+333);
 
-  // Náhodné barevné planety/mlhoviny bleskující kolem
-  const blobs=Math.floor(4+intensity*28);
-  for(let i=0;i<blobs;i++){
-    const x=r()*W,y=r()*H;
-    const sz=8+r()*160;
-    const a=r()*intensity*0.55;
-    const cols=['rgba(255,90,40,','rgba(80,140,255,','rgba(40,200,80,','rgba(255,210,60,','rgba(180,80,255,','rgba(200,220,255,'];
-    const col=cols[Math.floor(r()*cols.length)];
-    ctx.globalAlpha=a;
-    ctx.fillStyle=col+a+')';
-    ctx.beginPath();ctx.arc(x,y,sz,0,Math.PI*2);ctx.fill();
-  }
-
   // Horizontální rychlostní pruhy
   const streaks=Math.floor(intensity*70);
   for(let i=0;i<streaks;i++){

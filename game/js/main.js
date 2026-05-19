@@ -26,7 +26,6 @@ document.addEventListener('keydown',e=>{
   // Warp countdown — intercept first
   if(warpPhase==='countdown'){
     if(e.key==='Escape'){e.preventDefault();cancelWarp();return;}
-    if(e.key==='w'||e.key==='W'){e.preventDefault();beginWarp();return;}
     return;
   }
 
@@ -645,7 +644,7 @@ function update(dt){
   if(thrusting){
     const thrust=warpBoosting?C.WARP_THRUST:(boost?C.BOOST_THRUST:C.THRUST)*engMult;
     p.vx+=Math.cos(p.angle)*thrust;p.vy+=Math.sin(p.angle)*thrust;
-    p.fuel=Math.max(0,p.fuel-(boost?C.FUEL_BOOST:C.FUEL_THRUST));
+    if(!warpBoosting)p.fuel=Math.max(0,p.fuel-(boost?C.FUEL_BOOST:C.FUEL_THRUST));
     spawnTrail(p);
   }
 
