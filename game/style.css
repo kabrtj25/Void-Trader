@@ -63,6 +63,37 @@ canvas{display:block;}
 #btn-close-map:hover{border-color:var(--orange);color:var(--orange);}
 #map-canvas{display:block;cursor:grab;flex:1;}
 
+/* ========== GALAXY MAPA ========== */
+#galaxy-overlay{position:fixed;inset:0;background:rgba(0,0,8,0.98);display:none;flex-direction:column;z-index:210;}
+#galaxy-header{display:flex;align-items:center;gap:16px;padding:10px 18px;border-bottom:1px solid var(--border);flex-shrink:0;}
+#galaxy-title{font-size:14px;color:var(--orange);letter-spacing:3px;}
+#galaxy-hint{font-size:10px;color:rgba(255,149,0,0.4);flex:1;}
+#btn-close-galaxy{background:none;border:1px solid var(--border);color:var(--orange-dim);padding:6px 12px;font-family:'Courier New',monospace;font-size:11px;cursor:pointer;}
+#btn-close-galaxy:hover{border-color:var(--orange);color:var(--orange);}
+#galaxy-main{flex:1;display:flex;overflow:hidden;}
+#galaxy-canvas{flex:1;display:block;cursor:pointer;}
+#galaxy-info-panel{width:300px;border-left:1px solid var(--border);display:flex;flex-direction:column;padding:22px 18px;gap:12px;background:rgba(0,2,10,0.7);flex-shrink:0;}
+#galaxy-info-name{font-size:15px;color:var(--orange);letter-spacing:2px;min-height:22px;}
+#galaxy-info-desc{font-size:11px;color:rgba(255,149,0,0.5);line-height:1.6;min-height:44px;}
+#galaxy-info-stats{display:flex;flex-direction:column;gap:7px;flex:1;}
+.gstat-row{display:flex;justify-content:space-between;font-size:11px;padding:5px 0;border-bottom:1px solid rgba(255,149,0,0.07);}
+.gstat-label{color:rgba(255,149,0,0.45);}
+.gstat-val{color:var(--orange);}
+#btn-set-warp{background:rgba(255,149,0,0.06);border:1px solid rgba(255,149,0,0.25);color:rgba(255,149,0,0.35);padding:13px;font-family:'Courier New',monospace;font-size:12px;letter-spacing:2px;cursor:not-allowed;margin-top:auto;}
+#btn-set-warp:not(:disabled){border-color:var(--orange);color:var(--orange);cursor:pointer;background:rgba(255,149,0,0.1);}
+#btn-set-warp:not(:disabled):hover{background:rgba(255,149,0,0.22);}
+
+/* ========== WARP ODPOČET ========== */
+#warp-overlay{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;z-index:180;}
+#warp-title{font-size:18px;color:#ff9500;letter-spacing:5px;text-shadow:0 0 20px rgba(255,149,0,0.5);margin-bottom:6px;}
+#warp-destination{font-size:12px;color:rgba(255,149,0,0.5);letter-spacing:3px;margin-bottom:38px;}
+#warp-countdown-num{font-size:96px;color:#ff9500;font-weight:bold;text-shadow:0 0 40px rgba(255,149,0,0.4),0 0 80px rgba(255,149,0,0.15);line-height:1;margin-bottom:24px;min-width:3ch;text-align:center;}
+#warp-hint-text{font-size:12px;color:rgba(255,255,255,0.4);letter-spacing:2px;margin-bottom:18px;}
+#warp-bar-track{width:380px;height:3px;background:rgba(255,149,0,0.12);margin-bottom:22px;}
+#warp-bar-fill{height:100%;background:var(--orange);box-shadow:0 0 6px rgba(255,149,0,0.5);width:0%;}
+#btn-cancel-warp{background:none;border:1px solid rgba(255,60,60,0.35);color:rgba(255,80,80,0.6);padding:8px 22px;font-family:'Courier New',monospace;font-size:11px;cursor:pointer;}
+#btn-cancel-warp:hover{border-color:#ff4444;color:#ff4444;}
+
 /* ========== DOKOVACÍ PANEL ========== */
 #dock-panel{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:560px;max-height:90vh;background:var(--panel);border:1px solid var(--border);display:none;flex-direction:column;z-index:300;overflow:hidden;}
 #dock-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;background:rgba(255,149,0,0.04);}

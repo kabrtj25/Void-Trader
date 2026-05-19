@@ -1,10 +1,25 @@
 // ===== SPACE TRADER — generace světa =====
 const chunkCache = new Map();
 
+// Témata pro každou galaxii — různé názvy stanic a barvy mlhovin
+const GALAXY_THEMES = {
+  sol:      {stNames:['Colonia Port','Kepler Hub','Orion Dock','Sirius Base','Vega Station','Tau Port','Ceti Hub','Nova Dock'],
+             nebCols:['rgba(255,120,0,','rgba(255,60,0,','rgba(100,80,255,','rgba(0,80,200,','rgba(180,0,200,','rgba(0,140,200,']},
+  aethon:   {stNames:['Aethon Orbital','Nexus Alpha','Blue Forge','Ion Station','Pulse Dock','Core Hub','Sector VII','Deep Harbor'],
+             nebCols:['rgba(60,100,255,','rgba(0,60,220,','rgba(100,140,255,','rgba(30,80,200,']},
+  veridia:  {stNames:['Veridia Base','Spore Harbor','Green Reach','Bio Dock','Canopy Station','Chlora Post','Verdant Hub','Myco Reach'],
+             nebCols:['rgba(0,180,80,','rgba(60,220,100,','rgba(0,120,60,','rgba(80,200,120,']},
+  krynn:    {stNames:['Krynn Station','Red Forge','Ember Dock','Inferno Hub','Pyre Base','Cinder Post','Magma Reach','Scorch Point'],
+             nebCols:['rgba(255,60,0,','rgba(220,30,0,','rgba(255,100,20,','rgba(200,40,0,']},
+  voidreach:{stNames:['Void Node','Dark Harbor','Shadow Gate','Umbra Base','Rift Station','Null Dock','Abyss Hub','Eclipse Post'],
+             nebCols:['rgba(120,0,180,','rgba(80,0,140,','rgba(160,0,200,','rgba(60,20,100,']},
+};
+
 function getChunk(cx,cy){
   const key=chunkKey(cx,cy);
   if(chunkCache.has(key))return chunkCache.get(key);
-  const isSolar=cx===C.SOLAR_CHUNK.cx&&cy===C.SOLAR_CHUNK.cy;
+  const isSol=(window.currentGalaxy||'sol')==='sol';
+  const isSolar=isSol&&cx===C.SOLAR_CHUNK.cx&&cy===C.SOLAR_CHUNK.cy;
   const ch=isSolar?generateSolarSystem(cx,cy):generateChunk(cx,cy);
   chunkCache.set(key,ch);return ch;
 }
@@ -13,6 +28,9 @@ function generateChunk(cx,cy){
   const rng=makeRng(chunkSeed(cx,cy));
   const wx=cx*C.CHUNK, wy=cy*C.CHUNK;
   const ch={cx,cy,wx,wy,stars:[],nebula:null,system:null,asteroids:[]};
+
+  const gid=window.currentGalaxy||'sol';
+  const theme=GALAXY_THEMES[gid]||GALAXY_THEMES.sol;
 
   // Pozadí hvězdy
   const sc=C.CHUNK;
@@ -28,14 +46,15 @@ function generateChunk(cx,cy){
     });
   }
 
-  // Mlhovina
+  // Mlhovina — barvy podle galaxie
   if(rng()<0.45){
-    const cols=['rgba(255,120,0,','rgba(255,60,0,','rgba(100,80,255,','rgba(0,80,200,','rgba(180,0,200,','rgba(0,140,200,'];
+    const cols=theme.nebCols;
     ch.nebula={x:wx+rng()*sc,y:wy+rng()*sc,r:600+rng()*800,col:cols[Math.floor(rng()*cols.length)],alpha:0.03+rng()*0.045};
   }
 
-  // Sluneční soustava (20% šance, nebo fixní)
-  const fixed=FIXED_STATIONS.find(s=>s.cx===cx&&s.cy===cy);
+  // Hvězdné systémy — fixní stanice jen v Sol, jinak náhodné
+  const isSolGal=gid==='sol';
+  const fixed=isSolGal?FIXED_STATIONS.find(s=>s.cx===cx&&s.cy===cy):null;
   const hasSystem=fixed||rng()<0.40;
   if(hasSystem){
     const sr=makeRng(chunkSeed(cx,cy)+99);
@@ -58,7 +77,7 @@ function generateChunk(cx,cy){
       const r=12+sr()*28;
       planets.push({orbit,phase,period,r,color:pCols[Math.floor(sr()*pCols.length)],atmo:sr()<0.6});
     }
-    // Stanice
+    // Stanice — fixní (Sol) nebo náhodná s tématickým názvem
     let station=null;
     if(fixed){
       station={
@@ -70,7 +89,7 @@ function generateChunk(cx,cy){
         fixed:true
       };
     } else if(sr()<0.88){
-      const stNames=['Colonia Port','Kepler Hub','Orion Dock','Sirius Base','Vega Station','Tau Port','Ceti Hub','Nova Dock'];
+      const stNames=theme.stNames;
       station={
         x:starX+200+sr()*400, y:starY+200+sr()*400,
         name:stNames[Math.floor(sr()*stNames.length)],

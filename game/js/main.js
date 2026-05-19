@@ -2,9 +2,16 @@
 
 // State machine
 let gameState = null;  // hráč, entity, nav, atd.
-let state = 'menu';    // 'menu' | 'playing' | 'docked' | 'map'
+let state = 'menu';    // 'menu' | 'playing' | 'docked' | 'map' | 'galaxy' | 'warping'
 let canvas, W2, H2;    // W,H jsou v render.js
 let last = 0, frameCount = 0;
+
+// Warp systém
+window.currentGalaxy = 'sol';
+window.warpTarget = null;
+let warpPhase = null;   // null | 'countdown' | 'warping'
+let warpTimer = 0;
+let warpElapsed = 0;
 
 // Globální zpráva
 window.msgText=''; window.msgTimer=0;
@@ -15,9 +22,19 @@ const keys={};
 document.addEventListener('keydown',e=>{
   if(keys[e.code])return;
   keys[e.code]=true;
+
+  // Warp countdown — intercept first
+  if(warpPhase==='countdown'){
+    if(e.key==='Escape'){e.preventDefault();cancelWarp();return;}
+    if(e.key==='w'||e.key==='W'){e.preventDefault();beginWarp();return;}
+    return;
+  }
+
   if(state==='playing'){
     if(e.key===' '){e.preventDefault();tryShoot();}
     if(e.key==='m'||e.key==='M'){e.preventDefault();openMap();}
+    if(e.key==='r'||e.key==='R'){e.preventDefault();openGalaxyMap();}
+    if(e.key==='q'||e.key==='Q'){e.preventDefault();startWarpCountdown();}
     if(e.key==='e'||e.key==='E'){e.preventDefault();tryDock();}
     if(e.key==='Escape'){e.preventDefault();openPause();}
     if(e.key==='n'||e.key==='N'){clearNav();}
@@ -25,6 +42,8 @@ document.addEventListener('keydown',e=>{
     if(e.key==='Escape'){e.preventDefault();closePause();}
   } else if(state==='map'){
     if(e.key==='m'||e.key==='M'||e.key==='Escape'){e.preventDefault();closeMap();}
+  } else if(state==='galaxy'){
+    if(e.key==='r'||e.key==='R'||e.key==='Escape'){e.preventDefault();closeGalaxyMap();}
   } else if(state==='docked'){
     if(e.key==='e'||e.key==='E'||e.key==='Escape'){e.preventDefault();undock();}
   }
@@ -38,6 +57,9 @@ function isKey(...codes){return codes.some(c=>keys[c]);}
 function startGame(fromSave=false){
   document.getElementById('menu').style.display='none';
   document.getElementById('hud').style.display='block';
+  window.currentGalaxy='sol';
+  window.warpTarget=null;
+  warpPhase=null;warpTimer=0;warpElapsed=0;
 
   const save=fromSave?loadSave():null;
 
@@ -78,7 +100,7 @@ function startGame(fromSave=false){
   spawnInitialEnemies();
 
   state='playing';
-  setMsg('Vítejte ve Space Trader! [WASD] let  [SHIFT+W] boost  [SPACE] střelba  [E] přistání  [M] mapa',6000);
+  setMsg('Vítejte ve Space Trader! [WASD] let  [BOOST] Shift+W  [E] přistání  [M] mapa  [R] galaxie  [Q] warp',7000);
 }
 
 function spawnInitialEnemies(){
@@ -276,6 +298,68 @@ function closeMap(){
   state='playing';
   document.getElementById('map-overlay').style.display='none';
 }
+
+// ---- Galaxy mapa ----
+function openGalaxyMap(){
+  state='galaxy';
+  document.getElementById('galaxy-overlay').style.display='flex';
+  resizeGalaxyCanvas();
+  startGalaxyAnim();
+}
+function closeGalaxyMap(){
+  state='playing';
+  document.getElementById('galaxy-overlay').style.display='none';
+  stopGalaxyAnim();
+}
+
+// ---- Warp systém ----
+function startWarpCountdown(){
+  if(!window.warpTarget){setMsg('Nejdřív nastav kurz — stiskni [R] pro mapu galaxií.',3500);return;}
+  const p=gameState.player;
+  const g=window.warpTarget;
+  const hullPct=p.hull/p.hullMax*100;
+  const fuelPct=p.fuel/p.fuelMax*100;
+  if(hullPct<g.intReq){setMsg(`Trup příliš poškozen! Min. ${g.intReq}% (máš ${Math.floor(hullPct)}%).`,4000);return;}
+  if(fuelPct<g.fuelCost){setMsg(`Nedostatek paliva! Potřebuješ ${g.fuelCost}% nádrže (máš ${Math.floor(fuelPct)}%).`,4000);return;}
+  warpPhase='countdown';
+  warpTimer=20;
+  document.getElementById('warp-dest-name').textContent=g.name;
+  document.getElementById('warp-countdown-num').textContent='20';
+  document.getElementById('warp-bar-fill').style.width='0%';
+  document.getElementById('warp-overlay').style.display='flex';
+}
+function cancelWarp(){
+  warpPhase=null;warpTimer=0;
+  document.getElementById('warp-overlay').style.display='none';
+  setMsg('Warpové motory vypnuty.',2000);
+}
+function beginWarp(){
+  const p=gameState.player;
+  const g=window.warpTarget;
+  p.fuel=Math.max(0,p.fuel-(g.fuelCost/100)*p.fuelMax);
+  p.vx=0;p.vy=0;
+  warpPhase='warping';
+  warpElapsed=0;
+  document.getElementById('warp-overlay').style.display='none';
+}
+function completeWarp(){
+  const g=window.warpTarget;
+  window.currentGalaxy=g.id;
+  window.warpTarget=null;
+  warpPhase=null;warpElapsed=0;
+  chunkCache.clear();
+  const p=gameState.player;
+  p.x=g.id==='sol'?-2034:7500;
+  p.y=g.id==='sol'?7542:7500;
+  p.vx=0;p.vy=0;p.angle=-Math.PI/2;
+  gameState.bullets=[];gameState.enemies=[];gameState.particles=[];gameState.loots=[];
+  gameState.navTarget=null;
+  if(g.id==='sol')getChunk(C.SOLAR_CHUNK.cx,C.SOLAR_CHUNK.cy);
+  getChunk(Math.floor(p.x/C.CHUNK),Math.floor(p.y/C.CHUNK));
+  spawnInitialEnemies();
+  setMsg(`Warp úspěšný! Vítejte v ${g.name}.`,6000);
+}
+
 function clearNav(){
   if(gameState){gameState.navTarget=null;setMsg('Navigace zrušena.',1500);}
 }
@@ -519,7 +603,26 @@ function spawnTrail(p){
 
 // ---- Fyzika & update ----
 function update(dt){
-  if(state!=='playing'||!gameState)return;
+  if(!gameState)return;
+
+  // Warp countdown — hra zmražena, pouze odpočet
+  if(warpPhase==='countdown'){
+    warpTimer=Math.max(0,warpTimer-dt);
+    const pct=(20-warpTimer)/20;
+    document.getElementById('warp-countdown-num').textContent=Math.ceil(warpTimer)||'0';
+    document.getElementById('warp-bar-fill').style.width=(pct*100)+'%';
+    if(warpTimer<=0)beginWarp();
+    return;
+  }
+
+  // Warp probíhá — pouze timer
+  if(warpPhase==='warping'){
+    warpElapsed+=dt;
+    if(warpElapsed>=window.warpTarget.warpSecs)completeWarp();
+    return;
+  }
+
+  if(state!=='playing')return;
   const gs=gameState;
   const p=gs.player;
   if(p.dead)return;
@@ -800,7 +903,7 @@ function loop(ts){
 
   if(state==='menu')return;
   if(state==='docking')updateDocking(dt);
-  else if(state!=='paused')update(dt);
+  else if(state!=='paused'&&state!=='galaxy')update(dt);
   render(dt,ts/1000);
 }
 
@@ -808,6 +911,12 @@ function render(dt,t){
   if(!gameState)return;
   const gs=gameState;
   const p=gs.player;
+
+  // Warp vizuál — přepisuje vše ostatní
+  if(warpPhase==='warping'&&window.warpTarget){
+    renderWarp(warpElapsed,window.warpTarget.warpSecs,window.warpTarget.name,t);
+    return;
+  }
 
   // Cinematická sekvence přistávání
   if(state==='docking'){
@@ -920,6 +1029,7 @@ window.addEventListener('load',()=>{
 
   initMinimap();
   initMapCanvas();
+  initGalaxyCanvas();
   initMenuStars();
 
   // Menu tlačítka
@@ -929,6 +1039,8 @@ window.addEventListener('load',()=>{
   document.getElementById('btn-restart').onclick=()=>{document.getElementById('death-screen').style.display='none';startGame(false);};
   document.getElementById('btn-menu').onclick=()=>{document.getElementById('death-screen').style.display='none';document.getElementById('menu').style.display='flex';document.getElementById('hud').style.display='none';state='menu';gameState=null;initMenuStars();};
   document.getElementById('btn-close-map').onclick=()=>closeMap();
+  document.getElementById('btn-close-galaxy').onclick=()=>closeGalaxyMap();
+  document.getElementById('btn-cancel-warp').onclick=()=>cancelWarp();
   document.getElementById('btn-undock').onclick=()=>undock();
 
   // Pause menu

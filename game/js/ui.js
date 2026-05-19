@@ -527,4 +527,202 @@ function applyUpgrades(p){
   p.shieldMax=100+30*(p.upgrades.shield||0);
   p.hullMax=100+25*(p.upgrades.hull||0);
 }
+
+// ===== GALAXY MAP =====
+let galaxyCanvas,galaxyCtx,selectedGalaxyId=null,_galaxyAnimId=null;
+
+function initGalaxyCanvas(){
+  galaxyCanvas=document.getElementById('galaxy-canvas');
+  if(!galaxyCanvas)return;
+  galaxyCtx=galaxyCanvas.getContext('2d');
+  galaxyCanvas.addEventListener('click',handleGalaxyClick);
+}
+
+function resizeGalaxyCanvas(){
+  const hdr=document.getElementById('galaxy-header');
+  const hdrH=hdr?hdr.offsetHeight||48:48;
+  galaxyCanvas.width=Math.max(200,window.innerWidth-300);
+  galaxyCanvas.height=Math.max(200,window.innerHeight-hdrH);
+}
+
+function startGalaxyAnim(){
+  if(_galaxyAnimId)return;
+  function frame(ts){drawGalaxyMap(ts/1000);_galaxyAnimId=requestAnimationFrame(frame);}
+  _galaxyAnimId=requestAnimationFrame(frame);
+}
+
+function stopGalaxyAnim(){
+  if(_galaxyAnimId){cancelAnimationFrame(_galaxyAnimId);_galaxyAnimId=null;}
+}
+
+function drawGalaxyMap(t){
+  if(!galaxyCanvas||!galaxyCtx)return;
+  const GW=galaxyCanvas.width,GH=galaxyCanvas.height;
+  const gcx=GW/2,gcy=GH/2;
+  const g2=galaxyCtx;
+
+  g2.clearRect(0,0,GW,GH);
+  g2.fillStyle='#00000e';g2.fillRect(0,0,GW,GH);
+
+  // Vzdálené pozadí galaxií (dekorativní)
+  const bgRng=makeRng(77331);
+  for(let i=0;i<80;i++){
+    const bx=bgRng()*GW,by=bgRng()*GH;
+    const br=15+bgRng()*70,ba=bgRng()*0.06+0.01;
+    const bAngle=bgRng()*Math.PI;
+    const bCols=['rgba(255,200,100,','rgba(150,180,255,','rgba(180,255,200,','rgba(255,160,180,'];
+    const bcol=bCols[Math.floor(bgRng()*bCols.length)];
+    g2.save();
+    const bgr=g2.createRadialGradient(bx,by,0,bx,by,br);
+    bgr.addColorStop(0,bcol+ba+')');bgr.addColorStop(1,'transparent');
+    g2.fillStyle=bgr;
+    g2.beginPath();g2.ellipse(bx,by,br,br*0.38,bAngle,0,Math.PI*2);g2.fill();
+    g2.restore();
+  }
+
+  // Hvězdy pozadí
+  const stRng=makeRng(12345);
+  for(let i=0;i<300;i++){
+    const sx=stRng()*GW,sy=stRng()*GH;
+    const sa=stRng()*0.4+0.05+Math.sin(t*stRng()*2+i)*0.05;
+    g2.globalAlpha=sa;g2.fillStyle='#e8eeff';
+    g2.beginPath();g2.arc(sx,sy,stRng()*0.8+0.1,0,Math.PI*2);g2.fill();
+  }
+  g2.globalAlpha=1;
+
+  const currentGid=window.currentGalaxy||'sol';
+
+  // Slabé spojovací čáry mezi galaxiemi
+  g2.save();
+  g2.strokeStyle='rgba(255,149,0,0.04)';g2.lineWidth=1;g2.setLineDash([4,12]);
+  GALAXIES.forEach(ga=>{
+    GALAXIES.forEach(gb=>{
+      if(ga.id>=gb.id)return;
+      const ax=gcx+ga.mapX,ay=gcy+ga.mapY;
+      const bx2=gcx+gb.mapX,by2=gcy+gb.mapY;
+      g2.beginPath();g2.moveTo(ax,ay);g2.lineTo(bx2,by2);g2.stroke();
+    });
+  });
+  g2.setLineDash([]);g2.restore();
+
+  // Kreslení každé galaxie
+  GALAXIES.forEach(ga=>{
+    const gx=gcx+ga.mapX,gy=gcy+ga.mapY;
+    const isCurrent=currentGid===ga.id;
+    const isSelected=selectedGalaxyId===ga.id;
+    const baseR=isCurrent?88:isSelected?78:62;
+    const pulse=0.85+Math.sin(t*1.5+ga.mapX*0.008)*0.15;
+
+    g2.save();
+    g2.translate(gx,gy);
+    g2.rotate(t*0.06+ga.mapX*0.002);
+
+    // Vnější záře
+    const gr1=g2.createRadialGradient(0,0,0,0,0,baseR*2.8);
+    gr1.addColorStop(0,ga.glow+'0.10)');gr1.addColorStop(1,'transparent');
+    g2.fillStyle=gr1;g2.beginPath();g2.ellipse(0,0,baseR*2.8,baseR*1.2,0,0,Math.PI*2);g2.fill();
+
+    // Střed
+    const gr2=g2.createRadialGradient(0,0,0,0,0,baseR);
+    gr2.addColorStop(0,ga.glow+'0.95)');
+    gr2.addColorStop(0.25,ga.glow+'0.55)');
+    gr2.addColorStop(0.65,ga.glow+'0.18)');
+    gr2.addColorStop(1,'transparent');
+    g2.fillStyle=gr2;g2.globalAlpha=pulse;
+    g2.beginPath();g2.ellipse(0,0,baseR,baseR*0.48,0,0,Math.PI*2);g2.fill();
+    g2.globalAlpha=1;
+
+    // Spirální ramena (3 elipsy otočené)
+    [0,Math.PI*0.6,Math.PI*1.2].forEach(offset=>{
+      const ar=g2.createRadialGradient(0,0,0,0,0,baseR*0.9);
+      ar.addColorStop(0,'transparent');ar.addColorStop(0.4,ga.glow+'0.12)');ar.addColorStop(1,'transparent');
+      g2.fillStyle=ar;g2.globalAlpha=0.5;
+      g2.beginPath();g2.ellipse(0,0,baseR*0.9,baseR*0.22,offset,0,Math.PI*2);g2.fill();
+      g2.globalAlpha=1;
+    });
+
+    g2.restore();
+
+    // Rámečky (mimo rotaci)
+    if(isCurrent){
+      const ra=0.5+Math.sin(t*2)*0.25;
+      g2.save();g2.strokeStyle=`rgba(255,149,0,${ra})`;g2.lineWidth=2;
+      g2.shadowColor='rgba(255,149,0,0.7)';g2.shadowBlur=12;
+      g2.beginPath();g2.arc(gx,gy,baseR+14,0,Math.PI*2);g2.stroke();
+      g2.restore();
+    }
+    if(isSelected&&!isCurrent){
+      const ra=0.6+Math.sin(t*3)*0.4;
+      g2.save();g2.strokeStyle=`rgba(0,255,136,${ra})`;g2.lineWidth=2;
+      g2.shadowColor='rgba(0,255,136,0.8)';g2.shadowBlur=16;
+      g2.setLineDash([8,5]);
+      g2.beginPath();g2.arc(gx,gy,baseR+22,0,Math.PI*2);g2.stroke();
+      g2.setLineDash([]);g2.restore();
+    }
+
+    // Název galaxie
+    g2.save();
+    g2.textAlign='center';
+    g2.font=`bold ${isCurrent||isSelected?13:11}px "Courier New", monospace`;
+    g2.fillStyle=isCurrent?'#ff9500':isSelected?'#00ff88':ga.color;
+    g2.shadowColor=isCurrent?'rgba(255,149,0,0.6)':isSelected?'rgba(0,255,136,0.5)':ga.glow+'0.4)';
+    g2.shadowBlur=8;
+    g2.fillText(ga.name,gx,gy+baseR*1.15+18);
+    if(isCurrent){
+      g2.font='10px "Courier New", monospace';
+      g2.fillStyle='rgba(255,149,0,0.55)';
+      g2.fillText('⊙ AKTUÁLNÍ POLOHA',gx,gy+baseR*1.15+33);
+    }
+    g2.restore();
+  });
+
+  // Legenda
+  g2.textAlign='left';g2.font='9px "Courier New", monospace';
+  g2.fillStyle='rgba(255,149,0,0.3)';
+  g2.fillText('[ KLIKNI NA GALAXII PRO DETAILY ]',8,GH-8);
+}
+
+function handleGalaxyClick(e){
+  const rect=galaxyCanvas.getBoundingClientRect();
+  const mx=e.clientX-rect.left,my=e.clientY-rect.top;
+  const GW=galaxyCanvas.width,GH=galaxyCanvas.height;
+  let hit=null;
+  GALAXIES.forEach(ga=>{
+    const gx=GW/2+ga.mapX,gy=GH/2+ga.mapY;
+    if(Math.hypot(mx-gx,my-gy)<90)hit=ga;
+  });
+  if(!hit)return;
+  selectedGalaxyId=hit.id;
+  updateGalaxyInfoPanel(hit);
+}
+
+function updateGalaxyInfoPanel(ga){
+  const isCurrent=(window.currentGalaxy||'sol')===ga.id;
+  document.getElementById('galaxy-info-name').textContent=ga.name;
+  document.getElementById('galaxy-info-desc').textContent=ga.desc;
+
+  let html='';
+  if(!isCurrent){
+    const p=window.gameState?.player;
+    const fuelPct=p?Math.floor(p.fuel/p.fuelMax*100):0;
+    const hullPct=p?Math.floor(p.hull/p.hullMax*100):0;
+    const fuelOK=fuelPct>=ga.fuelCost;
+    const hullOK=hullPct>=ga.intReq;
+    html+=`<div class="gstat-row"><span class="gstat-label">Vzdálenost</span><span class="gstat-val">${ga.lightYears} ly</span></div>`;
+    html+=`<div class="gstat-row"><span class="gstat-label">Palivo</span><span class="gstat-val" style="color:${fuelOK?'var(--orange)':'#ff4444'}">${ga.fuelCost}% nádrže (máš ${fuelPct}%)</span></div>`;
+    html+=`<div class="gstat-row"><span class="gstat-label">Min. trup</span><span class="gstat-val" style="color:${hullOK?'var(--orange)':'#ff4444'}">${ga.intReq}% (máš ${hullPct}%)</span></div>`;
+    html+=`<div class="gstat-row"><span class="gstat-label">Warp čas</span><span class="gstat-val">${ga.warpSecs} s</span></div>`;
+  } else {
+    html='<div class="gstat-row"><span class="gstat-label">Status</span><span class="gstat-val">⊙ Aktuální poloha</span></div>';
+  }
+  document.getElementById('galaxy-info-stats').innerHTML=html;
+
+  const btn=document.getElementById('btn-set-warp');
+  btn.disabled=isCurrent;
+  btn.onclick=isCurrent?null:()=>{
+    window.warpTarget=ga;
+    if(typeof closeGalaxyMap==='function')closeGalaxyMap();
+    setMsg(`Kurz nastaven: ${ga.name}. Stiskni [Q] pro spuštění warpových motorů.`,6000);
+  };
+}
 function getCargoMax(p){return 10+5*(p.upgrades.cargo||0);}

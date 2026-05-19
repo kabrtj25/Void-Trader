@@ -35,7 +35,9 @@
           <span class="ck">SHIFT + W</span><span class="cd">Boost (spotřebuje palivo)</span>
           <span class="ck">MEZERNÍK</span><span class="cd">Střelba</span>
           <span class="ck">E</span><span class="cd">Přistání na stanici</span>
-          <span class="ck">M</span><span class="cd">Otevřít mapu galaxie</span>
+          <span class="ck">M</span><span class="cd">Otevřít mapu hvězdné soustavy</span>
+          <span class="ck">R</span><span class="cd">Mapa galaxií (warp)</span>
+          <span class="ck">Q</span><span class="cd">Spustit warpové motory</span>
           <span class="ck">N</span><span class="cd">Zrušit navigaci</span>
           <span class="ck">ESC</span><span class="cd">Mapa / Pauza</span>
         </div>
@@ -64,6 +66,34 @@
     </div>
     <canvas id="map-canvas" width="900" height="900"></canvas>
   </div>
+</div>
+
+<!-- GALAXY MAPA (klávesa R) -->
+<div id="galaxy-overlay" style="display:none">
+  <div id="galaxy-header">
+    <span id="galaxy-title">// MAPA GALAXIÍ</span>
+    <span id="galaxy-hint">Klikni na galaxii · [R] nebo [ESC] zavřít</span>
+    <button id="btn-close-galaxy">✕ Zavřít [R]</button>
+  </div>
+  <div id="galaxy-main">
+    <canvas id="galaxy-canvas"></canvas>
+    <div id="galaxy-info-panel">
+      <div id="galaxy-info-name">— Vyberte galaxii —</div>
+      <div id="galaxy-info-desc"></div>
+      <div id="galaxy-info-stats"></div>
+      <button id="btn-set-warp" disabled>◈ NASTAVIT KURZ</button>
+    </div>
+  </div>
+</div>
+
+<!-- WARP ODPOČET (klávesa Q spustí) -->
+<div id="warp-overlay" style="display:none">
+  <div id="warp-title">TERMOJETOVÉ MOTORY STARTUJÍ</div>
+  <div id="warp-destination">KURZ: <span id="warp-dest-name">—</span></div>
+  <div id="warp-countdown-num">20</div>
+  <div id="warp-hint-text">[ W ] — okamžitý start warpu</div>
+  <div id="warp-bar-track"><div id="warp-bar-fill"></div></div>
+  <button id="btn-cancel-warp">✕ PŘERUŠIT [ESC]</button>
 </div>
 
 <!-- DOKOVACÍ PANEL -->
@@ -206,7 +236,9 @@
       <span class="ck">SHIFT + W</span><span class="cd">Boost (spotřebuje palivo)</span>
       <span class="ck">MEZERNÍK</span><span class="cd">Střelba</span>
       <span class="ck">E</span><span class="cd">Přistání na stanici</span>
-      <span class="ck">M</span><span class="cd">Otevřít mapu galaxie</span>
+      <span class="ck">M</span><span class="cd">Otevřít mapu hvězdné soustavy</span>
+      <span class="ck">R</span><span class="cd">Mapa galaxií (warp)</span>
+      <span class="ck">Q</span><span class="cd">Spustit warpové motory</span>
       <span class="ck">N</span><span class="cd">Zrušit navigaci</span>
       <span class="ck">ESC</span><span class="cd">Herní menu / Pokračovat</span>
     </div>

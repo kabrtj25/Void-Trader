@@ -114,6 +114,20 @@ const FIXED_STATIONS = [
   // Speciální — Sluneční soustava je v SOLAR_CHUNK, stanice se generuje separátně
 ];
 
+// ===== 5 Galaxií — warp destinace =====
+const GALAXIES = [
+  {id:'sol',      name:'Sluneční soustava', desc:'Naše rodná hvězdná soustava. Devět planet, bezpočet stanic.',
+   mapX:0,   mapY:0,    color:'#ffee88', glow:'rgba(255,238,136,', fuelCost:0,   intReq:0,  lightYears:0,   warpSecs:0},
+  {id:'aethon',   name:'Aethon Prime',      desc:'Vzdálená soustava s modrou obří hvězdou. Vyspělá technologie a hustá obchodní síť.',
+   mapX:300, mapY:-130, color:'#88aaff', glow:'rgba(136,170,255,', fuelCost:55,  intReq:55, lightYears:4.2, warpSecs:12},
+  {id:'veridia',  name:'Mlhovina Veridia',  desc:'Hustá zelená mlhovina obklopující prastará slunce. Bohatá na vzácné biominery.',
+   mapX:-280,mapY:200,  color:'#66ffbb', glow:'rgba(102,255,187,', fuelCost:85,  intReq:50, lightYears:6.8, warpSecs:16},
+  {id:'krynn',    name:'Krynn Nexus',       desc:'Rudý systém s červenou trpasličí hvězdou. Nebezpečný, ale výnosný obchod.',
+   mapX:60,  mapY:310,  color:'#ff8844', glow:'rgba(255,136,68,',  fuelCost:40,  intReq:65, lightYears:3.1, warpSecs:10},
+  {id:'voidreach',name:'Void Reach',        desc:'Záhyb temného prostoru na hranici poznatelného vesmíru. Přežití není zaručeno.',
+   mapX:-220,mapY:-260, color:'#cc88ff', glow:'rgba(204,136,255,', fuelCost:110, intReq:35, lightYears:9.4, warpSecs:20},
+];
+
 const XP_TABLE = [0,100,250,450,700,1000,1400,1900,2500,3200,4500];
 function xpNeeded(lvl){return XP_TABLE[Math.min(lvl,XP_TABLE.length-1)]||XP_TABLE[XP_TABLE.length-1]+(lvl-XP_TABLE.length+1)*2000;}
 

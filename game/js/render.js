@@ -700,6 +700,85 @@ function renderVignette(){
   ctx.restore();
 }
 
+// ---- Warp vizuál (hyperspace) ----
+function renderWarp(elapsed,duration,destName,t){
+  const progress=Math.min(1,elapsed/duration);
+  ctx.save();
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.globalAlpha=1;ctx.shadowBlur=0;
+
+  // Pozadí — tmavě modré
+  ctx.fillStyle=`rgb(0,0,${Math.floor(6+progress*10)})`;
+  ctx.fillRect(0,0,W,H);
+
+  const cx=W/2,cy=H/2;
+
+  // Hvězdné pruhy z centra (hyperspace efekt)
+  const frame=Math.floor(t*20);
+  const sr=makeRng(frame*7919+99);
+  const numLines=160+Math.floor(progress*120);
+  for(let i=0;i<numLines;i++){
+    const angle=sr()*Math.PI*2;
+    const startD=18+sr()*28;
+    const len=(50+sr()*380)*(0.15+progress*0.85)*(0.4+sr()*0.6);
+    const bright=0.25+sr()*0.75;
+    const isBlue=sr()<0.4, isOrange=sr()<0.08;
+    const x1=cx+Math.cos(angle)*startD, y1=cy+Math.sin(angle)*startD;
+    const x2=cx+Math.cos(angle)*(startD+len), y2=cy+Math.sin(angle)*(startD+len);
+    ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);
+    ctx.lineWidth=0.4+sr()*1.8;
+    if(isOrange)     ctx.strokeStyle=`rgba(255,149,0,${bright*0.55})`;
+    else if(isBlue)  ctx.strokeStyle=`rgba(100,180,255,${bright*0.65})`;
+    else             ctx.strokeStyle=`rgba(220,235,255,${bright*0.38})`;
+    ctx.stroke();
+  }
+
+  // Centrální záře
+  const cg=ctx.createRadialGradient(cx,cy,0,cx,cy,70+progress*50);
+  cg.addColorStop(0,'rgba(200,230,255,0.85)');
+  cg.addColorStop(0.4,'rgba(80,150,255,0.3)');
+  cg.addColorStop(1,'transparent');
+  ctx.fillStyle=cg;ctx.beginPath();ctx.arc(cx,cy,120+progress*60,0,Math.PI*2);ctx.fill();
+
+  // Pulzující barevné bliknutí
+  const flash=Math.max(0,Math.sin(t*4.1)*0.13+Math.sin(t*7.7)*0.07+Math.sin(t*13.3)*0.04);
+  if(flash>0){ctx.globalAlpha=flash;ctx.fillStyle='rgba(140,200,255,1)';ctx.fillRect(0,0,W,H);ctx.globalAlpha=1;}
+
+  // Bílý záblesk při příjezdu
+  if(progress>0.88){
+    const af=Math.sin((progress-0.88)/0.12*Math.PI)*0.7;
+    ctx.globalAlpha=af;ctx.fillStyle='rgba(255,255,255,1)';ctx.fillRect(0,0,W,H);ctx.globalAlpha=1;
+  }
+
+  // Text HUD
+  ctx.textAlign='center';
+  ctx.font='bold 11px "Courier New", monospace';
+  ctx.fillStyle=`rgba(130,200,255,${0.7+Math.sin(t*5)*0.3})`;
+  ctx.shadowColor='rgba(100,200,255,0.6)';ctx.shadowBlur=16;
+  ctx.fillText('WARP DRIVE ACTIVE',cx,cy-110);
+
+  ctx.font='bold 38px "Courier New", monospace';
+  ctx.fillStyle='#ffffff';ctx.shadowColor='rgba(200,230,255,0.5)';ctx.shadowBlur=24;
+  ctx.fillText('100 000 km/s',cx,cy-62);
+
+  ctx.font='13px "Courier New", monospace';
+  ctx.fillStyle='rgba(255,149,0,0.9)';ctx.shadowColor='rgba(255,149,0,0.5)';ctx.shadowBlur=10;
+  ctx.fillText(`KURZ: ${destName.toUpperCase()}`,cx,cy+62);
+
+  // Progress bar
+  const bw=400,bh=3,bx=cx-bw/2,by=cy+84;
+  ctx.shadowBlur=0;ctx.globalAlpha=0.18;ctx.fillStyle='#ff9500';ctx.fillRect(bx,by,bw,bh);
+  ctx.globalAlpha=1;ctx.fillStyle='#ff9500';ctx.shadowColor='rgba(255,149,0,0.7)';ctx.shadowBlur=6;
+  ctx.fillRect(bx,by,bw*progress,bh);
+
+  const rem=Math.max(0,duration-elapsed);
+  ctx.font='10px "Courier New", monospace';ctx.shadowBlur=0;
+  ctx.fillStyle='rgba(255,149,0,0.45)';
+  ctx.fillText(`PŘÍLET ZA: ${rem.toFixed(1)} s`,cx,cy+108);
+
+  ctx.restore();
+}
+
 // ---- Navigační šipka ----
 function renderNavArrow(targetX,targetY,playerX,playerY,label){
   const wx=targetX-playerX,wy=targetY-playerY;
