@@ -125,6 +125,57 @@
   </div>
 </div>
 
+<!-- TRADE OVERLAY (fullscreen shop) -->
+<div id="trade-overlay" style="display:none">
+  <div id="trade-header">
+    <div id="trade-hdr-left">
+      <span id="trade-station-name">STANICE</span>
+      <span id="trade-cargo-badge">0/10</span>
+    </div>
+    <div id="trade-hdr-center">◈ OBCHOD</div>
+    <div id="trade-hdr-right">
+      <span id="trade-credits-hdr">0 Cr</span>
+      <button id="btn-trade-close">✕ ZAVŘÍT</button>
+    </div>
+  </div>
+  <div id="trade-body">
+    <div id="trade-buy-col">
+      <div class="trade-col-head">↓ KOUPIT</div>
+      <div id="trade-buy-list"></div>
+    </div>
+    <div id="trade-detail">
+      <div id="trade-detail-empty">← Vyberte zboží ze seznamu</div>
+      <div id="trade-detail-content" style="display:none">
+        <div id="trade-icon-wrap"><span id="trade-icon">📦</span></div>
+        <div id="trade-detail-name">—</div>
+        <div id="trade-detail-desc">—</div>
+        <div id="trade-prices">
+          <div class="trade-price-cell" id="tdp-buy">
+            <div class="tpc-label">NÁKUP</div>
+            <div class="tpc-val" id="tdp-buy-val">—</div>
+          </div>
+          <div class="trade-price-cell" id="tdp-sell">
+            <div class="tpc-label">PRODEJ</div>
+            <div class="tpc-val sell" id="tdp-sell-val">—</div>
+          </div>
+        </div>
+        <div id="trade-qty-row">
+          <button class="tqbtn" id="tq-minus">−</button>
+          <span id="tq-num">1</span>
+          <button class="tqbtn" id="tq-plus">+</button>
+          <button class="tq-max" onclick="setTradeMaxQty()">MAX</button>
+        </div>
+        <button id="trade-action-btn" disabled>—</button>
+        <div id="trade-stock-info">—</div>
+      </div>
+    </div>
+    <div id="trade-sell-col">
+      <div class="trade-col-head">↑ PRODAT</div>
+      <div id="trade-sell-list"></div>
+    </div>
+  </div>
+</div>
+
 <!-- ETS2 PAUZA -->
 <div id="pause-screen" style="display:none">
 

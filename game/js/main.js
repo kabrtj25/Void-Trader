@@ -80,6 +80,13 @@ function loadBindings(){try{const s=JSON.parse(localStorage.getItem('st_bindings
 window.msgText=''; window.msgTimer=0;
 function setMsg(txt,ms=3000){window.msgText=txt;window.msgTimer=ms;}
 
+// Spotřeba paliva — nejprve hlavní nádrž, pak záloha
+function consumeFuel(p,amount){
+  if(p.fuel>=amount){p.fuel=Math.max(0,p.fuel-amount);return;}
+  const used=p.fuel;p.fuel=0;
+  p.fuelReserve=Math.max(0,(p.fuelReserve||0)-(amount-used));
+}
+
 // Input
 const keys={};
 document.addEventListener('keydown',e=>{
@@ -138,6 +145,7 @@ function startGame(fromSave=false){
     hull:save?.hull||100, hullMax:100,
     shield:save?.shield||100, shieldMax:100,
     fuel:save?.fuel||C.FUEL_MAX, fuelMax:C.FUEL_MAX,
+    fuelReserve:save?.fuelReserve??C.FUEL_MAX*0.1, fuelReserveMax:C.FUEL_MAX*0.1,
     credits:save?.credits||1000,
     cargo:save?.cargo||{}, cargoCount:save?.cargoCount||0,
     upgrades:save?.upgrades||{},
@@ -343,6 +351,7 @@ function undock(){
   }
   gameState.dockStation=null;
   document.getElementById('dock-panel').style.display='none';
+  document.getElementById('trade-overlay').style.display='none';
   document.getElementById('hud').style.display='block';
   saveGame();
   setMsg('Vzlet dokončen.',2000);
@@ -711,15 +720,15 @@ function update(dt){
   if(thrusting){
     const thrust=warpBoosting?C.WARP_THRUST:(boost?C.BOOST_THRUST:C.THRUST)*engMult*parkMult;
     p.vx+=Math.cos(p.angle)*thrust;p.vy+=Math.sin(p.angle)*thrust;
-    if(!warpBoosting)p.fuel=Math.max(0,p.fuel-(boost?C.FUEL_BOOST:C.FUEL_THRUST));
+    if(!warpBoosting)consumeFuel(p,boost?C.FUEL_BOOST:C.FUEL_THRUST);
     spawnTrail(p);
   }
 
   // Boční trysky — strafe (zakázáno při warpu)
   if(warpPhase!=='boosting'){
     const sideThr=C.SIDE_THRUST*engMult*parkMult;
-    if(strafeL){p.vx+=Math.sin(p.angle)*sideThr;p.vy-=Math.cos(p.angle)*sideThr;p.fuel=Math.max(0,p.fuel-C.FUEL_THRUST*0.4);}
-    if(strafeR){p.vx-=Math.sin(p.angle)*sideThr;p.vy+=Math.cos(p.angle)*sideThr;p.fuel=Math.max(0,p.fuel-C.FUEL_THRUST*0.4);}
+    if(strafeL){p.vx+=Math.sin(p.angle)*sideThr;p.vy-=Math.cos(p.angle)*sideThr;consumeFuel(p,C.FUEL_THRUST*0.4);}
+    if(strafeR){p.vx-=Math.sin(p.angle)*sideThr;p.vy+=Math.cos(p.angle)*sideThr;consumeFuel(p,C.FUEL_THRUST*0.4);}
   }
 
   // Speed cap — v parkovacím režimu velmi nízký, žádný při boost nebo warpu
@@ -755,7 +764,7 @@ function update(dt){
   }
 
   // Idle fuel
-  p.fuel=Math.max(0,p.fuel-C.FUEL_IDLE);
+  consumeFuel(p,C.FUEL_IDLE);
 
   // Invincibility
   if(p.invTimer>0)p.invTimer=Math.max(0,p.invTimer-dt);
@@ -943,6 +952,7 @@ function saveGame(){
   if(!gameState||gameState.player.dead)return;
   const p=gameState.player;
   const data={x:p.x,y:p.y,angle:p.angle,hull:p.hull,shield:p.shield,fuel:p.fuel,
+    fuelReserve:p.fuelReserve,
     credits:p.credits,cargo:p.cargo,cargoCount:p.cargoCount,upgrades:p.upgrades,
     xp:p.xp,level:p.level,totalEarned:gameState.totalEarned};
   try{localStorage.setItem(C.SAVE_KEY,JSON.stringify(data));}catch(e){}
