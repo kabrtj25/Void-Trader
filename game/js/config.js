@@ -50,14 +50,14 @@ const C = {
 };
 
 const GOODS = [
-  {name:'Potraviny',    base:12,  vol:1},
-  {name:'Textil',       base:22,  vol:1},
-  {name:'Elektronika',  base:85,  vol:2},
-  {name:'Léčiva',       base:110, vol:1},
-  {name:'Rudy',         base:35,  vol:3},
-  {name:'Technologie',  base:180, vol:2},
-  {name:'Zbraně',       base:320, vol:2},
-  {name:'Biopalivo',    base:48,  vol:1},
+  {name:'Potraviny',   base:12,  vol:1, icon:'🌾', desc:'Základní potraviny a zásoby. Stabilní poptávka na každé stanici ve vesmíru.'},
+  {name:'Textil',      base:22,  vol:1, icon:'🧵', desc:'Průmyslové i luxusní tkaniny. Vhodné jako doplňkový náklad na kratší trasy.'},
+  {name:'Elektronika', base:85,  vol:2, icon:'💾', desc:'Výpočetní čipy a výkonné moduly. Vysoká hodnota, nestálé tržní ceny.'},
+  {name:'Léčiva',      base:110, vol:1, icon:'💊', desc:'Syntetické léčivé přípravky. Vždy žádané v odlehlých a pohraničních sektorech.'},
+  {name:'Rudy',        base:35,  vol:3, icon:'⛏',  desc:'Těžená surová ruda z asteroidů. Nízká cena za kus, velký objem.'},
+  {name:'Technologie', base:180, vol:2, icon:'⚙',  desc:'Pokročilé strojní díly a kybernetické systémy. Špičková obchodní marže.'},
+  {name:'Zbraně',      base:320, vol:2, icon:'🔫', desc:'Regulované vojenské vybavení. Velmi výnosné — vysoké riziko přepravy.'},
+  {name:'Biopalivo',   base:48,  vol:1, icon:'⚗',  desc:'Organická paliva a reaktanty. Stabilní cena, vysoká obchodní rotace.'},
 ];
 
 const UPGRADES = [

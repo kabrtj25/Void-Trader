@@ -3,120 +3,136 @@
 // ---- HUD ----
 function renderHUD(player,nearStation,dockingState,t){
   const pad=16;
-
-  // === Levý panel — systémy lodi ===
-  const lx=pad,ly=pad,lw=200,lh=180;
+  const lx=pad,ly=pad,lw=228,lh=230;
   hudPanel(lx,ly,lw,lh);
 
   ctx.save();
-  ctx.font='9px "Courier New", monospace';ctx.fillStyle='rgba(255,149,0,0.5)';ctx.textAlign='left';
-  ctx.fillText('// SYSTÉMY LODI',lx+10,ly+14);
+  ctx.textAlign='left';
+  const bx=lx+10, bw=lw-20;
 
-  // HP bar
-  const hullPct=player.hull/player.hullMax;
-  hudBar(lx+10,ly+26,lw-20,10,'HULL',hullPct,hullPct<0.3?'#ff2200':'#ff9500');
+  // Header
+  ctx.font='8px "Courier New", monospace';
+  ctx.fillStyle='rgba(0,200,200,0.62)';
+  ctx.fillText('// SYSTÉMY LODI',bx,ly+14);
+  ctx.strokeStyle='rgba(0,200,200,0.13)';ctx.lineWidth=0.5;
+  ctx.beginPath();ctx.moveTo(bx,ly+19);ctx.lineTo(lx+lw-10,ly+19);ctx.stroke();
 
-  // Štít bar
-  const shldPct=player.shield/player.shieldMax;
-  hudBar(lx+10,ly+50,lw-20,10,'ŠTÍT',shldPct,'#4080ff');
+  // PALIVO
+  const fuelPct=clamp(player.fuel/player.fuelMax,0,1);
+  const fuelLow=fuelPct<0.15&&(player.fuelReserve||0)<1;
+  ctx.font='7px "Courier New", monospace';
+  ctx.fillStyle=fuelLow?'rgba(255,80,0,0.85)':'rgba(0,200,200,0.62)';
+  ctx.fillText('PALIVO',bx,ly+29);
+  hudBarColor(bx,ly+31,bw,8,fuelPct,
+    fuelLow?'#ff4400':'#00d4ff',
+    fuelLow?'rgba(255,68,0,0.1)':'rgba(0,212,255,0.07)');
 
-  // Palivo bar
-  const fuelPct=player.fuel/player.fuelMax;
-  hudBar(lx+10,ly+74,lw-20,10,'PALIVO',fuelPct,fuelPct<0.2?'#ff4400':'#ff9500');
+  // ZÁLOHA
+  const rsvMax=player.fuelReserveMax||C.FUEL_MAX*0.1;
+  const rsvPct=clamp((player.fuelReserve||0)/rsvMax,0,1);
+  ctx.font='7px "Courier New", monospace';
+  ctx.fillStyle='rgba(60,100,200,0.6)';
+  ctx.fillText('ZÁLOHA',bx,ly+48);
+  hudBarColor(bx,ly+50,bw,4,rsvPct,'#5577ee','rgba(40,60,180,0.08)',false);
+  ctx.font='7px "Courier New", monospace';ctx.fillStyle='rgba(100,140,230,0.65)';ctx.textAlign='right';
+  ctx.fillText(Math.round(rsvPct*100)+'%',lx+lw-10,ly+54);ctx.textAlign='left';
 
-  // Rychlost v km/s
+  // POŠKOZENÍ (0% = zdravá loď, 100% = zničena)
+  const dmgPct=clamp(1-(player.hull/player.hullMax),0,1);
+  const dmgColor=dmgPct<0.25?'#00cc66':dmgPct<0.55?'#ff9500':'#ff2200';
+  const dmgLabelCol=dmgPct<0.25?'rgba(0,200,100,0.65)':dmgPct<0.55?'rgba(255,149,0,0.65)':'rgba(255,50,0,0.85)';
+  ctx.font='7px "Courier New", monospace';ctx.fillStyle=dmgLabelCol;
+  ctx.fillText('POŠKOZENÍ',bx,ly+62);
+  hudBarColor(bx,ly+64,bw,8,dmgPct,dmgColor,'rgba(50,0,0,0.1)');
+
+  // Separator
+  ctx.strokeStyle='rgba(0,200,200,0.08)';ctx.lineWidth=0.5;
+  ctx.beginPath();ctx.moveTo(bx,ly+80);ctx.lineTo(lx+lw-10,ly+80);ctx.stroke();
+
+  // RYCHLOST
   const spdRaw=Math.hypot(player.vx,player.vy);
   const spdKms=spdRaw*C.SPEED_KMS_FACTOR;
   const spdText=spdKms>=1000?Math.round(spdKms).toLocaleString('cs')+' km/s':spdKms.toFixed(1)+' km/s';
-  ctx.font='10px "Courier New", monospace';ctx.fillStyle='rgba(255,149,0,0.7)';
-  ctx.fillText('RYCHLOST',lx+10,ly+102);
-  ctx.font='bold 16px "Courier New", monospace';ctx.fillStyle='#ffaa00';
-  ctx.fillText(spdText,lx+10,ly+120);
+  ctx.font='7px "Courier New", monospace';ctx.fillStyle='rgba(180,210,240,0.5)';
+  ctx.fillText('RYCHLOST',bx,ly+92);
+  ctx.font='bold 14px "Courier New", monospace';ctx.fillStyle='#ddeeff';
+  ctx.fillText(spdText,bx,ly+107);
 
   // Souřadnice
-  ctx.font='9px "Courier New", monospace';ctx.fillStyle='rgba(255,149,0,0.5)';
-  ctx.fillText(`${Math.round(player.x/100)}, ${Math.round(player.y/100)} AU`,lx+10,ly+140);
+  ctx.font='7px "Courier New", monospace';ctx.fillStyle='rgba(100,150,190,0.45)';
+  ctx.fillText(`${Math.round(player.x/100)}, ${Math.round(player.y/100)} AU`,bx,ly+120);
 
-  // Level
-  ctx.font='9px "Courier New", monospace';ctx.fillStyle='rgba(255,149,0,0.5)';
-  ctx.fillText(`CMDR LVL ${player.level}`,lx+10,ly+158);
-  // XP bar
-  const xpPct=player.xp/xpNeeded(player.level);
-  ctx.fillStyle='#1a0800';ctx.fillRect(lx+10,ly+162,lw-20,4);
-  ctx.fillStyle='#ff9500';ctx.fillRect(lx+10,ly+162,(lw-20)*xpPct,4);
+  // Level & XP
+  const xpPct=clamp(player.xp/xpNeeded(player.level),0,1);
+  ctx.font='7px "Courier New", monospace';ctx.fillStyle='rgba(255,200,0,0.55)';
+  ctx.fillText(`CMDR LVL ${player.level}`,bx,ly+133);
+  ctx.fillStyle='rgba(60,40,0,0.45)';ctx.fillRect(bx,ly+136,bw,3);
+  ctx.fillStyle='#ffcc00';ctx.fillRect(bx,ly+136,bw*xpPct,3);
 
-  ctx.restore();
+  // Separator
+  ctx.strokeStyle='rgba(255,200,0,0.1)';ctx.lineWidth=0.5;
+  ctx.beginPath();ctx.moveTo(bx,ly+146);ctx.lineTo(lx+lw-10,ly+146);ctx.stroke();
 
-  // === Pravý panel — kredity & náklad ===
-  const rw=200,rh=140,rx=W-pad-rw,ry=pad;
-  hudPanel(rx,ry,rw,rh);
-  ctx.save();
-  ctx.font='9px "Courier New", monospace';ctx.fillStyle='rgba(255,149,0,0.5)';ctx.textAlign='left';
-  ctx.fillText('// EKONOMIKA',rx+10,ry+14);
-  ctx.font='bold 22px "Courier New", monospace';ctx.fillStyle='#ffcc00';ctx.shadowColor='#ffcc00';ctx.shadowBlur=10;
-  ctx.fillText(player.credits.toLocaleString('cs')+' Cr',rx+10,ry+42);
+  // KREDITY
+  ctx.font='7px "Courier New", monospace';ctx.fillStyle='rgba(255,200,0,0.5)';
+  ctx.fillText('KREDITY',bx,ly+157);
+  ctx.font='bold 17px "Courier New", monospace';
+  ctx.fillStyle='#ffcc00';ctx.shadowColor='rgba(255,200,0,0.4)';ctx.shadowBlur=7;
+  ctx.fillText(player.credits.toLocaleString('cs')+' Cr',bx,ly+174);
   ctx.shadowBlur=0;
-  ctx.font='9px "Courier New", monospace';ctx.fillStyle='rgba(255,149,0,0.5)';
+
+  // NÁKLAD
   const cmax=getCargoMax(player);
-  ctx.fillText(`NÁKLAD: ${player.cargoCount}/${cmax}`,rx+10,ry+60);
-  // Cargo bar
-  ctx.fillStyle='#1a0800';ctx.fillRect(rx+10,ry+66,rw-20,6);
-  ctx.fillStyle=player.cargoCount/cmax>0.85?'#ff4400':'#ff9500';
-  ctx.fillRect(rx+10,ry+66,(rw-20)*player.cargoCount/cmax,6);
-  // Náklad seznam
-  ctx.font='9px "Courier New", monospace';ctx.fillStyle='rgba(255,149,0,0.7)';
-  let cy2=ry+82;
-  Object.entries(player.cargo).slice(0,4).forEach(([name,qty])=>{
-    ctx.fillText(`${name} ×${qty}`,rx+10,cy2);cy2+=13;
-  });
+  const cargoFill=player.cargoCount/Math.max(cmax,1);
+  ctx.font='7px "Courier New", monospace';ctx.fillStyle='rgba(170,210,230,0.45)';
+  ctx.fillText(`NÁKLAD  ${player.cargoCount} / ${cmax}`,bx,ly+189);
+  ctx.fillStyle='rgba(0,212,255,0.06)';ctx.fillRect(bx,ly+192,bw,3);
+  ctx.fillStyle=cargoFill>0.85?'#ff4400':'rgba(0,200,200,0.48)';
+  ctx.fillRect(bx,ly+192,bw*cargoFill,3);
+
+  // ŠTÍT (inline)
+  const shldPct=clamp(player.shield/player.shieldMax,0,1);
+  ctx.font='7px "Courier New", monospace';ctx.fillStyle='rgba(70,110,230,0.55)';
+  ctx.fillText('ŠTÍT',bx,ly+204);
+  ctx.fillStyle='rgba(0,0,50,0.3)';ctx.fillRect(bx+28,ly+197,bw-28,5);
+  ctx.fillStyle='#4488ff';ctx.fillRect(bx+28,ly+197,Math.max(0,(bw-28)*shldPct),5);
+  ctx.font='7px "Courier New", monospace';ctx.fillStyle='rgba(100,150,255,0.65)';ctx.textAlign='right';
+  ctx.fillText(Math.round(shldPct*100)+'%',lx+lw-10,ly+202);ctx.textAlign='left';
+
   ctx.restore();
 
-  // === Dolní střed — zprávy ===
+  // ── Centre indicators ──
   if(window.msgText&&window.msgTimer>0){
-    ctx.save();
-    const alpha=Math.min(1,window.msgTimer/500);
-    ctx.globalAlpha=alpha;
+    ctx.save();const alpha=Math.min(1,window.msgTimer/500);ctx.globalAlpha=alpha;
     ctx.textAlign='center';ctx.font='13px "Courier New", monospace';
     ctx.fillStyle='#ffcc00';ctx.shadowColor='#ffcc00';ctx.shadowBlur=12;
-    ctx.fillText(window.msgText,W/2,H-90);
-    ctx.restore();
+    ctx.fillText(window.msgText,W/2,H-90);ctx.restore();
   }
-
-  // Boost indikátor
   if(player.boosting&&player.fuel>0){
-    ctx.save();
-    ctx.textAlign='center';ctx.font='bold 13px "Courier New", monospace';
+    ctx.save();ctx.textAlign='center';ctx.font='bold 13px "Courier New", monospace';
     ctx.fillStyle='#00ccff';ctx.shadowColor='#00ccff';ctx.shadowBlur=15;
-    ctx.fillText('⚡ BOOST AKTIVNÍ',W/2,H-110);
-    ctx.restore();
+    ctx.fillText('⚡ BOOST AKTIVNÍ',W/2,H-110);ctx.restore();
   }
-
-  // Parkovací režim indikátor
   if(window.parkingMode){
-    ctx.save();
-    const pa=0.75+Math.sin(t*3)*0.25;
-    ctx.globalAlpha=pa;ctx.textAlign='center';ctx.font='bold 14px "Courier New", monospace';
+    ctx.save();const pa=0.75+Math.sin(t*3)*0.25;ctx.globalAlpha=pa;
+    ctx.textAlign='center';ctx.font='bold 14px "Courier New", monospace';
     ctx.fillStyle='#ffcc00';ctx.shadowColor='#ffcc00';ctx.shadowBlur=18;
-    ctx.fillText('⚓ PARKOVACÍ REŽIM',W/2,H-130);
-    ctx.restore();
+    ctx.fillText('⚓ PARKOVACÍ REŽIM',W/2,H-130);ctx.restore();
   }
-  if(player.fuel<10){
-    ctx.save();
-    const fa=0.5+Math.sin(t*6)*0.5;
-    ctx.globalAlpha=fa;ctx.textAlign='center';ctx.font='bold 13px "Courier New", monospace';
+  if(player.fuel<1&&(player.fuelReserve||0)<1){
+    ctx.save();const fa=0.5+Math.sin(t*6)*0.5;ctx.globalAlpha=fa;
+    ctx.textAlign='center';ctx.font='bold 13px "Courier New", monospace';
     ctx.fillStyle='#ff2200';ctx.shadowColor='#ff2200';ctx.shadowBlur=15;
-    ctx.fillText('⚠ KRITICKÁ HLADINA PALIVA',W/2,H-130);
-    ctx.restore();
+    ctx.fillText('⚠ KRITICKÁ HLADINA PALIVA',W/2,H-130);ctx.restore();
   }
 }
 
 function hudPanel(x,y,w,h){
   ctx.save();
-  ctx.fillStyle='rgba(0,4,14,0.82)';ctx.fillRect(x,y,w,h);
-  ctx.strokeStyle='rgba(255,149,0,0.35)';ctx.lineWidth=1;ctx.strokeRect(x,y,w,h);
-  // Corner accents
+  ctx.fillStyle='rgba(0,4,22,0.86)';ctx.fillRect(x,y,w,h);
+  ctx.strokeStyle='rgba(0,200,200,0.28)';ctx.lineWidth=1;ctx.strokeRect(x,y,w,h);
   const cs=10;
-  ctx.strokeStyle='rgba(255,149,0,0.7)';ctx.lineWidth=1.5;
+  ctx.strokeStyle='rgba(0,212,255,0.65)';ctx.lineWidth=1.5;
   [[x,y],[x+w,y],[x,y+h],[x+w,y+h]].forEach(([cx,cy],i)=>{
     const sx=i%2===0?1:-1,sy=i<2?1:-1;
     ctx.beginPath();ctx.moveTo(cx+sx*cs,cy);ctx.lineTo(cx,cy);ctx.lineTo(cx,cy+sy*cs);ctx.stroke();
@@ -124,14 +140,23 @@ function hudPanel(x,y,w,h){
   ctx.restore();
 }
 
+function hudBarColor(x,y,w,h,pct,fg,bg='rgba(255,255,255,0.05)',showPct=true){
+  ctx.fillStyle=bg;ctx.fillRect(x,y,w,h);
+  ctx.fillStyle=fg;ctx.fillRect(x,y,w*clamp(pct,0,1),h);
+  ctx.strokeStyle='rgba(255,255,255,0.04)';ctx.lineWidth=0.5;ctx.strokeRect(x,y,w,h);
+  if(showPct){
+    ctx.font='7px "Courier New", monospace';ctx.fillStyle='rgba(255,255,255,0.65)';
+    ctx.textAlign='right';
+    ctx.fillText(Math.round(pct*100)+'%',x+w,y+h-1);
+    ctx.textAlign='left';
+  }
+}
+
+// Keep old hudBar for compatibility (unused by HUD but may be called elsewhere)
 function hudBar(x,y,w,h,label,pct,color){
-  ctx.font='8px "Courier New", monospace';ctx.fillStyle='rgba(255,149,0,0.5)';
+  ctx.font='8px "Courier New", monospace';ctx.fillStyle='rgba(0,200,200,0.5)';
   ctx.fillText(label,x,y-2);
-  ctx.fillStyle='rgba(255,149,0,0.1)';ctx.fillRect(x,y,w,h);
-  ctx.fillStyle=color;ctx.fillRect(x,y,w*clamp(pct,0,1),h);
-  ctx.strokeStyle='rgba(255,149,0,0.2)';ctx.lineWidth=1;ctx.strokeRect(x,y,w,h);
-  ctx.fillStyle='rgba(255,255,255,0.7)';
-  ctx.fillText(Math.round(pct*100)+'%',x+w+4,y+h-1);
+  hudBarColor(x,y,w,h,pct,color,'rgba(0,212,255,0.07)');
 }
 
 // ---- Minimapa ----
@@ -447,18 +472,21 @@ function handleMapClick(e){
 
 // ---- Tab switching ----
 function switchDockTab(tab){
+  if(tab==='trade'){
+    // Open full-screen trade overlay
+    if(window.gameState?.dockStation)
+      openTradeOverlay(window.gameState.player,window.gameState.dockStation);
+    return;
+  }
   document.querySelectorAll('.dtab').forEach(btn=>{
     const map={services:'SERVIS',trade:'OBCHOD',upgrades:'UPGRADY'};
     btn.classList.toggle('active',btn.textContent.trim()===map[tab]);
   });
-  ['services','trade','upgrades'].forEach(id=>{
+  ['services','upgrades'].forEach(id=>{
     const el=document.getElementById('dtab-'+id);
     if(!el)return;
-    if(id==='trade') el.style.display=id===tab?'flex':'none';
-    else el.style.display=id===tab?'block':'none';
+    el.style.display=id===tab?'block':'none';
   });
-  if(tab==='trade'&&window.gameState?.dockStation)
-    renderTradePanel(window.gameState.player,window.gameState.dockStation);
 }
 
 // ---- Dokovací panel ----
@@ -470,11 +498,17 @@ function renderDockPanel(player,station){
   document.getElementById('dock-name').textContent=station.name;
   document.getElementById('dock-tier').textContent='◆'.repeat(station.tier)+'◇'.repeat(3-station.tier);
   // Services
-  const fm=player.fuelMax-player.fuel,fc=Math.ceil(fm*C.FUEL_PRICE);
-  document.getElementById('fuel-cost').textContent=fm<1?'Plná nádrž':`${fc} Cr`;
-  document.getElementById('fuel-btn').disabled=fm<1||player.credits<fc;
+  const fm=player.fuelMax-player.fuel;
+  const fr=(player.fuelReserveMax||0)-(player.fuelReserve||0);
+  const fc=Math.ceil((fm+fr)*C.FUEL_PRICE);
+  document.getElementById('fuel-cost').textContent=(fm<1&&fr<1)?'Plná nádrž':`${fc} Cr`;
+  document.getElementById('fuel-btn').disabled=(fm<1&&fr<1)||player.credits<fc;
   document.getElementById('fuel-btn').onclick=()=>{
-    if(player.credits>=fc&&fm>=1){player.credits-=fc;player.fuel=player.fuelMax;renderDockPanel(player,station);setMsg('Palivo doplněno!',2000);}
+    if(player.credits>=fc&&(fm>=1||fr>=1)){
+      player.credits-=fc;player.fuel=player.fuelMax;
+      player.fuelReserve=player.fuelReserveMax;
+      renderDockPanel(player,station);setMsg('Palivo a záloha doplněny!',2000);
+    }
   };
   const hm=player.hullMax-player.hull,hc=Math.ceil(hm*C.HULL_PRICE);
   document.getElementById('hull-cost').textContent=hm<1?'Trup OK':`${hc} Cr`;
@@ -505,35 +539,172 @@ function renderDockPanel(player,station){
   renderTradePanel(player,station);
 }
 
-function renderTradePanel(player,station){
-  const inv=station.inv;
-  const bl=document.getElementById('buy-list');bl.innerHTML='';
-  const sl=document.getElementById('sell-list');sl.innerHTML='';
-  Object.entries(inv).forEach(([name,info])=>{
-    if(info.buy&&info.qty>0){
-      const cmax=getCargoMax(player);
-      const row=document.createElement('div');row.className='trade-row';
-      row.innerHTML=`<span class="tname">${name}</span><span class="tprice">${info.buy} Cr</span><span class="tqty">${info.qty}×</span>`;
-      const btn=document.createElement('button');btn.className='tbtn';btn.textContent='Koupit';
-      btn.disabled=player.credits<info.buy||player.cargoCount>=cmax;
-      btn.onclick=()=>{if(player.credits>=info.buy&&player.cargoCount<cmax){player.credits-=info.buy;info.qty--;player.cargo[name]=(player.cargo[name]||0)+1;player.cargoCount++;renderTradePanel(player,station);setMsg(`Zakoupeno: ${name}`,1500);}};
-      row.appendChild(btn);bl.appendChild(row);
-    }
-    if(info.sell){
-      const qty=player.cargo[name]||0;if(!qty)return;
-      const row=document.createElement('div');row.className='trade-row';
-      row.innerHTML=`<span class="tname">${name}</span><span class="tprice sell">${info.sell} Cr</span><span class="tqty">${qty}×</span>`;
-      const btn=document.createElement('button');btn.className='tbtn sbtn';btn.textContent='Prodat';
-      btn.onclick=()=>{player.credits+=info.sell;player.cargo[name]--;if(!player.cargo[name])delete player.cargo[name];player.cargoCount--;renderTradePanel(player,station);setMsg(`Prodáno: ${name} za ${info.sell} Cr`,1500);};
-      row.appendChild(btn);sl.appendChild(row);
-    }
-  });
-  if(!bl.children.length)bl.innerHTML='<div class="empty">Nic k prodeji</div>';
-  if(!sl.children.length)sl.innerHTML='<div class="empty">Nic k prodeji ve skladu</div>';
+// ---- Full-screen Trade Overlay ----
+let _tradeSelected=null; // {name, info, mode:'buy'|'sell'}
+let _tradeQty=1;
+let _tradePlayer=null, _tradeStation=null;
+
+function openTradeOverlay(player,station){
+  _tradePlayer=player;_tradeStation=station;
+  _tradeSelected=null;_tradeQty=1;
+  document.getElementById('trade-overlay').style.display='flex';
+  document.getElementById('btn-trade-close').onclick=closeTradeOverlay;
+  document.getElementById('tq-minus').onclick=()=>{_tradeQty=Math.max(1,_tradeQty-1);_updateTradeDetail();};
+  document.getElementById('tq-plus').onclick=()=>{_tradeQty++;_updateTradeDetail();};
+  _renderTradeOverlay();
 }
+
+function closeTradeOverlay(){
+  document.getElementById('trade-overlay').style.display='none';
+  // Reset dock panel to services tab
+  if(_tradeStation)renderDockPanel(_tradePlayer,_tradeStation);
+}
+
+function _renderTradeOverlay(){
+  if(!_tradePlayer||!_tradeStation)return;
+  const p=_tradePlayer,st=_tradeStation,inv=st.inv;
+  const cmax=getCargoMax(p);
+  document.getElementById('trade-station-name').textContent=st.name;
+  document.getElementById('trade-cargo-badge').textContent=`NÁKLAD ${p.cargoCount}/${cmax}`;
+  document.getElementById('trade-credits-hdr').textContent=p.credits.toLocaleString('cs')+' Cr';
+
+  // Buy list
+  const bl=document.getElementById('trade-buy-list');bl.innerHTML='';
+  Object.entries(inv).forEach(([name,info])=>{
+    if(!info.buy)return;
+    const g=GOODS.find(x=>x.name===name)||{icon:'📦'};
+    const avail=info.qty>0;
+    const div=document.createElement('div');
+    div.className='trade-item-row'+((!avail)||p.credits<info.buy||p.cargoCount>=cmax?' tir-na':'')+
+      (_tradeSelected?.name===name&&_tradeSelected?.mode==='buy'?' trow-selected':'');
+    div.innerHTML=`<span class="tir-icon">${g.icon}</span><span class="tir-name">${name}</span>`+
+      `<span class="tir-price">${info.buy} Cr</span><span class="tir-qty">${info.qty}×</span>`;
+    if(avail)div.onclick=()=>_selectTradeItem(name,info,'buy');
+    bl.appendChild(div);
+  });
+  if(!bl.children.length)bl.innerHTML='<div class="trade-empty">Stanice nemá zboží</div>';
+
+  // Sell list (player cargo)
+  const sl=document.getElementById('trade-sell-list');sl.innerHTML='';
+  Object.entries(p.cargo).forEach(([name,qty])=>{
+    if(!qty)return;
+    const info=inv[name];
+    if(!info?.sell)return;
+    const g=GOODS.find(x=>x.name===name)||{icon:'📦'};
+    const div=document.createElement('div');
+    div.className='trade-item-row'+(_tradeSelected?.name===name&&_tradeSelected?.mode==='sell'?' trow-selected':'');
+    div.innerHTML=`<span class="tir-icon">${g.icon}</span><span class="tir-name">${name}</span>`+
+      `<span class="tir-price sell">${info.sell} Cr</span><span class="tir-qty">${qty}×</span>`;
+    div.onclick=()=>_selectTradeItem(name,info,'sell');
+    sl.appendChild(div);
+  });
+  if(!sl.children.length)sl.innerHTML='<div class="trade-empty">Náklad prázdný</div>';
+
+  _updateTradeDetail();
+}
+
+function _selectTradeItem(name,info,mode){
+  _tradeSelected={name,info,mode};
+  _tradeQty=1;
+  _updateTradeDetail();
+  _renderTradeOverlay(); // refresh selection highlight
+}
+
+function _updateTradeDetail(){
+  const content=document.getElementById('trade-detail-content');
+  const empty=document.getElementById('trade-detail-empty');
+  if(!_tradeSelected){content.style.display='none';empty.style.display='';return;}
+  content.style.display='flex';empty.style.display='none';
+
+  const {name,info,mode}=_tradeSelected;
+  const p=_tradePlayer;
+  const g=GOODS.find(x=>x.name===name)||{icon:'📦',desc:''};
+  const cmax=getCargoMax(p);
+
+  document.getElementById('trade-icon').textContent=g.icon;
+  document.getElementById('trade-detail-name').textContent=name.toUpperCase();
+  document.getElementById('trade-detail-desc').textContent=g.desc||'';
+
+  const buyCell=document.getElementById('tdp-buy');
+  const sellCell=document.getElementById('tdp-sell');
+  document.getElementById('tdp-buy-val').textContent=info.buy?info.buy+' Cr':'—';
+  document.getElementById('tdp-sell-val').textContent=info.sell?info.sell+' Cr':'—';
+  buyCell.classList.toggle('tpc-inactive',!info.buy);
+  sellCell.classList.toggle('tpc-inactive',!info.sell);
+
+  // Clamp qty
+  const maxQty=mode==='buy'
+    ?Math.max(0,Math.min(info.qty,cmax-p.cargoCount,Math.floor(p.credits/(info.buy||1))))
+    :(p.cargo[name]||0);
+  _tradeQty=clamp(_tradeQty,1,Math.max(1,maxQty));
+  document.getElementById('tq-num').textContent=_tradeQty;
+
+  const btn=document.getElementById('trade-action-btn');
+  if(mode==='buy'){
+    const cost=_tradeQty*(info.buy||0);
+    const canBuy=info.buy&&info.qty>=_tradeQty&&p.cargoCount+_tradeQty<=cmax&&p.credits>=cost;
+    btn.disabled=!canBuy;
+    btn.className='buy-btn';
+    btn.textContent=`KOUPIT ${_tradeQty}× — ${cost.toLocaleString('cs')} Cr`;
+    document.getElementById('trade-stock-info').textContent=
+      `Na skladě: ${info.qty}×  |  V nákladu: ${p.cargoCount}/${cmax}  |  Kredity: ${p.credits.toLocaleString('cs')} Cr`;
+  } else {
+    const earn=_tradeQty*(info.sell||0);
+    const have=p.cargo[name]||0;
+    btn.disabled=!info.sell||have<_tradeQty;
+    btn.className='sell-btn';
+    btn.textContent=`PRODAT ${_tradeQty}× — +${earn.toLocaleString('cs')} Cr`;
+    document.getElementById('trade-stock-info').textContent=
+      `Máš: ${have}×  |  Cena/ks: ${info.sell} Cr  |  Celkem: +${earn.toLocaleString('cs')} Cr`;
+  }
+  btn.onclick=_executeTrade;
+}
+
+function _executeTrade(){
+  if(!_tradeSelected||!_tradePlayer||!_tradeStation)return;
+  const {name,info,mode}=_tradeSelected;
+  const p=_tradePlayer;
+  const cmax=getCargoMax(p);
+  if(mode==='buy'){
+    const cost=_tradeQty*(info.buy||0);
+    if(!info.buy||info.qty<_tradeQty||p.cargoCount+_tradeQty>cmax||p.credits<cost)return;
+    p.credits-=cost;info.qty-=_tradeQty;
+    p.cargo[name]=(p.cargo[name]||0)+_tradeQty;p.cargoCount+=_tradeQty;
+    setMsg(`Zakoupeno: ${_tradeQty}× ${name} za ${cost.toLocaleString('cs')} Cr`,2000);
+  } else {
+    const earn=_tradeQty*(info.sell||0);
+    const have=p.cargo[name]||0;
+    if(!info.sell||have<_tradeQty)return;
+    p.credits+=earn;p.cargoCount-=_tradeQty;
+    p.cargo[name]-=_tradeQty;
+    if(!p.cargo[name])delete p.cargo[name];
+    if(window.gameState)window.gameState.totalEarned=(window.gameState.totalEarned||0)+earn;
+    setMsg(`Prodáno: ${_tradeQty}× ${name} za ${earn.toLocaleString('cs')} Cr`,2000);
+    if(_tradeSelected.mode==='sell'&&!(p.cargo[name])){_tradeSelected=null;_tradeQty=1;}
+  }
+  _tradeQty=1;
+  _renderTradeOverlay();
+}
+
+function setTradeMaxQty(){
+  if(!_tradeSelected||!_tradePlayer)return;
+  const {name,info,mode}=_tradeSelected;
+  const p=_tradePlayer;const cmax=getCargoMax(p);
+  if(mode==='buy'){
+    _tradeQty=Math.max(1,Math.min(info.qty||0,cmax-p.cargoCount,Math.floor(p.credits/(info.buy||1))));
+  } else {
+    _tradeQty=Math.max(1,p.cargo[name]||1);
+  }
+  _updateTradeDetail();
+}
+
+// Legacy renderTradePanel (kept for compatibility — dock panel no longer uses inline trade)
+function renderTradePanel(player,station){}
+
 
 function applyUpgrades(p){
   p.fuelMax=C.FUEL_MAX*(1+0.25*(p.upgrades.fuel||0));
+  p.fuelReserveMax=p.fuelMax*0.1;
   p.shieldMax=100+30*(p.upgrades.shield||0);
   p.hullMax=100+25*(p.upgrades.hull||0);
 }

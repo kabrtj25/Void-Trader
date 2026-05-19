@@ -23,25 +23,7 @@
     <div id="menu-buttons">
       <button class="menu-btn primary" id="btn-new">▶ NOVÁ HRA</button>
       <button class="menu-btn" id="btn-load">↺ POKRAČOVAT</button>
-      <button class="menu-btn" id="btn-settings">⚙ NASTAVENÍ</button>
-    </div>
-    <div id="settings-panel" style="display:none">
-      <div class="setting-row">
-        <span>Ovládání:</span>
-        <div class="ctrl-grid">
-          <span class="ck">W / ↑</span><span class="cd">Zrychlení (thrust)</span>
-          <span class="ck">A / D</span><span class="cd">Otočení lodě</span>
-          <span class="ck">Q / E</span><span class="cd">Boční let (strafe)</span>
-          <span class="ck">SHIFT + W</span><span class="cd">Boost (spotřebuje palivo)</span>
-          <span class="ck">P</span><span class="cd">Parkovací režim (pomalé přistávání)</span>
-          <span class="ck">MEZERNÍK</span><span class="cd">Střelba</span>
-          <span class="ck">F</span><span class="cd">Přistání na stanici</span>
-          <span class="ck">M</span><span class="cd">Otevřít mapu hvězdné soustavy</span>
-          <span class="ck">N</span><span class="cd">Mapa galaxií</span>
-          <span class="ck">R</span><span class="cd">Spustit warpové motory</span>
-          <span class="ck">ESC</span><span class="cd">Mapa / Pauza</span>
-        </div>
-      </div>
+      <button class="menu-btn" id="btn-help">? NÁPOVĚDA</button>
     </div>
     <div id="menu-footer">SPACE TRADER © 2025 — Nekonečný vesmír</div>
   </div>
@@ -143,6 +125,57 @@
   </div>
 </div>
 
+<!-- TRADE OVERLAY (fullscreen shop) -->
+<div id="trade-overlay" style="display:none">
+  <div id="trade-header">
+    <div id="trade-hdr-left">
+      <span id="trade-station-name">STANICE</span>
+      <span id="trade-cargo-badge">0/10</span>
+    </div>
+    <div id="trade-hdr-center">◈ OBCHOD</div>
+    <div id="trade-hdr-right">
+      <span id="trade-credits-hdr">0 Cr</span>
+      <button id="btn-trade-close">✕ ZAVŘÍT</button>
+    </div>
+  </div>
+  <div id="trade-body">
+    <div id="trade-buy-col">
+      <div class="trade-col-head">↓ KOUPIT</div>
+      <div id="trade-buy-list"></div>
+    </div>
+    <div id="trade-detail">
+      <div id="trade-detail-empty">← Vyberte zboží ze seznamu</div>
+      <div id="trade-detail-content" style="display:none">
+        <div id="trade-icon-wrap"><span id="trade-icon">📦</span></div>
+        <div id="trade-detail-name">—</div>
+        <div id="trade-detail-desc">—</div>
+        <div id="trade-prices">
+          <div class="trade-price-cell" id="tdp-buy">
+            <div class="tpc-label">NÁKUP</div>
+            <div class="tpc-val" id="tdp-buy-val">—</div>
+          </div>
+          <div class="trade-price-cell" id="tdp-sell">
+            <div class="tpc-label">PRODEJ</div>
+            <div class="tpc-val sell" id="tdp-sell-val">—</div>
+          </div>
+        </div>
+        <div id="trade-qty-row">
+          <button class="tqbtn" id="tq-minus">−</button>
+          <span id="tq-num">1</span>
+          <button class="tqbtn" id="tq-plus">+</button>
+          <button class="tq-max" onclick="setTradeMaxQty()">MAX</button>
+        </div>
+        <button id="trade-action-btn" disabled>—</button>
+        <div id="trade-stock-info">—</div>
+      </div>
+    </div>
+    <div id="trade-sell-col">
+      <div class="trade-col-head">↑ PRODAT</div>
+      <div id="trade-sell-list"></div>
+    </div>
+  </div>
+</div>
+
 <!-- ETS2 PAUZA -->
 <div id="pause-screen" style="display:none">
 
@@ -226,24 +259,6 @@
 
   </div>
 
-  <!-- Nastavení (skryté, zobrazí se po kliknutí) -->
-  <div id="esc-settings-panel" style="display:none">
-    <div class="esc-settings-title">OVLÁDÁNÍ</div>
-    <div class="esc-ctrl-grid">
-      <span class="ck">W / ↑</span><span class="cd">Zrychlení (thrust)</span>
-      <span class="ck">A / D</span><span class="cd">Otočení lodě</span>
-      <span class="ck">Q / E</span><span class="cd">Boční let (strafe)</span>
-      <span class="ck">SHIFT + W</span><span class="cd">Boost (spotřebuje palivo)</span>
-      <span class="ck">P</span><span class="cd">Parkovací režim (pomalé přistávání)</span>
-      <span class="ck">MEZERNÍK</span><span class="cd">Střelba</span>
-      <span class="ck">F</span><span class="cd">Přistání na stanici</span>
-      <span class="ck">M</span><span class="cd">Otevřít mapu hvězdné soustavy</span>
-      <span class="ck">N</span><span class="cd">Mapa galaxií</span>
-      <span class="ck">R</span><span class="cd">Spustit warpové motory</span>
-      <span class="ck">ESC</span><span class="cd">Herní menu / Pokračovat</span>
-    </div>
-  </div>
-
   <!-- Spodní panel tlačítek (ETS2 styl) -->
   <div id="esc-bottombar">
     <button class="esc-btn primary" id="btn-resume">
@@ -283,6 +298,88 @@
     <div id="death-sub">Vaše mise skončila</div>
     <button class="menu-btn primary" id="btn-restart">↺ NOVÁ HRA</button>
     <button class="menu-btn" id="btn-menu">↩ HLAVNÍ MENU</button>
+  </div>
+</div>
+
+<!-- NASTAVENÍ OVERLAY -->
+<div id="settings-overlay" style="display:none">
+  <div id="settings-box">
+    <div id="settings-header">
+      <span id="settings-title">⚙ NASTAVENÍ</span>
+      <button id="btn-settings-close">✕ Zavřít</button>
+    </div>
+    <div id="settings-tabs">
+      <button class="stab active" id="stab-keys">KLÁVESY</button>
+      <button class="stab" id="stab-sounds">ZVUKY</button>
+    </div>
+    <div id="settings-body">
+      <div id="stab-keys-panel">
+        <div id="keybind-list"></div>
+        <div id="settings-footer">
+          <button id="btn-settings-reset">↺ Výchozí klávesy</button>
+          <span class="settings-note">Klikni na klávesu a stiskni novou · ESC = zrušit</span>
+        </div>
+      </div>
+      <div id="stab-sounds-panel" style="display:none">
+        <div id="sounds-placeholder">
+          <div class="sounds-icon">🔊</div>
+          <div class="sounds-text">Zvukový systém bude přidán v budoucí verzi.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- NÁPOVĚDA OVERLAY -->
+<div id="help-overlay" style="display:none">
+  <div id="help-box">
+    <div id="help-header">
+      <span id="help-title">? NÁPOVĚDA — JAK HRÁT</span>
+      <button id="btn-help-close">✕ Zavřít</button>
+    </div>
+    <div id="help-body">
+
+      <div class="help-section">
+        <h3>🚀 Pohyb ve vesmíru</h3>
+        <p>Tvoje loď se pohybuje setrvačností — ve vesmíru neexistuje tření. Stiskni <b>W</b> pro zrychlení dopředu, <b>A / D</b> pro otočení lodě. <b>Q</b> a <b>E</b> jsou boční trysky — pohyb do stran bez otočení. <b>Shift+W</b> aktivuje boost pro rychlé zrychlení (spotřebovává palivo). Loď se sama nezastaví — musíš otočit a brzdit protitryskami.</p>
+      </div>
+
+      <div class="help-section">
+        <h3>⚓ Parkovací režim (P)</h3>
+        <p>Klávesa <b>P</b> přepne do parkovacího režimu. Loď letí pomaleji, rychle zpomaluje a je snazší ji přesně navést. Ideální pro přistávání na stanicích. Na obrazovce se zobrazí <b>⚓ PARKOVACÍ REŽIM</b>.</p>
+      </div>
+
+      <div class="help-section">
+        <h3>🏭 Přistání na stanicích</h3>
+        <p>Přibliž se ke stanici — uvidíš dokovací indikátor s úhlem a rychlostí. Zarovnej loď s dokovacím portem a sniž rychlost pod 5 km/s. Jakmile se zobrazí <b>PŘISTÁT: F</b>, stiskni <b>F</b>. Na stanici můžeš doplnit palivo, opravit trup, nabít štít, obchodovat a kupovat upgrady.</p>
+      </div>
+
+      <div class="help-section">
+        <h3>📦 Obchod</h3>
+        <p>Každá stanice má vlastní ceny zboží. Kupuj levně na jedné stanici a prodávej draze na jiné. Sleduji nabídku a poptávku — ceny se liší. Kapacita nákladu je omezená, upgraduj ji na stanici. Vydělané kredity utrať za vylepšení lodi.</p>
+      </div>
+
+      <div class="help-section">
+        <h3>⚡ Upgrady lodi</h3>
+        <p>Na každé stanici jsou dostupné upgrady: <b>Motor</b> (vyšší rychlost), <b>Štít</b> (větší ochrana), <b>Pancéřování</b> (více HP), <b>Náklad</b> (více místa), <b>Zbraně</b> (větší poškození), <b>Nádrž</b> (více paliva). Každý upgrade má maximální úroveň.</p>
+      </div>
+
+      <div class="help-section">
+        <h3>🗺 Mapa hvězdné soustavy (M)</h3>
+        <p>Klávesa <b>M</b> otevře mapu aktuální hvězdné soustavy. Klikni na stanici pro nastavení navigace — na obrazovce se zobrazí šipka směrem ke stanici. Klávesa <b>N</b> otevře mapu galaxií.</p>
+      </div>
+
+      <div class="help-section">
+        <h3>🌌 Mezigalaktický warp (N → R)</h3>
+        <p>Stiskni <b>N</b> pro otevření mapy galaxií. Klikni na cílovou galaxii a nastav kurz. Ujisti se, že máš dostatek paliva a opravený trup. Pak stiskni <b>R</b> — spustí se 20sekundový odpočet termohmotových motorů. Po odpočtu drž <b>W</b> a nabírej rychlost. Nad 30 000 km/s se aktivuje warp a za několik sekund dorazíš do cílové galaxie.</p>
+      </div>
+
+      <div class="help-section">
+        <h3>⚔ Nepřátelé</h3>
+        <p>Ve vesmíru se pohybují nepřátelské lodě. Útočí střelbou. Bráň se klávesou <b>Mezerník</b> (střelba) a vyhýbej se projektilům manévrováním. Za zničeného nepřítele dostaneš kredity a zkušenostní body. Hlídej stav trupu a štítu v levém HUD panelu.</p>
+      </div>
+
+    </div>
   </div>
 </div>
 
