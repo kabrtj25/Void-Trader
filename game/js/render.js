@@ -1301,7 +1301,7 @@ function renderWarp(elapsed,duration,destName,t){
 
   ctx.font='bold 38px "Courier New", monospace';
   ctx.fillStyle='#ffffff';ctx.shadowColor='rgba(200,230,255,0.5)';ctx.shadowBlur=24;
-  ctx.fillText('100 000 km/s',cx,cy-62);
+  ctx.fillText('100 000 000 km/s',cx,cy-62);
 
   ctx.font='13px "Courier New", monospace';
   ctx.fillStyle='rgba(255,149,0,0.9)';ctx.shadowColor='rgba(255,149,0,0.5)';ctx.shadowBlur=10;

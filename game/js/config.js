@@ -15,9 +15,9 @@ const C = {
   MAX_SPD:          28,
   BOOST_THRUST:     0.90,
   WARP_THRUST:      3.0,
-  WARP_SPEED_KMS:   30000,
+  WARP_SPEED_KMS:   90000000,  // 90 mil. km/s = 0.3c — prah aktivace warpu
   ROT_SPD:          2.0,
-  SPEED_KMS_FACTOR: 50,
+  SPEED_KMS_FACTOR: 150000,    // 1 herní jednotka = 150 000 km (1 AU = 1000 j. = 150 mil. km)
 
   // Palivo
   FUEL_MAX:     100,
