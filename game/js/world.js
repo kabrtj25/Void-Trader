@@ -55,7 +55,8 @@ function generateChunk(cx,cy){
   // Hvězdné systémy — fixní stanice jen v Sol, jinak náhodné
   const isSolGal=gid==='sol';
   const fixed=isSolGal?FIXED_STATIONS.find(s=>s.cx===cx&&s.cy===cy):null;
-  const hasSystem=fixed||rng()<0.40;
+  const fixedLarge=isSolGal?LARGE_STATIONS.find(s=>s.cx===cx&&s.cy===cy):null;
+  const hasSystem=fixed||fixedLarge||rng()<0.40;
   if(hasSystem){
     const sr=makeRng(chunkSeed(cx,cy)+99);
     const starX=wx+sc*0.3+sr()*sc*0.4;
@@ -77,9 +78,19 @@ function generateChunk(cx,cy){
       const r=12+sr()*28;
       planets.push({orbit,phase,period,r,color:pCols[Math.floor(sr()*pCols.length)],atmo:sr()<0.6});
     }
-    // Stanice — fixní (Sol) nebo náhodná s tématickým názvem
+    // Stanice — velká Coriolis, fixní (Sol) nebo náhodná s tématickým názvem
     let station=null;
-    if(fixed){
+    if(fixedLarge){
+      station={
+        x:starX+500, y:starY+500,
+        name:fixedLarge.name, tier:fixedLarge.tier, color:fixedLarge.color,
+        angle:sr()*Math.PI*2, rotSpeed:0.0008+sr()*0.0012,
+        r:240+sr()*80,
+        type:'large',
+        inv:generateInv(sr),
+        fixed:true
+      };
+    } else if(fixed){
       station={
         x:starX+240, y:starY+240,
         name:fixed.name, tier:fixed.tier, color:fixed.color,
@@ -89,16 +100,37 @@ function generateChunk(cx,cy){
         fixed:true
       };
     } else if(sr()<0.88){
-      const stNames=theme.stNames;
-      station={
-        x:starX+200+sr()*400, y:starY+200+sr()*400,
-        name:stNames[Math.floor(sr()*stNames.length)],
-        tier:1+Math.floor(sr()*3), color:'#ff9500',
-        angle:sr()*Math.PI*2, rotSpeed:0.002+sr()*0.005,
-        r:40+sr()*25,
-        inv:generateInv(sr),
-        fixed:false
-      };
+      const outerDist=Math.abs(cx)+Math.abs(cy);
+      const largeChance=outerDist<=7?0:outerDist<=12?0.14:0.22;
+      if(sr()<largeChance){
+        // Procedurální velká Coriolis stanice ve vzdálených chunkcích
+        const lcols=['#00d4ff','#aa44ff','#ff5533','#00ff88','#ffaa00','#ff6622','#8844ff','#ff2244','#44ffbb','#ffcc44'];
+        const lpref=['Coriolis','Iron','Orbital','Titan','Void','Deep','Armored','Nexus','Dark','Prime'];
+        const lsuf=['Hub','Bastion','Citadel','Forge','Gate','Reach','Station','Nexus','Post','Rampart'];
+        const ni=Math.floor(sr()*lpref.length),si=Math.floor(sr()*lsuf.length);
+        const num=Math.floor(Math.abs(cx*cy)%100+1);
+        station={
+          x:starX+500+sr()*300, y:starY+500+sr()*300,
+          name:`${lpref[ni]} ${lsuf[si]} ${num}`,
+          tier:3, color:lcols[Math.floor(sr()*lcols.length)],
+          angle:sr()*Math.PI*2, rotSpeed:0.0008+sr()*0.0012,
+          r:240+sr()*80,
+          type:'large',
+          inv:generateInv(sr),
+          fixed:false
+        };
+      } else {
+        const stNames=theme.stNames;
+        station={
+          x:starX+200+sr()*400, y:starY+200+sr()*400,
+          name:stNames[Math.floor(sr()*stNames.length)],
+          tier:1+Math.floor(sr()*3), color:'#ff9500',
+          angle:sr()*Math.PI*2, rotSpeed:0.002+sr()*0.005,
+          r:40+sr()*25,
+          inv:generateInv(sr),
+          fixed:false
+        };
+      }
     }
     ch.system={sx:starX,sy:starY,...stype,planets,station};
   }

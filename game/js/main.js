@@ -14,6 +14,7 @@ let warpTimer = 0;
 let warpElapsed = 0;
 let parkingMode = false;
 Object.defineProperty(window,'parkingMode',{get:()=>parkingMode});
+let interiorData = null;
 
 // ===== Systém klávesových zkratek =====
 const DEFAULT_BINDINGS = {
@@ -116,6 +117,9 @@ document.addEventListener('keydown',e=>{
     if(codeMatchesAction(e.code,'sysMap')||codeMatchesAction(e.code,'pause')){e.preventDefault();closeMap();}
   } else if(state==='galaxy'){
     if(codeMatchesAction(e.code,'galaxy')||codeMatchesAction(e.code,'pause')){e.preventDefault();closeGalaxyMap();}
+  } else if(state==='interior'){
+    if(codeMatchesAction(e.code,'dock')){e.preventDefault();completeParkingInInterior();}
+    if(codeMatchesAction(e.code,'pause')){e.preventDefault();exitInterior();}
   } else if(state==='docked'){
     if(codeMatchesAction(e.code,'dock')||codeMatchesAction(e.code,'pause')){e.preventDefault();undock();}
   }
@@ -158,7 +162,7 @@ function startGame(fromSave=false){
 
   gameState={
     player, chunks:[],
-    bullets:[], enemies:[], particles:[], loots:[],
+    bullets:[], enemies:[], particles:[], loots:[], stationDebris:[],
     navTarget:null,
     nearStation:null, dockStation:null,
     dockingState:{approaching:false,align:0,speed:0},
@@ -272,13 +276,14 @@ function tryDock(){
 
 function initDockingSequence(station){
   const gs=gameState,p=gs.player;
-  // Zmrazit pozici portu — loď poletí přesně do otvoru
-  const portX=station.x+station.r*0.88*Math.cos(station.angle);
-  const portY=station.y+station.r*0.88*Math.sin(station.angle);
-  gs.dockAnim={station,timer:0,duration:3.8,progress:0,
+  const portFrac=station.type==='large'?1.0:0.88;
+  const portX=station.x+station.r*portFrac*Math.cos(station.angle);
+  const portY=station.y+station.r*portFrac*Math.sin(station.angle);
+  const dur=station.type==='large'?5.2:3.8;
+  gs.dockAnim={station,phase:1,timer:0,duration:dur,progress:0,
     startX:p.x,startY:p.y,portX,portY,
     savedRotSpeed:station.rotSpeed};
-  station.rotSpeed=0.00012; // téměř zastavit rotaci
+  station.rotSpeed=station.type==='large'?0.00004:0.00012;
   state='docking';
   document.getElementById('hud').style.display='none';
   setMsg('');
@@ -286,15 +291,223 @@ function initDockingSequence(station){
 
 function completeDocking(station){
   const anim=gameState.dockAnim;
-  if(anim)station.rotSpeed=anim.savedRotSpeed;
-  gameState.dockAnim=null;
+  if(station.type==='large'){
+    // Phase 1 done — fly through slot into interior (phase 2)
+    const p=gameState.player;
+    const iR=station.r*0.82;
+    anim.phase=2;
+    anim.timer=0;
+    anim.duration=1.6;
+    anim.progress=0;
+    anim.startX=p.x;
+    anim.startY=p.y;
+    // Target: dead center of the station (hub)
+    anim.targetX=station.x;
+    anim.targetY=station.y;
+  } else {
+    if(anim)station.rotSpeed=anim.savedRotSpeed;
+    gameState.dockAnim=null;
+    startDocking(station);
+  }
+}
+
+function showParkingBayUI(station){
+  state='docked';
+  window._parkingStation=station;
+  document.getElementById('parking-station-name').textContent=station.name;
+  const grid=document.getElementById('parking-bays-grid');
+  grid.innerHTML='';
+  // Seed bays from station name for consistent layout
+  const seed=station.name.split('').reduce((s,c)=>s+c.charCodeAt(0),0);
+  const rng2=makeRng(seed);
+  const numBays=8;
+  for(let i=1;i<=numBays;i++){
+    const occupied=rng2()<0.28;
+    const btn=document.createElement('button');
+    btn.className='parking-bay-btn'+(occupied?' occupied':'');
+    btn.innerHTML=`<div class="bay-num">BAY-${String(i).padStart(2,'0')}</div>`+
+      `<div class="bay-status">${occupied?'🔴 OBSAZENO':'🟢 VOLNÉ'}</div>`;
+    if(!occupied){
+      btn.onclick=()=>selectParkingBay(station,i);
+    } else {
+      btn.disabled=true;
+    }
+    grid.appendChild(btn);
+  }
+  document.getElementById('parking-overlay').style.display='flex';
+}
+
+function selectParkingBay(station,bayNum){
+  window._parkingStation=null;
+  document.getElementById('parking-overlay').style.display='none';
+  setMsg(`Coriolis hangár — přistání na BAY-${String(bayNum).padStart(2,'0')} potvrzeno.`,3500);
   startDocking(station);
+}
+
+function enterInterior(station){
+  const gs=gameState,p=gs.player;
+  gs.dockAnim=null;
+  const iR=station.r*0.82;
+  // Bays built into the ring wall — far from center, spread in a wide arc
+  const bayDist=iR*0.80;
+  const entryA=station.angle;
+  // 6 bays spread across 270° arc, leaving 90° gap at the entry/exit slot
+  const bayOffs=[55,110,165,195,250,305].map(d=>d*Math.PI/180);
+  const seed=station.name.split('').reduce((s,c)=>s+c.charCodeAt(0),0);
+  const rngB=makeRng(seed+777);
+  const bays=bayOffs.map((off,i)=>{
+    const a=entryA+off;
+    return{
+      x:station.x+Math.cos(a)*bayDist,
+      y:station.y+Math.sin(a)*bayDist,
+      angle:a, num:i+1,
+      occupied:rngB()<0.3,
+      r:iR*0.16
+    };
+  });
+  // Player arrives at hub center — zero velocity, facing the interior
+  p.vx=0;p.vy=0;
+  p.angle=station.angle+Math.PI; // face back toward entry slot
+  p.thrusting=false;p.boosting=false;
+  interiorData={station,iR,bays,entryFlash:1.0,nearBay:null};
+  state='interior';
+  document.getElementById('hud').style.display='block';
+  setMsg('VNITŘEK STANICE — [WASDQE] pro let  •  [F] přistát u hangáru  •  ESC = nouzový výstup',8000);
+}
+
+function updateInterior(dt){
+  if(!interiorData)return;
+  const id=interiorData,gs=gameState,p=gs.player,st=id.station;
+  if(p.dead)return;
+
+  // Fade entry flash
+  if(id.entryFlash>0)id.entryFlash=Math.max(0,id.entryFlash-dt*2.5);
+
+  st.angle+=st.rotSpeed*dt;
+  if(window.msgTimer>0)window.msgTimer=Math.max(0,window.msgTimer-dt*1000);
+  gs.t+=dt;
+  if(shootCd>0)shootCd=Math.max(0,shootCd-dt);
+
+  // Full flight controls — spacious interior, only slightly reduced thrust
+  const intMult=0.70;
+  const thrusting=isAction('thrust');
+  const boost=isAction('boost')&&p.fuel>0;
+  const rotL=isAction('rotLeft');
+  const rotR=isAction('rotRight');
+  const strafeL=isAction('strafeL');
+  const strafeR=isAction('strafeR');
+  window._strafeL=strafeL;window._strafeR=strafeR;
+
+  if(rotL)p.angle-=C.ROT_SPD*dt;
+  if(rotR)p.angle+=C.ROT_SPD*dt;
+
+  if(thrusting){
+    const thrust=(boost?C.BOOST_THRUST:C.THRUST)*intMult;
+    p.vx+=Math.cos(p.angle)*thrust;
+    p.vy+=Math.sin(p.angle)*thrust;
+    consumeFuel(p,boost?C.FUEL_BOOST*0.5:C.FUEL_THRUST*0.5);
+    spawnTrail(p);
+  }
+  if(strafeL){p.vx+=Math.sin(p.angle)*C.SIDE_THRUST*intMult;p.vy-=Math.cos(p.angle)*C.SIDE_THRUST*intMult;}
+  if(strafeR){p.vx-=Math.sin(p.angle)*C.SIDE_THRUST*intMult;p.vy+=Math.cos(p.angle)*C.SIDE_THRUST*intMult;}
+
+  p.thrusting=thrusting;p.boosting=boost&&thrusting;
+
+  // Speed cap — generous inside the station
+  const spd=Math.hypot(p.vx,p.vy);
+  const maxIntSpd=boost?C.MAX_SPD*1.4:C.MAX_SPD*0.85;
+  if(spd>maxIntSpd){p.vx*=maxIntSpd/spd;p.vy*=maxIntSpd/spd;}
+  const drag=boost?C.DRAG_BOOST:C.DRAG;
+  p.vx*=drag;p.vy*=drag;
+  p.x+=p.vx;p.y+=p.vy;
+
+  // Soft wall boundary — ring wall, slight damage on hard impact
+  const wallD=Math.hypot(p.x-st.x,p.y-st.y);
+  const wallR=id.iR*0.86;
+  if(wallD>wallR){
+    const nx=(p.x-st.x)/wallD,ny=(p.y-st.y)/wallD;
+    const dot=p.vx*nx+p.vy*ny;
+    p.vx=(p.vx-2*dot*nx)*0.60;p.vy=(p.vy-2*dot*ny)*0.60;
+    p.x=st.x+nx*wallR;p.y=st.y+ny*wallR;
+    if(dot>2.0)hitPlayer(Math.ceil(dot*2));
+  }
+
+  // Engine trails
+  engineTrails.forEach(t=>{t.x+=t.vx;t.y+=t.vy;t.life-=dt;t.vx*=0.92;t.vy*=0.92;});
+  engineTrails=engineTrails.filter(t=>t.life>0);
+
+  // Particles
+  gs.particles.forEach(pt=>{pt.x+=pt.vx;pt.y+=pt.vy;pt.life-=dt;pt.vx*=0.93;pt.vy*=0.93;});
+  gs.particles=gs.particles.filter(pt=>pt.life>0);
+
+  // Camera follows PLAYER — station interior shifts as you move through it
+  camX=p.x-W/2;camY=p.y-H/2;
+  // Zoom: enough to see the ring wall from the center; feels vast when flying
+  const targetZoom=Math.min(W,H)*0.30/id.iR;
+  camZoom+=(targetZoom-camZoom)*Math.min(1,dt*2.5);
+
+  gs.chunks=getVisibleChunks(p.x,p.y);
+
+  // Find nearest free bay
+  id.nearBay=null;
+  let closestBD=Infinity;
+  id.bays.forEach(bay=>{
+    if(bay.occupied)return;
+    const bd=Math.hypot(p.x-bay.x,p.y-bay.y);
+    if(bd<bay.r*2.2&&bd<closestBD){closestBD=bd;id.nearBay=bay;}
+  });
+
+  if(p.invTimer>0)p.invTimer=Math.max(0,p.invTimer-dt);
+  p.shieldRegenTimer+=dt;
+  if(p.shieldRegenTimer>5)p.shield=Math.min(p.shieldMax,p.shield+dt*8);
+}
+
+function completeParkingInInterior(){
+  if(!interiorData)return;
+  const bay=interiorData.nearBay;
+  if(!bay){setMsg('Nejsi dostatečně blízko hangáru.',2000);return;}
+  const st=interiorData.station;
+  bay.occupied=true;
+  interiorData=null;
+  setMsg(`BAY-${String(bay.num).padStart(2,'0')} — přistání potvrzeno.`,3500);
+  startDocking(st);
+}
+
+function exitInterior(){
+  if(!interiorData)return;
+  const st=interiorData.station,p=gameState.player;
+  interiorData=null;
+  state='playing';
+  // Eject out through slot
+  p.x=st.x+Math.cos(st.angle)*st.r*0.45;
+  p.y=st.y+Math.sin(st.angle)*st.r*0.45;
+  p.vx=Math.cos(st.angle)*3.5;p.vy=Math.sin(st.angle)*3.5;
+  p.angle=st.angle;
+  camZoom=0.6;
+  document.getElementById('hud').style.display='block';
+  setMsg('Nouzový výstup ze stanice.',2500);
 }
 
 function updateDocking(dt){
   const gs=gameState;
   if(!gs.dockAnim)return;
   const anim=gs.dockAnim,p=gs.player,st=anim.station;
+
+  if(anim.phase===2){
+    anim.timer+=dt;
+    anim.progress=Math.min(1,anim.timer/anim.duration);
+    const ease=Math.pow(anim.progress,0.55);
+    p.x=anim.startX+(anim.targetX-anim.startX)*ease;
+    p.y=anim.startY+(anim.targetY-anim.startY)*ease;
+    p.angle=Math.atan2(anim.targetY-anim.startY,anim.targetX-anim.startX);
+    p.thrusting=anim.progress<0.7;p.boosting=false;
+    st.angle+=st.rotSpeed*dt;
+    camX=st.x-W/2;camY=st.y-H/2;
+    gs.chunks=getVisibleChunks(p.x,p.y);
+    if(anim.progress>=1)enterInterior(st);
+    return;
+  }
+
   anim.timer+=dt;
   anim.progress=Math.min(1,anim.timer/anim.duration);
   const prog=anim.progress;
@@ -345,13 +558,22 @@ function undock(){
   // Odleť v opačném směru od stanice
   const st=gameState.dockStation;
   if(st){
-    const dx=p.x-st.x,dy=p.y-st.y;
-    const d=Math.hypot(dx,dy)||1;
-    p.vx=dx/d*2;p.vy=dy/d*2;
+    if(st.type==='large'){
+      // Launch out through the mail slot
+      p.x=st.x+Math.cos(st.angle)*st.r*0.45;
+      p.y=st.y+Math.sin(st.angle)*st.r*0.45;
+      p.vx=Math.cos(st.angle)*3;p.vy=Math.sin(st.angle)*3;
+      p.angle=st.angle;
+    } else {
+      const dx=p.x-st.x,dy=p.y-st.y;
+      const d=Math.hypot(dx,dy)||1;
+      p.vx=dx/d*2;p.vy=dy/d*2;
+    }
   }
   gameState.dockStation=null;
   document.getElementById('dock-panel').style.display='none';
   document.getElementById('trade-overlay').style.display='none';
+  document.getElementById('parking-overlay').style.display='none';
   document.getElementById('hud').style.display='block';
   saveGame();
   setMsg('Vzlet dokončen.',2000);
@@ -657,6 +879,56 @@ function spawnExplosion(x,y,big=false){
   spawnParticles(x,y,Math.ceil(n*0.3),'#ffcc00',big?2:1.5,1.4,false);
 }
 
+function stationCrash(st){
+  const gs=gameState,p=gs.player;
+  if(p.dead||p.invTimer>0)return;
+
+  // Initial flash explosions
+  spawnExplosion(p.x,p.y,true);
+  for(let i=0;i<4;i++){
+    const ox=(Math.random()-.5)*st.r*0.8,oy=(Math.random()-.5)*st.r*0.8;
+    spawnExplosion(st.x+ox,st.y+oy,true);
+  }
+
+  // Station breaks into large structural debris chunks that float in space
+  gs.stationDebris=gs.stationDebris||[];
+  const debCols=[st.color,st.color,st.color+'cc','#1a2030','#0a1520','#2a1500','#151515'];
+  const numChunks=22+Math.floor(Math.random()*12);
+  for(let i=0;i<numChunks;i++){
+    const a=(i/numChunks)*Math.PI*2+(Math.random()-.5)*0.55;
+    const speed=0.3+Math.random()*2.8;
+    const dist=st.r*(0.1+Math.random()*0.8);
+    // Bigger pieces further out, smaller near impact
+    const sz=i<6?(60+Math.random()*80):(20+Math.random()*55);
+    const nv=4+Math.floor(Math.random()*4);
+    const verts=[];
+    for(let j=0;j<nv;j++){
+      const jA=(j/nv)*Math.PI*2+(Math.random()-.5)*0.55;
+      const r=sz*(0.3+Math.random()*0.7);
+      verts.push({x:Math.cos(jA)*r,y:Math.sin(jA)*r});
+    }
+    gs.stationDebris.push({
+      x:st.x+Math.cos(a)*dist, y:st.y+Math.sin(a)*dist,
+      vx:Math.cos(a)*speed+p.vx*0.2,
+      vy:Math.sin(a)*speed+p.vy*0.2,
+      angle:Math.random()*Math.PI*2,
+      rotSpeed:(Math.random()-.5)*0.03,
+      verts, sz,
+      color:debCols[Math.floor(Math.random()*debCols.length)],
+      glowFade:1.0 // hot debris glow that fades
+    });
+  }
+  // Small ship debris (particles — these are fine)
+  spawnParticles(p.x,p.y,35,'#4488ff',5,1.8,true);
+  spawnParticles(p.x,p.y,20,'#ff9500',4,1.2,true);
+
+  // Heavy screen shake
+  shakeX=(Math.random()-.5)*60;shakeY=(Math.random()-.5)*60;
+  p.dead=true;
+  setMsg('KOLIZE SE STANICÍ — KATASTROFICKÝ VÝBUCH!',5000);
+  setTimeout(showDeath,2400);
+}
+
 // ---- Engine trails ----
 let engineTrails=[];
 function spawnTrail(p){
@@ -773,6 +1045,9 @@ function update(dt){
   p.shieldRegenTimer+=dt;
   if(p.shieldRegenTimer>5)p.shield=Math.min(p.shieldMax,p.shield+dt*8);
 
+  // Screen shake decay
+  shakeX*=0.82;shakeY*=0.82;
+
   // Camera follow
   camX=p.x-W/2;camY=p.y-H/2;
 
@@ -789,7 +1064,8 @@ function update(dt){
     if(!st)return;
     st.angle+=st.rotSpeed;
     const d=dist2(p,st);
-    if(d<closestStD){closestStD=d;if(d<800)gs.nearStation=st;}
+    const nearRange=st.type==='large'?st.r*4:800;
+    if(d<closestStD){closestStD=d;if(d<nearRange)gs.nearStation=st;}
   };
   gs.chunks.forEach(ch=>{
     if(!ch.system)return;
@@ -817,21 +1093,34 @@ function update(dt){
   if(gs.nearStation){
     const st=gs.nearStation;
     const d=dist2(p,st);
-    // Směr dokovacího průchodu (rotuje se stanicí)
-    const portAngle=st.angle;  // mail slot direction
-    const portNormal=portAngle; // normal pointing outward from port
-    // Vektor přiblížení hráče
+    const portAngle=st.angle;
     const approachAngle=Math.atan2(p.y-st.y,p.x-st.x);
-    // Zarovnání = jak moc letí hráč DO průchodu
-    const align=Math.abs(angleDiff(approachAngle,portNormal))*180/Math.PI;
+    const align=Math.abs(angleDiff(approachAngle,portAngle))*180/Math.PI;
     const speed=Math.hypot(p.vx,p.vy);
+    const isLarge=st.type==='large';
+    const dockDist=isLarge?st.r:C.DOCK_DIST;
+    const dockAngle=isLarge?12:C.DOCK_ANGLE;
+    const approachDist=isLarge?st.r*4.5:C.DOCK_DIST*3;
     gs.dockingState={
-      approaching:d<C.DOCK_DIST*3,
+      approaching:d<approachDist,
       align,speed,
-      dockable: d<C.DOCK_DIST&&align<C.DOCK_ANGLE&&speed<C.DOCK_SPD
+      dockable:d<dockDist&&align<dockAngle&&speed<C.DOCK_SPD
     };
   } else {
     gs.dockingState={approaching:false,align:0,speed:0,dockable:false};
+  }
+
+  // Stanice — kolize s tělem (netrefení do otvoru)
+  if(gs.nearStation&&!gs.dockingState.dockable&&!p.dead){
+    const st=gs.nearStation;
+    const d=dist2(p,st);
+    const isLarge=st.type==='large';
+    const collR=isLarge?st.r*1.05:st.r*1.1;
+    const dockAngleLim=isLarge?12:C.DOCK_ANGLE;
+    const spd=Math.hypot(p.vx,p.vy);
+    if(d<collR&&gs.dockingState.align>=dockAngleLim&&spd>0.8){
+      stationCrash(st);
+    }
   }
 
   // Asteroidy — kolize
@@ -920,6 +1209,16 @@ function update(dt){
     }
   }
 
+  // Station debris — float through space permanently, glow cools down
+  if(gs.stationDebris?.length){
+    gs.stationDebris.forEach(d=>{
+      d.x+=d.vx;d.y+=d.vy;
+      d.angle+=d.rotSpeed;
+      d.vx*=0.9998;d.vy*=0.9998; // near-zero drag in space
+      if(d.glowFade>0)d.glowFade=Math.max(0,d.glowFade-dt*0.18);
+    });
+  }
+
   // Autosave každých 30s
   gs._saveTimer=(gs._saveTimer||0)+dt;
   if(gs._saveTimer>30){gs._saveTimer=0;saveGame();}
@@ -968,6 +1267,7 @@ function loop(ts){
 
   if(state==='menu')return;
   if(state==='docking')updateDocking(dt);
+  else if(state==='interior')updateInterior(dt);
   else if(state!=='paused'&&state!=='galaxy')update(dt);
   render(dt,ts/1000);
 }
@@ -981,6 +1281,14 @@ function render(dt,t){
   if(state==='docking'){
     ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.setLineDash([]);ctx.shadowBlur=0;
     renderDockingSequence(gs,t);
+    return;
+  }
+
+  // Vnitřek stanice
+  if(state==='interior'){
+    if(!interiorData)return;
+    ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.setLineDash([]);ctx.shadowBlur=0;
+    renderInteriorScene(interiorData,p,t,dt);
     return;
   }
 
@@ -1000,6 +1308,7 @@ function render(dt,t){
 
   renderSystems(gs.chunks,t);
   gs.chunks.forEach(ch=>ch.asteroids.forEach(a=>renderAsteroid(a,t)));
+  if(gs.stationDebris?.length)renderStationDebris(gs.stationDebris,t);
   const allParts=[...engineTrails,...gs.particles];
   renderParticles(allParts);
   gs.loots.forEach(l=>renderLoot(l));
@@ -1010,7 +1319,9 @@ function render(dt,t){
     const drawSt=(st)=>{
       if(!st)return;
       const isNear=st===gs.nearStation;
-      renderStation(st,t,isNear,isNear&&gs.dockingState?.dockable);
+      const dock=isNear&&gs.dockingState?.dockable;
+      if(st.type==='large')renderLargeStation(st,t,isNear,dock);
+      else renderStation(st,t,isNear,dock);
     };
     drawSt(ch.system.station);
     ch.system.planets?.forEach(pl=>{
@@ -1243,6 +1554,12 @@ window.addEventListener('load',()=>{
   document.getElementById('btn-close-galaxy').onclick=()=>closeGalaxyMap();
   document.getElementById('btn-cancel-warp').onclick=()=>cancelWarp();
   document.getElementById('btn-undock').onclick=()=>undock();
+  document.getElementById('btn-parking-skip').onclick=()=>{
+    if(!window._parkingStation)return;
+    document.getElementById('parking-overlay').style.display='none';
+    startDocking(window._parkingStation);
+    window._parkingStation=null;
+  };
 
   // Pause menu
   document.getElementById('btn-resume').onclick=()=>closePause();

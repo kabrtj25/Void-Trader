@@ -69,6 +69,18 @@ const UPGRADES = [
   {id:'fuel',    name:'Nádrž',           max:3, cost:700,  desc:'Nádrž +25%'},
 ];
 
+// ===== Velké Coriolis stanice (Elite Dangerous styl) — daleko od středu =====
+const LARGE_STATIONS = [
+  {cx:13,  cy:4,   name:'Port Leviathan',      tier:3, color:'#00d4ff'},
+  {cx:-12, cy:14,  name:'Nexus Colossus',       tier:3, color:'#aa44ff'},
+  {cx:18,  cy:-11, name:'Titan Gate',            tier:3, color:'#ff5533'},
+  {cx:-16, cy:-13, name:'Void Fortress',         tier:3, color:'#00ff88'},
+  {cx:7,   cy:17,  name:'Citadel Behemoth',      tier:3, color:'#ffaa00'},
+  {cx:-22, cy:8,   name:'Omega Station Alpha',   tier:3, color:'#ff6622'},
+  {cx:15,  cy:-18, name:'Deep Forge Prime',      tier:3, color:'#8844ff'},
+  {cx:-8,  cy:-21, name:'Abyss Colossus',        tier:3, color:'#ff2244'},
+];
+
 // Fixní stanice rovnoměrně rozložené po celé mapě
 const FIXED_STATIONS = [
   // Vnitřní oblast (1-4 chunky od středu)

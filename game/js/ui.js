@@ -190,10 +190,28 @@ function renderMinimap(player,chunks,navTarget,t){
     const px=cx+(st.x-player.x)*sc,py=cy+(st.y-player.y)*sc;
     if(Math.hypot(px-cx,py-cy)>S/2-4)return;
     mmCtx.save();
-    mmCtx.fillStyle=st.color;mmCtx.globalAlpha=0.5+pulse*0.3;
-    mmCtx.beginPath();
-    for(let i=0;i<6;i++){const a=i*Math.PI/3;mmCtx.lineTo(px+Math.cos(a)*4,py+Math.sin(a)*4);}
-    mmCtx.closePath();mmCtx.fill();mmCtx.globalAlpha=1;
+    if(st.type==='large'){
+      // Velká Coriolis — prstencový symbol
+      const sr2=7+pulse*1.5;
+      mmCtx.globalAlpha=0.6+pulse*0.3;
+      mmCtx.strokeStyle=st.color;mmCtx.lineWidth=1.8;
+      mmCtx.shadowColor=st.color;mmCtx.shadowBlur=6;
+      mmCtx.beginPath();mmCtx.arc(px,py,sr2,0,Math.PI*2);mmCtx.stroke();
+      mmCtx.shadowBlur=0;
+      // Kříž uvnitř
+      mmCtx.lineWidth=1;mmCtx.strokeStyle=st.color+'99';
+      const ch=sr2*0.55;
+      mmCtx.beginPath();mmCtx.moveTo(px-ch,py);mmCtx.lineTo(px+ch,py);mmCtx.stroke();
+      mmCtx.beginPath();mmCtx.moveTo(px,py-ch);mmCtx.lineTo(px,py+ch);mmCtx.stroke();
+      // Vnitřní tečka
+      mmCtx.fillStyle=st.color;mmCtx.beginPath();mmCtx.arc(px,py,2,0,Math.PI*2);mmCtx.fill();
+    } else {
+      mmCtx.fillStyle=st.color;mmCtx.globalAlpha=0.5+pulse*0.3;
+      mmCtx.beginPath();
+      for(let i=0;i<6;i++){const a=i*Math.PI/3;mmCtx.lineTo(px+Math.cos(a)*4,py+Math.sin(a)*4);}
+      mmCtx.closePath();mmCtx.fill();
+    }
+    mmCtx.globalAlpha=1;
     mmCtx.restore();
   };
   chunks.forEach(ch=>{
@@ -317,16 +335,47 @@ function drawBigMap(){
       const{x:spx,y:spy}=wp(st.x-player.x,st.y-player.y);
       const isNav=window.gameState.navTarget===st;
       mapCtx.save();
-      mapCtx.strokeStyle=isNav?'#00ff88':st.color;mapCtx.lineWidth=isNav?2:1;
-      mapCtx.fillStyle='rgba(0,4,14,0.9)';
-      const stR=5+st.tier*2;
-      mapCtx.beginPath();
-      for(let i=0;i<6;i++){const a=i*Math.PI/3;mapCtx.lineTo(spx+Math.cos(a)*stR,spy+Math.sin(a)*stR);}
-      mapCtx.closePath();mapCtx.fill();mapCtx.stroke();
-      mapCtx.fillStyle=isNav?'#00ff88':st.color;
-      mapCtx.font=`${9+st.tier}px "Courier New", monospace`;mapCtx.textAlign='center';
-      mapCtx.fillText(st.name,spx,spy-stR-5);
-      // Klikací oblast — data-attr pro klik
+      if(st.type==='large'){
+        // Velká Coriolis — výrazný prstencový symbol
+        const stR=14+st.tier*2;
+        mapCtx.strokeStyle=isNav?'#00ff88':st.color;mapCtx.lineWidth=isNav?2.5:2;
+        mapCtx.shadowColor=isNav?'#00ff88':st.color;mapCtx.shadowBlur=12;
+        mapCtx.beginPath();mapCtx.arc(spx,spy,stR,0,Math.PI*2);mapCtx.stroke();
+        mapCtx.shadowBlur=0;
+        // Vnější záše
+        mapCtx.globalAlpha=0.18;
+        mapCtx.beginPath();mapCtx.arc(spx,spy,stR*1.6,0,Math.PI*2);
+        mapCtx.fillStyle=st.color;mapCtx.fill();
+        mapCtx.globalAlpha=1;
+        // Diagonální výztuhy
+        mapCtx.strokeStyle=(isNav?'#00ff88':st.color)+'88';mapCtx.lineWidth=1;
+        for(let i=0;i<4;i++){
+          const a=(i/4)*Math.PI*2+Math.PI/8;
+          mapCtx.beginPath();
+          mapCtx.moveTo(spx+Math.cos(a)*stR*0.35,spy+Math.sin(a)*stR*0.35);
+          mapCtx.lineTo(spx+Math.cos(a)*stR*0.88,spy+Math.sin(a)*stR*0.88);
+          mapCtx.stroke();
+        }
+        mapCtx.fillStyle=isNav?'#00ff88':st.color;mapCtx.beginPath();mapCtx.arc(spx,spy,3,0,Math.PI*2);mapCtx.fill();
+        // Název — větší a výraznější
+        mapCtx.font=`bold ${12+st.tier}px "Courier New", monospace`;mapCtx.textAlign='center';
+        mapCtx.fillStyle=isNav?'#00ff88':st.color;
+        mapCtx.shadowColor=isNav?'#00ff88':st.color;mapCtx.shadowBlur=8;
+        mapCtx.fillText('◈ '+st.name,spx,spy-stR-8);
+        mapCtx.shadowBlur=0;
+        mapCtx.font='9px "Courier New",monospace';mapCtx.fillStyle=(isNav?'#00ff88':st.color)+'99';
+        mapCtx.fillText('CORIOLIS CLASS',spx,spy-stR-20);
+      } else {
+        const stR=5+st.tier*2;
+        mapCtx.strokeStyle=isNav?'#00ff88':st.color;mapCtx.lineWidth=isNav?2:1;
+        mapCtx.fillStyle='rgba(0,4,14,0.9)';
+        mapCtx.beginPath();
+        for(let i=0;i<6;i++){const a=i*Math.PI/3;mapCtx.lineTo(spx+Math.cos(a)*stR,spy+Math.sin(a)*stR);}
+        mapCtx.closePath();mapCtx.fill();mapCtx.stroke();
+        mapCtx.fillStyle=isNav?'#00ff88':st.color;
+        mapCtx.font=`${9+st.tier}px "Courier New", monospace`;mapCtx.textAlign='center';
+        mapCtx.fillText(st.name,spx,spy-stR-5);
+      }
       mapCtx.restore();
     }
   });
@@ -418,12 +467,116 @@ function drawBigMap(){
     }
   }
 
-  // Zoom label
-  mapCtx.fillStyle='rgba(255,149,0,0.5)';mapCtx.font='9px "Courier New", monospace';mapCtx.textAlign='left';
-  mapCtx.fillText(`ZOOM: ${mapZoom.toFixed(1)}×  |  ${Math.round(player.x/100)}, ${Math.round(player.y/100)} AU`,8,MH-8);
-  // Legenda
-  mapCtx.textAlign='right';
-  mapCtx.fillText('● Hvězda  ◆ Stanice  ☀ Sol  [KLIK] = Nastavit navigaci',MW-8,MH-8);
+  // === VŽDY VIDITELNÉ VELKÉ STANICE (z LARGE_STATIONS pole, i neobjevené) ===
+  if(typeof LARGE_STATIONS!=='undefined'&&window.currentGalaxy==='sol'){
+    LARGE_STATIONS.forEach(ls=>{
+      const chKey=chunkKey(ls.cx,ls.cy);
+      let stx,sty;
+      if(chunkCache.has(chKey)){
+        const ch=chunkCache.get(chKey);
+        if(ch.system?.station?.type==='large'){stx=ch.system.station.x;sty=ch.system.station.y;}
+        else{stx=ls.cx*C.CHUNK+C.CHUNK*0.65;sty=ls.cy*C.CHUNK+C.CHUNK*0.65;}
+      } else {
+        stx=ls.cx*C.CHUNK+C.CHUNK*0.65;sty=ls.cy*C.CHUNK+C.CHUNK*0.65;
+      }
+      const{x:spx,y:spy}=wp(stx-player.x,sty-player.y);
+      if(spx<-60||spx>MW+60||spy<-60||spy>MH+60)return;
+      const discovered=chunkCache.has(chKey);
+      const stR=13;
+      mapCtx.save();
+      mapCtx.globalAlpha=discovered?1:0.55;
+      mapCtx.strokeStyle=ls.color;mapCtx.lineWidth=2;
+      mapCtx.shadowColor=ls.color;mapCtx.shadowBlur=discovered?12:5;
+      mapCtx.beginPath();mapCtx.arc(spx,spy,stR,0,Math.PI*2);mapCtx.stroke();
+      mapCtx.shadowBlur=0;
+      // Glow
+      mapCtx.globalAlpha=discovered?0.18:0.08;
+      mapCtx.fillStyle=ls.color;mapCtx.beginPath();mapCtx.arc(spx,spy,stR*1.65,0,Math.PI*2);mapCtx.fill();
+      mapCtx.globalAlpha=discovered?1:0.55;
+      // Diagonály
+      mapCtx.strokeStyle=ls.color+'88';mapCtx.lineWidth=1;
+      for(let i=0;i<4;i++){
+        const a=(i/4)*Math.PI*2+Math.PI/8;
+        mapCtx.beginPath();
+        mapCtx.moveTo(spx+Math.cos(a)*stR*0.35,spy+Math.sin(a)*stR*0.35);
+        mapCtx.lineTo(spx+Math.cos(a)*stR*0.88,spy+Math.sin(a)*stR*0.88);
+        mapCtx.stroke();
+      }
+      mapCtx.fillStyle=ls.color;mapCtx.beginPath();mapCtx.arc(spx,spy,2.5,0,Math.PI*2);mapCtx.fill();
+      mapCtx.font='bold 11px "Courier New",monospace';mapCtx.textAlign='center';
+      mapCtx.fillStyle=ls.color;mapCtx.shadowColor=ls.color;mapCtx.shadowBlur=discovered?6:0;
+      mapCtx.fillText('◈ '+ls.name,spx,spy-stR-7);
+      mapCtx.shadowBlur=0;
+      if(!discovered){
+        mapCtx.font='8px "Courier New",monospace';mapCtx.fillStyle=ls.color+'88';
+        mapCtx.fillText('[ NEOBJEVENO ]',spx,spy-stR-18);
+      } else {
+        mapCtx.font='8px "Courier New",monospace';mapCtx.fillStyle=ls.color+'88';
+        mapCtx.fillText('CORIOLIS CLASS',spx,spy-stR-19);
+      }
+      mapCtx.restore();
+    });
+  }
+
+  // === LEGENDA — panel dole ===
+  const legH=44,legY2=MH-legH;
+  mapCtx.save();
+  mapCtx.fillStyle='rgba(0,3,14,0.88)';mapCtx.fillRect(0,legY2,MW,legH);
+  mapCtx.strokeStyle='rgba(255,149,0,0.2)';mapCtx.lineWidth=1;
+  mapCtx.beginPath();mapCtx.moveTo(0,legY2);mapCtx.lineTo(MW,legY2);mapCtx.stroke();
+
+  const legItems=[
+    {icon:null,color:'#ffee88',  label:'☀ Hvězda / Slunce'},
+    {icon:'hex',color:'#ff9500', label:'◆ Malá stanice (Transformer)'},
+    {icon:'ring',color:'#00d4ff',label:'◎ Velká stanice (Coriolis)'},
+    {icon:'ring',color:'#aa44ff',label:'◎ Coriolis — neobjeveno (55% průhlednost)'},
+    {icon:null,color:'#ff9500',  label:'▶ Hráč'},
+    {icon:null,color:'#00ff88',  label:'◈ Cílová navigace'},
+  ];
+  const legPad=16,legSpacing=MW/legItems.length;
+  mapCtx.font='10px "Courier New",monospace';mapCtx.textAlign='center';
+
+  legItems.forEach((li,i)=>{
+    const lx=legPad+i*legSpacing+legSpacing*0.5;
+    const ly=legY2+16;
+    mapCtx.save();
+    // Ikona
+    if(li.icon==='hex'){
+      mapCtx.strokeStyle=li.color;mapCtx.lineWidth=1.2;
+      mapCtx.fillStyle='rgba(0,4,14,0.9)';mapCtx.beginPath();
+      for(let j=0;j<6;j++){const a=j*Math.PI/3;mapCtx.lineTo(lx+Math.cos(a)*6,ly+Math.sin(a)*6);}
+      mapCtx.closePath();mapCtx.fill();mapCtx.stroke();
+    } else if(li.icon==='ring'){
+      mapCtx.strokeStyle=li.color;mapCtx.lineWidth=1.5;
+      mapCtx.shadowColor=li.color;mapCtx.shadowBlur=5;
+      mapCtx.beginPath();mapCtx.arc(lx,ly,6,0,Math.PI*2);mapCtx.stroke();
+      mapCtx.shadowBlur=0;
+      mapCtx.strokeStyle=li.color+'55';mapCtx.lineWidth=0.8;
+      for(let j=0;j<4;j++){const a=(j/4)*Math.PI*2+Math.PI/8;
+        mapCtx.beginPath();mapCtx.moveTo(lx+Math.cos(a)*2.5,ly+Math.sin(a)*2.5);
+        mapCtx.lineTo(lx+Math.cos(a)*5.2,ly+Math.sin(a)*5.2);mapCtx.stroke();}
+    } else {
+      mapCtx.fillStyle=li.color;
+      if(li.label.startsWith('▶')){
+        mapCtx.save();mapCtx.translate(lx,ly);mapCtx.rotate(-Math.PI/2);
+        mapCtx.beginPath();mapCtx.moveTo(0,-6);mapCtx.lineTo(4,4);mapCtx.lineTo(-4,4);mapCtx.closePath();
+        mapCtx.fill();mapCtx.restore();
+      } else {
+        mapCtx.beginPath();mapCtx.arc(lx,ly,5,0,Math.PI*2);mapCtx.fill();
+      }
+    }
+    // Text
+    mapCtx.fillStyle='rgba(200,220,255,0.7)';mapCtx.textAlign='center';
+    mapCtx.fillText(li.label,lx,ly+18);
+    mapCtx.restore();
+  });
+
+  // Zoom + souřadnice vpravo dole
+  mapCtx.font='9px "Courier New", monospace';mapCtx.textAlign='right';
+  mapCtx.fillStyle='rgba(255,149,0,0.5)';
+  mapCtx.fillText(`ZOOM: ${mapZoom.toFixed(1)}×  |  ${Math.round(player.x/100)}, ${Math.round(player.y/100)} AU  |  [KLIK] = Nastavit navigaci`,MW-8,legY2-6);
+
+  mapCtx.restore();
 }
 
 function handleMapClick(e){
@@ -453,6 +606,22 @@ function handleMapClick(e){
       if(d<closestD+10){closestD=d;closest=pl.station;}
     });
   });
+  // Kliknutí na vždy-viditelné velké stanice (i neobjevené)
+  if(!closest&&typeof LARGE_STATIONS!=='undefined'&&window.currentGalaxy==='sol'){
+    LARGE_STATIONS.forEach(ls=>{
+      const chKey=chunkKey(ls.cx,ls.cy);
+      let stx,sty;
+      if(chunkCache.has(chKey)){
+        const ch=chunkCache.get(chKey);
+        if(ch.system?.station?.type==='large'){stx=ch.system.station.x;sty=ch.system.station.y;}
+        else{stx=ls.cx*C.CHUNK+C.CHUNK*0.65;sty=ls.cy*C.CHUNK+C.CHUNK*0.65;}
+      } else {stx=ls.cx*C.CHUNK+C.CHUNK*0.65;sty=ls.cy*C.CHUNK+C.CHUNK*0.65;}
+      const px2=cx+(stx-player.x)*baseScale,py2=cy+(sty-player.y)*baseScale;
+      if(Math.hypot(mx-px2,my-py2)<22&&!closest){
+        closest={x:stx,y:sty,name:ls.name+(chunkCache.has(chKey)?'':' [neobjeveno]')};
+      }
+    });
+  }
   // Kliknutí na SOL (střed slunce)
   if(!closest){
     const solSys=getChunk(C.SOLAR_CHUNK.cx,C.SOLAR_CHUNK.cy)?.system;
