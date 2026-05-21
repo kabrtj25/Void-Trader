@@ -8,8 +8,3 @@ Jirik gay-
 
 
 Goat ja- 
-pri ulozeni hry ze stanice, kdyz se respawnes tak se spawemes buglej ve stanici a umres pokud se pohnes, 
-
-kdyz mas ulozenou hru a vypnes to a pak to naloadujes pres pokracovat zustane ti pozadi galaxie ve ktere si skoncil ale kdyz se podivas na mapu galaxii pise ti to ze si ve slunecni soustave
-
-kdyz letis do jiny galaxie muzes nabourat do satnice a umrit
