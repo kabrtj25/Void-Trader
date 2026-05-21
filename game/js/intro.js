@@ -15,16 +15,17 @@ const LO = LG.fadeEnd; // 7.0
 
 const PH = {
   fadeIn:   [LO,       LO+1.0],
-  pre:      [LO,       LO+3.0],   // shuttle on pad, steam
-  ignition: [LO+3.0,   LO+4.8],   // liftoff
-  ascent:   [LO+4.8,   LO+15.0],  // ascent 10.2s
-  srbSep:   [LO+7.8,   LO+9.5],   // SRB separation
-  etSep:    [LO+13.5,  LO+14.5],  // ET separation
-  orbit:    [LO+15.0,  LO+18.5],  // orbit 3.5s
-  combat:   [LO+18.5,  LO+23.0],  // combat 4.5s
-  title:    [LO+23.0,  LO+29.5],
+  pre:      [LO,       LO+4.5],    // shuttle on pad, steam
+  ignition: [LO+4.5,   LO+6.5],    // SSME ignition (T-2 to T-0)
+  rise:     [LO+6.5,   LO+11.5],   // slow liftoff, clearing tower
+  ascent:   [LO+11.5,  LO+23.5],   // powered ascent
+  srbSep:   [LO+14.5,  LO+16.0],   // SRB separation
+  etSep:    [LO+20.5,  LO+22.0],   // ET separation
+  orbit:    [LO+23.5,  LO+27.5],   // orbit
+  combat:   [LO+27.5,  LO+32.0],   // combat
+  title:    [LO+32.0,  LO+38.5],
 };
-const TOTAL = LO + 31.0;
+const TOTAL = LO + 40.0;
 
 // ---- Utils ----
 function lerp(a,b,t){return a+(b-a)*t;}
@@ -36,7 +37,7 @@ function pt(t,ph){return clamp((t-ph[0])/(ph[1]-ph[0]),0,1);}
 // ---- Globals ----
 let canvas,ctx,W,H;
 let startTime=null,lastTs=0,dt=0,running=true;
-let hotP=[],smokeP=[];
+let hotP=[],smokeP=[],trailPts=[];
 
 const STARS=Array.from({length:500},()=>({
   nx:Math.random(),ny:Math.random(),
@@ -103,9 +104,10 @@ function frame(ts){
 }
 
 function getAlt(t){
-  if(t<PH.ascent[0])return 0;
+  if(t<PH.rise[0])return 0;
   if(t>=PH.orbit[0])return 1;
-  return eI(pt(t,PH.ascent));
+  if(t<PH.rise[1])return eI(pt(t,PH.rise))*.07;  // slow rise: 0→0.07
+  return .07+eI(pt(t,PH.ascent))*.93;              // main ascent: 0.07→1.0
 }
 
 function drawFrame(t){
@@ -193,52 +195,79 @@ function drawLogoPhase(t){
 }
 
 // ================================================================
-//  LAUNCH SCENE
-//  Shuttle starts BIG at bottom, zooms out dramatically as it climbs.
-//  Rocket stays VERTICAL throughout launch (nose always pointing UP).
+//  LAUNCH SCENE — realistic 1:1 rocket liftoff
 // ================================================================
+function getRocketTransform(alt){
+  // Camera starts ground-level zoomed in, pulls back as rocket climbs
+  let sc,ry;
+  if(alt<.07){
+    const p=alt/.07;
+    sc=lerp(2.1,1.65,eI(p));
+    ry=lerp(H*.74,H*.66,eI(p));
+  }else{
+    const p=eO((alt-.07)/.93);
+    sc=lerp(1.65,.14,p);
+    ry=lerp(H*.66,H*.20,p);
+  }
+  return{sc,ry};
+}
+
 function drawLaunchScene(t,alt){
+  const{sc,ry}=getRocketTransform(alt);
+  const rx=W*.5;
+  const padY=ry+sc*60;
+
   drawSky(alt);
   drawStars(t,clamp(alt*3.5,0,1));
 
-  // Horizon drops as altitude increases
   const horizY=H*.70+alt*H*1.7;
   if(horizY<H+40){
     drawHorizon(horizY);
     drawCityLights(t,horizY,clamp(1-alt/.30,0,1));
   }
 
-  // KEY FIX: rocket rises AND zooms out — creates convincing liftoff feel
-  // sc: 1.0 (huge on screen) → 0.16 (tiny in space)
-  const sc=lerp(1.0,.16,eO(alt));
-  const rx=W*.5;
-  // ry: rocket center moves from 60% down to 18% as it climbs
-  const ry=lerp(H*.60,H*.18,eO(alt));
-
   const srbP=pt(t,PH.srbSep);
   const etP=pt(t,PH.etSep);
+  const hasSRBs=srbP<.92;
 
-  // Pre-launch steam venting
+  // Pre-ignition steam venting
   if(t<PH.ignition[0]){
-    const steamProg=clamp((t-LO)/1.2,0,1);
-    drawSteam(rx,ry+sc*55,sc,steamProg,t);
+    const steamProg=clamp((t-LO)/2.5,0,1);
+    drawSteam(rx,padY,sc,steamProg,t);
   }
 
-  // Launch pad
-  if(alt<.10) drawPad(rx,ry+sc*55,sc,clamp(1-alt/.10,0,1));
+  // Water deluge + ignition cloud (SSME ignition to shortly after liftoff)
+  if(t>=PH.ignition[0]&&t<PH.rise[0]+1.2){
+    const wp=clamp((t-PH.ignition[0])/.45,0,1);
+    drawWaterDeluge(rx,padY,sc,wp,t);
+  }
 
-  // Exhaust (SRBs + SSMEs)
-  const hasSRBs=srbP<.92;
+  // Massive ground smoke cloud (persists after liftoff)
+  if(t>=PH.rise[0]) drawGroundSmoke(rx,padY,sc,t-PH.rise[0],alt,t);
+
+  // Launch pad structure fades as rocket climbs
+  if(alt<.13) drawPad(rx,padY,sc,clamp(1-alt/.13,0,1));
+
+  // Exhaust flames
   if(t>=PH.ignition[0]){
-    const fp=clamp((t-PH.ignition[0])/.95,0,1);
-    if(hasSRBs){
-      drawSRBFlame(rx-sc*66,ry+sc*56,sc,fp,t,alt);
-      drawSRBFlame(rx+sc*66,ry+sc*56,sc,fp,t,alt);
+    const fp=clamp((t-PH.ignition[0])/.8,0,1);
+    const inFlight=t>=PH.rise[0];
+    const srbFp=inFlight?clamp((t-PH.rise[0])/.35,0,1):0;
+    if(inFlight&&hasSRBs){
+      drawSRBFlame(rx-sc*66,ry+sc*56,sc,srbFp,t,alt);
+      drawSRBFlame(rx+sc*66,ry+sc*56,sc,srbFp,t,alt);
     }
     drawSSME(rx-sc*12,ry+sc*56,sc,fp*.85,t,alt);
     drawSSME(rx,      ry+sc*63,sc,fp*.85,t,alt);
     drawSSME(rx+sc*12,ry+sc*56,sc,fp*.85,t,alt);
     updateParticles();
+  }
+
+  // Condensation trail left in sky
+  if(t>=PH.rise[0]&&alt>.001){
+    trailPts.push({x:rx,y:ry-sc*114,t});
+    trailPts=trailPts.filter(p=>(t-p.t)<10);
+    drawSmokeTrail(t);
   }
 
   // Speed streaks in upper atmosphere
@@ -260,7 +289,7 @@ function drawLaunchScene(t,alt){
     }
   }
 
-  // Separated SRBs tumble outward and downward
+  // Separated SRBs tumble outward
   if(srbP>.01&&srbP<=1){
     const sepX=eO(srbP)*sc*220;
     const sepY=eO(srbP)*sc*120;
@@ -277,11 +306,92 @@ function drawLaunchScene(t,alt){
   drawShuttleStack(rx,ry,sc,srbP,etAlpha,etOffX,etOffY);
   drawLaunchHUD(t,alt);
 
-  // Ignition flash
-  if(t>=PH.ignition[0]&&t<PH.ignition[0]+.70){
-    ctx.globalAlpha=(1-pt(t,[PH.ignition[0],PH.ignition[0]+.70]))*.88;
-    ctx.fillStyle='#fff8ee';ctx.fillRect(0,0,W,H);ctx.globalAlpha=1;
+  // SSME ignition flash (small, blue-white)
+  if(t>=PH.ignition[0]&&t<PH.ignition[0]+.45){
+    ctx.globalAlpha=(1-clamp((t-PH.ignition[0])/.45,0,1))*.42;
+    ctx.fillStyle='#eaf4ff';ctx.fillRect(0,0,W,H);ctx.globalAlpha=1;
   }
+  // SRB liftoff flash (big, orange-white)
+  if(t>=PH.rise[0]&&t<PH.rise[0]+.60){
+    ctx.globalAlpha=(1-clamp((t-PH.rise[0])/.60,0,1))*.85;
+    ctx.fillStyle='#fff8e8';ctx.fillRect(0,0,W,H);ctx.globalAlpha=1;
+  }
+}
+
+// White steam cloud from water deluge system
+function drawWaterDeluge(cx,padY,sc,progress,t){
+  for(let i=0;i<16;i++){
+    const phi=i/16*Math.PI*2;
+    const r=(14+i*8)*sc*.35*progress;
+    const ox=Math.cos(phi)*sc*(22+i*7)*progress*.85+Math.sin(t*2.8+i)*.4*sc*5;
+    const oy=-Math.abs(Math.sin(phi))*sc*16*progress+Math.cos(t*2.2+i)*.3*sc*5;
+    const a=progress*.52*(1-i/20);
+    if(a<=0||r<=0)continue;
+    const sg=ctx.createRadialGradient(cx+ox,padY+oy,0,cx+ox,padY+oy,r);
+    sg.addColorStop(0,`rgba(222,230,245,${a})`);
+    sg.addColorStop(1,'transparent');
+    ctx.fillStyle=sg;
+    ctx.beginPath();ctx.arc(cx+ox,padY+oy,r,0,Math.PI*2);ctx.fill();
+  }
+}
+
+// Massive fireball + billowing black smoke at pad base
+function drawGroundSmoke(cx,padY,sc,age,alt,t){
+  const baseY=Math.min(padY,H+100);
+
+  // Initial fireball (fades over 2.5s)
+  if(age<2.5){
+    const fp=Math.max(0,1-age/2.5);
+    const fr=(65+age*55)*sc*.38;
+    ctx.save();
+    const fg=ctx.createRadialGradient(cx,baseY,0,cx,baseY,fr);
+    fg.addColorStop(0,`rgba(255,248,188,${fp*.95})`);
+    fg.addColorStop(.28,`rgba(255,148,20,${fp*.82})`);
+    fg.addColorStop(.62,`rgba(215,52,5,${fp*.46})`);
+    fg.addColorStop(1,'transparent');
+    ctx.fillStyle=fg;ctx.shadowColor='#ff7700';ctx.shadowBlur=70*fp;
+    ctx.beginPath();ctx.arc(cx,baseY,fr,0,Math.PI*2);ctx.fill();
+    ctx.shadowBlur=0;ctx.restore();
+  }
+
+  // Billowing smoke puffs spreading outward
+  for(let i=0;i<24;i++){
+    const frac=i/24;
+    const pAge=Math.max(0,age-frac*1.4);
+    if(pAge<=0)continue;
+    const angle=-Math.PI*.8+frac*Math.PI*1.6;
+    const hSpread=Math.sin(angle)*pAge*42*sc*.28;
+    const vRise=Math.cos(Math.abs(angle)*.55)*pAge*25*sc*.28;
+    const ox=hSpread+Math.sin(t*1.3+i*.8)*sc*5;
+    const oy=-vRise+Math.cos(t*1.0+i*.6)*sc*3.5;
+    const r=(10+pAge*26+i*5.5)*sc*.26;
+    const darkness=Math.min(1,pAge*.16);
+    const v=Math.floor(lerp(185,22,darkness));
+    const a=Math.max(0,.44-pAge*.028)*Math.min(1,pAge*2.8);
+    if(a<=0||r<=0)continue;
+    const sg=ctx.createRadialGradient(cx+ox,baseY+oy,0,cx+ox,baseY+oy,r);
+    sg.addColorStop(0,`rgba(${v},${Math.max(0,v-5)},${Math.max(0,v-10)},${a})`);
+    sg.addColorStop(1,'transparent');
+    ctx.fillStyle=sg;
+    ctx.beginPath();ctx.arc(cx+ox,baseY+oy,r,0,Math.PI*2);ctx.fill();
+  }
+}
+
+// Fading condensation/exhaust trail in the sky
+function drawSmokeTrail(t){
+  if(trailPts.length<2)return;
+  for(let i=0;i<trailPts.length;i++){
+    const p=trailPts[i];
+    const age=t-p.t;
+    const a=Math.max(0,.26-age*.032)*Math.min(1,age*4);
+    if(a<=0)continue;
+    const r=Math.min(3+age*2.8,28);
+    const v=Math.min(128+Math.floor(age*3),200);
+    ctx.globalAlpha=a;
+    ctx.fillStyle=`rgb(${v},${v},${v-5})`;
+    ctx.beginPath();ctx.arc(p.x,p.y,r,0,Math.PI*2);ctx.fill();
+  }
+  ctx.globalAlpha=1;
 }
 
 // ================================================================
@@ -659,9 +769,9 @@ function updateParticles(){
 // ---- Launch HUD ----
 function drawLaunchHUD(t,alt){
   ctx.textAlign='left';
-  // Countdown before ignition
-  if(t<PH.ignition[0]&&t>LO+.6){
-    const secs=Math.max(1,Math.ceil(PH.ignition[0]-t));
+  // Countdown (T-minus before liftoff)
+  if(t>=LO+.6&&t<PH.rise[0]){
+    const secs=Math.max(0,Math.ceil(PH.rise[0]-t));
     ctx.save();
     ctx.globalAlpha=.55+Math.sin(t*10)*.45;
     ctx.shadowColor='#ff4400';ctx.shadowBlur=25;ctx.fillStyle='#ff6622';
@@ -674,12 +784,29 @@ function drawLaunchHUD(t,alt){
     ctx.fillText('▸ SYSTÉMY: NOMINAL  ·  5 MOTORŮ ONLINE',W*.04,H*.145);
     ctx.globalAlpha=1;
   }
-  // IGNITION
-  if(t>=PH.ignition[0]&&t<PH.ignition[0]+1.3){
-    const f=eO(clamp((t-PH.ignition[0])/.22,0,1))*(1-clamp((t-PH.ignition[0]-.88)/.42,0,1));
+  // SSME ignition notice
+  if(t>=PH.ignition[0]&&t<PH.ignition[0]+1.8){
+    const f=eO(clamp((t-PH.ignition[0])/.25,0,1))*(1-clamp((t-PH.ignition[0]-1.2)/.6,0,1));
+    ctx.save();ctx.globalAlpha=f*.85;
+    ctx.shadowColor='#88ddff';ctx.shadowBlur=20;ctx.fillStyle='#aaddff';
+    ctx.font=`${Math.round(W*.013)}px Courier New`;ctx.textAlign='center';
+    ctx.fillText('◈  SSME — ZAPALOVÁNÍ  ◈',W*.5,H*.16);ctx.restore();
+  }
+  // LIFTOFF
+  if(t>=PH.rise[0]&&t<PH.rise[0]+2.2){
+    const f=eO(clamp((t-PH.rise[0])/.22,0,1))*(1-clamp((t-PH.rise[0]-1.5)/.7,0,1));
     ctx.save();ctx.globalAlpha=f;ctx.shadowColor='#ff8800';ctx.shadowBlur=55;
     ctx.fillStyle='#ffaa00';ctx.font=`bold ${Math.round(W*.065)}px Courier New`;
-    ctx.textAlign='center';ctx.fillText('IGNITION',W*.5,H*.18);ctx.restore();
+    ctx.textAlign='center';ctx.fillText('LIFTOFF',W*.5,H*.18);ctx.restore();
+  }
+  // Tower clearance
+  const clearT=PH.rise[0]+3.5;
+  if(t>=clearT&&t<clearT+2.5){
+    const f=eO(clamp((t-clearT)/.5,0,1))*(1-clamp((t-clearT-1.8)/.7,0,1));
+    ctx.save();ctx.globalAlpha=f*.8;
+    ctx.fillStyle='#00ff88';ctx.shadowColor='#00cc55';ctx.shadowBlur=18;
+    ctx.font=`${Math.round(W*.011)}px Courier New`;ctx.textAlign='center';
+    ctx.fillText('◈  VĚŽOVÁ VZDÁLENOST VYMAZÁNA',W*.5,H*.16);ctx.restore();
   }
   // Ascent telemetry
   if(t>PH.ascent[0]+.6&&alt<.88){
