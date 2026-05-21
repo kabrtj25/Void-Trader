@@ -119,6 +119,7 @@
 <!-- HUD (zobrazí se při hře) -->
 <div id="hud" style="display:none">
   <div id="admin-hud-badge" style="display:none">⚙ ADMIN REŽIM · ∞ PALIVO · ∞ PENÍZE · NEZNIČITELNÝ</div>
+  <div id="contract-hud" style="display:none"></div>
   <!-- Minimapa -->
   <div id="minimap-wrap">
     <canvas id="mm" width="180" height="180"></canvas>
@@ -175,7 +176,7 @@
   </div>
   <div id="dock-tabs">
     <button class="dtab active" onclick="switchDockTab('services')">SERVIS</button>
-    <button class="dtab" onclick="switchDockTab('trade')">OBCHOD</button>
+    <button class="dtab" onclick="switchDockTab('contracts')">ZAKÁZKY</button>
     <button class="dtab" onclick="switchDockTab('upgrades')">UPGRADY</button>
   </div>
   <div id="dock-body">
@@ -195,17 +196,8 @@
       </div>
       <button class="svc-btn" id="btn-save" style="margin-top:12px;width:100%">↓ Uložit hru</button>
     </div>
-    <!-- OBCHOD -->
-    <div id="dtab-trade" style="display:none">
-      <div class="trade-col">
-        <div class="trade-title">Koupit</div>
-        <div id="buy-list"></div>
-      </div>
-      <div class="trade-col">
-        <div class="trade-title">Prodat</div>
-        <div id="sell-list"></div>
-      </div>
-    </div>
+    <!-- ZAKÁZKY -->
+    <div id="dtab-contracts" style="display:none"></div>
     <!-- UPGRADY -->
     <div id="dtab-upgrades" style="display:none">
       <div id="upgrade-list"></div>
@@ -599,6 +591,50 @@
         <p>Ve vesmíru se pohybují nepřátelské lodě. Útočí střelbou. Bráň se klávesou <b>Mezerník</b> (střelba) a vyhýbej se projektilům manévrováním. Za zničeného nepřítele dostaneš kredity a zkušenostní body. Hlídej stav trupu a štítu v levém HUD panelu.</p>
       </div>
 
+    </div>
+  </div>
+</div>
+
+<!-- DELIVERY SUMMARY OVERLAY -->
+<div id="delivery-overlay" style="display:none">
+  <div id="delivery-bg-glow"></div>
+  <div id="delivery-box">
+    <div id="delivery-header">
+      <div id="delivery-badge">◈ ZAKÁZKA SPLNĚNA</div>
+      <div id="delivery-galaxy"></div>
+    </div>
+    <div id="delivery-cargo-row">
+      <div id="delivery-icon"></div>
+      <div id="delivery-cargo-info">
+        <div id="delivery-cargo-name"></div>
+        <div id="delivery-route">
+          <span id="delivery-from"></span>
+          <span id="delivery-arr"> → </span>
+          <span id="delivery-to"></span>
+        </div>
+      </div>
+    </div>
+    <div id="delivery-divider"></div>
+    <div id="delivery-stats">
+      <div class="dstat-row" id="dstat-rating">
+        <span class="dstat-label">HODNOCENÍ</span>
+        <span class="dstat-stars" id="delivery-stars"></span>
+      </div>
+      <div class="dstat-row">
+        <span class="dstat-label">ODMĚNA</span>
+        <span class="dstat-val" id="delivery-reward-val" style="color:var(--gold)">0 Cr</span>
+      </div>
+      <div class="dstat-row">
+        <span class="dstat-label">ZKUŠENOSTI</span>
+        <span class="dstat-val" id="delivery-xp-val" style="color:#44aaff">+0 XP</span>
+      </div>
+      <div class="dstat-row">
+        <span class="dstat-label">CELKEM VYDĚLÁNO</span>
+        <span class="dstat-val" id="delivery-total-val" style="color:rgba(255,200,0,0.55)">0 Cr</span>
+      </div>
+    </div>
+    <div id="delivery-footer">
+      <button id="delivery-next-btn">Zobrazit zakázky na stanici →</button>
     </div>
   </div>
 </div>

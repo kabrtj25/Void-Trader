@@ -125,6 +125,41 @@ function renderHUD(player,nearStation,dockingState,t){
     ctx.fillStyle='#ff2200';ctx.shadowColor='#ff2200';ctx.shadowBlur=15;
     ctx.fillText('⚠ KRITICKÁ HLADINA PALIVA',W/2,H-130);ctx.restore();
   }
+
+  // ---- Varovný systém kolize ----
+  const cw=window._collisionWarn;
+  if(cw){
+    ctx.save();
+    // Pulsace: rychlejší a intenzivnější čím blíž
+    const pFreq=4+cw.urgency*10;
+    const pulse=0.55+Math.sin(t*pFreq)*0.45;
+    const alpha=0.7+cw.urgency*0.3;
+    ctx.globalAlpha=alpha*pulse;
+
+    // Červený vignette-flash po krajích obrazovky při vysoké urgency
+    if(cw.urgency>0.55){
+      const flashA=(cw.urgency-0.55)/0.45*0.28*pulse;
+      const grad=ctx.createRadialGradient(W/2,H/2,H*0.3,W/2,H/2,H*0.85);
+      grad.addColorStop(0,'rgba(255,0,0,0)');
+      grad.addColorStop(1,`rgba(255,0,0,${flashA})`);
+      ctx.globalAlpha=1;ctx.fillStyle=grad;ctx.fillRect(0,0,W,H);
+      ctx.globalAlpha=alpha*pulse;
+    }
+
+    // Hlavní varovný text
+    const warnY=H/2-W*0.18;
+    ctx.textAlign='center';
+    ctx.font=`bold ${cw.urgency>0.7?15:13}px "Courier New", monospace`;
+    ctx.fillStyle='#ff2200';ctx.shadowColor='#ff3300';ctx.shadowBlur=22;
+    ctx.fillText(`⚠ RIZIKO KOLIZE — ${cw.label}`,W/2,warnY);
+
+    // Vzdálenost + TTC
+    ctx.font='11px "Courier New", monospace';
+    ctx.fillStyle='#ff6644';ctx.shadowBlur=10;
+    ctx.fillText(`${cw.dist} m  •  kolize za ${cw.ttc.toFixed(1)} s`,W/2,warnY+18);
+
+    ctx.restore();
+  }
 }
 
 function hudPanel(x,y,w,h){
@@ -641,21 +676,18 @@ function handleMapClick(e){
 
 // ---- Tab switching ----
 function switchDockTab(tab){
-  if(tab==='trade'){
-    // Open full-screen trade overlay
-    if(window.gameState?.dockStation)
-      openTradeOverlay(window.gameState.player,window.gameState.dockStation);
-    return;
-  }
   document.querySelectorAll('.dtab').forEach(btn=>{
-    const map={services:'SERVIS',trade:'OBCHOD',upgrades:'UPGRADY'};
+    const map={services:'SERVIS',contracts:'ZAKÁZKY',upgrades:'UPGRADY'};
     btn.classList.toggle('active',btn.textContent.trim()===map[tab]);
   });
-  ['services','upgrades'].forEach(id=>{
+  ['services','contracts','upgrades'].forEach(id=>{
     const el=document.getElementById('dtab-'+id);
     if(!el)return;
     el.style.display=id===tab?'block':'none';
   });
+  if(tab==='contracts'&&window.gameState?.dockStation){
+    renderContractsTab(window.gameState.player,window.gameState.dockStation);
+  }
 }
 
 // ---- Dokovací panel ----
@@ -704,8 +736,248 @@ function renderDockPanel(player,station){
       row.appendChild(btn);}
     ul.appendChild(row);
   });
-  // Trade
-  renderTradePanel(player,station);
+}
+
+
+// ================================================================
+//  ZAKÁZKY (Contract System)
+// ================================================================
+let _currentContracts=[];
+
+function generateContracts(station,galaxyId){
+  const daySeed=Math.floor(Date.now()/(1000*60*30)); // refresh every 30 min
+  const stSeed=station.name.split('').reduce((s,c)=>s+c.charCodeAt(0),0);
+  const rng=makeRng(((stSeed*997+daySeed*1009)>>>0));
+  const ALL_DEST=[...FIXED_STATIONS,...LARGE_STATIONS].filter(s=>s.name!==station.name);
+  const OTHER_GALAXIES=GALAXIES.filter(g=>g.id!==galaxyId&&g.fuelCost>0);
+  const contracts=[];
+  for(let i=0;i<5;i++){
+    const c=CONTRACT_CARGO[Math.floor(rng()*CONTRACT_CARGO.length)];
+    const crossGal=OTHER_GALAXIES.length>0&&rng()<0.38;
+    let to,toGalaxy,toIsGalaxy,reward;
+    if(crossGal){
+      const gal=OTHER_GALAXIES[Math.floor(rng()*OTHER_GALAXIES.length)];
+      to=gal.name; toGalaxy=gal.id; toIsGalaxy=true;
+      reward=Math.round((c.base*50+gal.lightYears*7000)*(0.85+rng()*0.3));
+    } else {
+      const dest=ALL_DEST[Math.floor(rng()*ALL_DEST.length)];
+      const scx=station.cx!==undefined?station.cx:0;
+      const scy=station.cy!==undefined?station.cy:0;
+      const chD=Math.max(1,Math.hypot(dest.cx-scx,dest.cy-scy));
+      reward=Math.round((c.base*7+chD*1100)*(0.85+rng()*0.3));
+      to=dest.name; toGalaxy=galaxyId; toIsGalaxy=false;
+    }
+    contracts.push({
+      id:`${station.name}_${i}_${daySeed}`,
+      cargo:c.name, cargoIcon:c.icon,
+      fromStation:station.name, fromGalaxy:galaxyId,
+      to, toGalaxy, toIsGalaxy,
+      reward:Math.max(500,reward),
+      xp:Math.round(Math.max(500,reward)/140),
+      danger:c.danger,
+    });
+  }
+  return contracts;
+}
+
+function renderContractsTab(player,station){
+  const el=document.getElementById('dtab-contracts');
+  if(!el)return;
+  const galaxyId=window.currentGalaxy||'sol';
+  _currentContracts=generateContracts(station,galaxyId);
+  const active=player.activeContract;
+  const DCOL=['#00d480','#ffaa00','#ff6600','#ff2244'];
+  const DLBL=['Bezpečné','Mírné riziko','Nebezpečné','Extrémní'];
+  let html='';
+
+  if(active){
+    const gal=GALAXIES.find(g=>g.id===active.toGalaxy);
+    const gc=gal?.color||'#ff9500';
+    const destLabel=active.toIsGalaxy?(gal?.name||active.toGalaxy):active.to;
+    html+=`<div class="contract-active">
+      <div class="ca-header"><span class="ca-badge">◈ AKTIVNÍ ZAKÁZKA</span>
+        <button class="ca-cancel-btn" onclick="cancelContract()">✕ Zrušit</button></div>
+      <div class="ca-body">
+        <span class="ca-icon">${active.cargoIcon}</span>
+        <div class="ca-info">
+          <div class="ca-cargo">${active.cargo}</div>
+          <div class="ca-route">${active.fromStation} <span class="ca-arr">→</span>
+            <span style="color:${gc}">${destLabel}</span>
+            ${active.toIsGalaxy?`<span class="cc-warp-badge">WARP</span>`:''}
+          </div>
+        </div>
+        <div class="ca-reward-block"><div class="ca-rew">${active.reward.toLocaleString('cs')} Cr</div>
+          <div class="ca-xp">+${active.xp} XP</div></div>
+      </div>
+      <div class="ca-hint">${active.toIsGalaxy
+        ?`Warpuj do galaxie <b>${gal?.name||active.toGalaxy}</b> a přistaň na jakékoliv stanici`
+        :`Doručit na: <b>${active.to}</b>${active.toGalaxy!==galaxyId?' (jiná galaxie)':''}`
+      }</div>
+    </div>
+    <div class="contracts-sep">Dostupné zakázky ${active?'— přijetí nové zruší aktivní':''}</div>`;
+  } else {
+    html+='<div class="contracts-sep">Dostupné zakázky na stanici '+station.name+'</div>';
+  }
+
+  _currentContracts.forEach((c,i)=>{
+    const gal=GALAXIES.find(g=>g.id===c.toGalaxy);
+    const gc=gal?.color||'#ff9500';
+    const destLabel=c.toIsGalaxy?(gal?.name||c.to):c.to;
+    const isAct=active?.id===c.id;
+    html+=`<div class="contract-card${isAct?' cc-taken':''}">
+      <div class="cc-top">
+        <span class="cc-icon">${c.cargoIcon}</span>
+        <div class="cc-main">
+          <div class="cc-cargo">${c.cargo}</div>
+          <div class="cc-route">
+            <span class="cc-from">${c.fromStation}</span>
+            <span class="cc-arr">→</span>
+            <span class="cc-to" style="color:${gc}">${destLabel}</span>
+            ${c.toIsGalaxy?`<span class="cc-warp-badge">WARP</span>`:''}
+          </div>
+          <div class="cc-danger" style="color:${DCOL[c.danger]}">${DLBL[c.danger]}</div>
+        </div>
+        <div class="cc-right">
+          <div class="cc-reward">${c.reward.toLocaleString('cs')} Cr</div>
+          <div class="cc-xp">+${c.xp} XP</div>
+        </div>
+      </div>
+      ${isAct
+        ?'<div class="cc-active-lbl">✓ PŘIJATO</div>'
+        :`<button class="cc-accept-btn" onclick="acceptContract(${i})">Přijmout zakázku</button>`
+      }
+    </div>`;
+  });
+  el.innerHTML=html;
+}
+
+function _setContractNav(contract){
+  if(!contract||!window.gameState)return;
+  const gs=window.gameState;
+  const galaxyId=window.currentGalaxy||'sol';
+
+  if(contract.toIsGalaxy){
+    // Cross-galaxy: nastav warpTarget na cílovou galaxii
+    const gal=GALAXIES.find(g=>g.id===contract.toGalaxy);
+    if(gal&&gal.id!==galaxyId){
+      window.warpTarget=gal;
+      setMsg(`Zakázka přijata! Warp kurz nastaven: ${gal.name} — stiskni [R]`,6000);
+    }
+    return;
+  }
+
+  // Same-galaxy: hledej stanici podle jména v chunkcache
+  let found=null;
+  if(typeof chunkCache!=='undefined'){
+    chunkCache.forEach(ch=>{
+      if(found)return;
+      if(ch.system?.station?.name===contract.to) found=ch.system.station;
+      ch.system?.planets?.forEach(pl=>{
+        if(pl.station?.name===contract.to) found=pl.station;
+      });
+    });
+  }
+  if(!found){
+    // Stanice ještě není v cache — odhadni z FIXED/LARGE_STATIONS definic
+    const def=[...FIXED_STATIONS,...LARGE_STATIONS].find(s=>s.name===contract.to);
+    if(def) found={x:def.cx*C.CHUNK+C.CHUNK*0.5, y:def.cy*C.CHUNK+C.CHUNK*0.5, name:def.name};
+  }
+  if(found){
+    gs.navTarget=found;
+    const dist=(Math.hypot(found.x-gs.player.x,found.y-gs.player.y)/1000).toFixed(1);
+    setMsg(`Zakázka přijata! Navigace: ${found.name}  (${dist} AU)`,5000);
+  } else {
+    setMsg(`Zakázka přijata: ${contract.cargo} → ${contract.to}`,4000);
+  }
+}
+
+function acceptContract(idx){
+  const c=_currentContracts[idx];
+  if(!c||!window.gameState)return;
+  window.gameState.player.activeContract=c;
+  updateContractHUD(c);
+  _setContractNav(c);
+  const st=window.gameState.dockStation;
+  if(st) renderContractsTab(window.gameState.player,st);
+}
+
+function cancelContract(){
+  if(!window.gameState)return;
+  window.gameState.player.activeContract=null;
+  updateContractHUD(null);
+  const st=window.gameState.dockStation;
+  if(st) renderContractsTab(window.gameState.player,st);
+  setMsg('Zakázka zrušena.',2000);
+}
+
+function updateContractHUD(contract){
+  const el=document.getElementById('contract-hud');
+  if(!el)return;
+  if(!contract){el.style.display='none';el.innerHTML='';return;}
+  const gal=GALAXIES.find(g=>g.id===contract.toGalaxy);
+  const gc=gal?.color||'#ff9500';
+  const dest=contract.toIsGalaxy?(gal?.name||contract.toGalaxy):contract.to;
+  el.style.display='block';
+  el.innerHTML=`<span class="chud-icon">${contract.cargoIcon}</span>`+
+    `<span class="chud-label">${contract.cargo}</span>`+
+    `<span class="chud-arr">→</span>`+
+    `<span class="chud-dest" style="color:${gc}">${dest}</span>`+
+    `<span class="chud-rew">${contract.reward.toLocaleString('cs')} Cr</span>`;
+}
+
+// ---- Delivery Summary Screen ----
+function showDeliveryScreen(contract, reward, xp, totalEarned){
+  const ov=document.getElementById('delivery-overlay');
+  if(!ov)return;
+
+  const gal=GALAXIES.find(g=>g.id===contract.toGalaxy);
+  const gc=gal?.color||'#ff9500';
+  const destLabel=contract.toIsGalaxy?(gal?.name||contract.toGalaxy):contract.to;
+
+  // Plnit statický obsah
+  document.getElementById('delivery-galaxy').textContent=
+    (gal?.name||'Sluneční soustava').toUpperCase();
+  document.getElementById('delivery-icon').textContent=contract.cargoIcon;
+  document.getElementById('delivery-cargo-name').textContent=contract.cargo;
+  document.getElementById('delivery-from').textContent=contract.fromStation;
+  document.getElementById('delivery-to').style.color=gc;
+  document.getElementById('delivery-to').textContent=destLabel;
+
+  // Hodnocení (5 hvězd vždy — v budoucnu lze rozlišovat)
+  document.getElementById('delivery-stars').textContent='★★★★★';
+
+  // Reset číselníků
+  document.getElementById('delivery-reward-val').textContent='0 Cr';
+  document.getElementById('delivery-xp-val').textContent='+0 XP';
+  document.getElementById('delivery-total-val').textContent=
+    (totalEarned-reward).toLocaleString('cs')+' Cr';
+
+  ov.style.display='flex';
+
+  // Animace počítání peněz
+  const dur=1800; // ms
+  const start=performance.now();
+  function tick(now){
+    const p=Math.min(1,(now-start)/dur);
+    // easeOutExpo
+    const e=p===1?1:1-Math.pow(2,-10*p);
+    const cur=Math.round(reward*e);
+    document.getElementById('delivery-reward-val').textContent=
+      cur.toLocaleString('cs')+' Cr';
+    document.getElementById('delivery-xp-val').textContent=
+      '+'+Math.round(xp*e)+' XP';
+    document.getElementById('delivery-total-val').textContent=
+      Math.round((totalEarned-reward)+reward*e).toLocaleString('cs')+' Cr';
+    if(p<1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+
+  // Tlačítko Další zakázky
+  document.getElementById('delivery-next-btn').onclick=()=>{
+    ov.style.display='none';
+    // Přepni tab na zakázky
+    if(typeof switchDockTab==='function') switchDockTab('contracts');
+  };
 }
 
 // ---- Full-screen Trade Overlay ----

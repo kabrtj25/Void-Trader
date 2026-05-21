@@ -1057,19 +1057,19 @@ function renderPlayerShip(player,t,sx,sy){
   ctx.save();
   ctx.translate(sx,sy);ctx.rotate(player.angle+Math.PI/2);
 
-  // === BOČNÍ OMS TRYSKY ===
+  // === BOČNÍ OMS TRYSKY (vychází z OMS podů na y=8, x=±9) ===
   if(strafeL){
     const fl=8+Math.random()*6;ctx.globalAlpha=0.7+Math.random()*0.2;
-    const eg=ctx.createLinearGradient(19,0,19+fl,0);
+    const eg=ctx.createLinearGradient(9,8,9+fl,8);
     eg.addColorStop(0,'rgba(80,200,255,0.9)');eg.addColorStop(1,'transparent');
-    ctx.fillStyle=eg;ctx.beginPath();ctx.moveTo(19,-2.5);ctx.lineTo(19,2.5);ctx.lineTo(19+fl,0);ctx.fill();
+    ctx.fillStyle=eg;ctx.beginPath();ctx.moveTo(9,5.5);ctx.lineTo(9,10.5);ctx.lineTo(9+fl,8);ctx.fill();
     ctx.globalAlpha=1;
   }
   if(strafeR){
     const fl=8+Math.random()*6;ctx.globalAlpha=0.7+Math.random()*0.2;
-    const eg=ctx.createLinearGradient(-19,0,-19-fl,0);
+    const eg=ctx.createLinearGradient(-9,8,-9-fl,8);
     eg.addColorStop(0,'rgba(80,200,255,0.9)');eg.addColorStop(1,'transparent');
-    ctx.fillStyle=eg;ctx.beginPath();ctx.moveTo(-19,-2.5);ctx.lineTo(-19,2.5);ctx.lineTo(-19-fl,0);ctx.fill();
+    ctx.fillStyle=eg;ctx.beginPath();ctx.moveTo(-9,5.5);ctx.lineTo(-9,10.5);ctx.lineTo(-9-fl,8);ctx.fill();
     ctx.globalAlpha=1;
   }
 

@@ -69,6 +69,21 @@ const UPGRADES = [
   {id:'fuel',    name:'Nádrž',           max:3, cost:700,  desc:'Nádrž +25%'},
 ];
 
+const CONTRACT_CARGO = [
+  {name:'Zásilka elektroniky',  icon:'💾', base:800,  danger:0},
+  {name:'Lékařský náklad',      icon:'💊', base:650,  danger:0},
+  {name:'Vojenský materiál',    icon:'🔫', base:1300, danger:2},
+  {name:'Humanitární pomoc',    icon:'🌾', base:450,  danger:0},
+  {name:'Průmyslové díly',      icon:'⚙',  base:750,  danger:0},
+  {name:'Vzácné minerály',      icon:'💎', base:1600, danger:1},
+  {name:'Chemikálie',           icon:'⚗',  base:950,  danger:1},
+  {name:'Diplomatická pošta',   icon:'📫', base:1100, danger:0},
+  {name:'Biologické vzorky',    icon:'🧪', base:1050, danger:1},
+  {name:'Luxusní zboží',        icon:'🏺', base:1800, danger:0},
+  {name:'Zbraňové součástky',   icon:'🔩', base:1400, danger:2},
+  {name:'Tajná zásilka',        icon:'📦', base:2100, danger:3},
+];
+
 // ===== Velké Coriolis stanice (Elite Dangerous styl) — daleko od středu =====
 const LARGE_STATIONS = [
   {cx:13,  cy:4,   name:'Port Leviathan',      tier:3, color:'#00d4ff'},

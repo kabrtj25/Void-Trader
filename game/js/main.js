@@ -237,6 +237,7 @@ function startGame(fromSave=false){
     cargo:save?.cargo||{}, cargoCount:save?.cargoCount||0,
     upgrades:save?.upgrades||{},
     xp:save?.xp||0, level:save?.level||1,
+    activeContract:save?.activeContract||null,
     invTimer:0, shieldRegenTimer:0,
     thrusting:false, boosting:false,
     dead:false
@@ -262,6 +263,10 @@ function startGame(fromSave=false){
   spawnInitialEnemies();
 
   state='playing';
+  // Obnov HUD zakázky po načtení uložené hry
+  if(typeof updateContractHUD==='function') updateContractHUD(player.activeContract||null);
+  // Obnov navigaci z aktivní zakázky
+  if(player.activeContract&&typeof _setContractNav==='function') _setContractNav(player.activeContract);
   setMsg('Vítejte! [W] thrust  [AD] otočení  [QE] strafe  [F] přistání  [M] mapa  [N] galaxie  [R] warp',7000);
 }
 
@@ -632,8 +637,30 @@ function startDocking(station){ SFX.playDock();
   parkingMode=false;
   state='docked';
   document.getElementById('hud').style.display='none';
+
+  // Zkontroluj doručení aktivní zakázky
+  const ac=gs.player.activeContract;
+  let delivered=false;
+  if(ac){
+    const gId=window.currentGalaxy||'sol';
+    const ok=ac.toIsGalaxy?(gId===ac.toGalaxy):(station.name===ac.to&&gId===ac.toGalaxy);
+    if(ok){
+      const reward=ac.reward, xp=ac.xp||50;
+      gs.player.credits+=reward;
+      addXP(gs.player,xp);
+      gs.player.activeContract=null;
+      gs.totalEarned=(gs.totalEarned||0)+reward;
+      delivered=true;
+      SFX.playLevelUp();
+      updateContractHUD(null);
+      // Zobraz delivery summary screen (mírné zpoždění aby dock panel byl pod ním)
+      const _ac=ac, _rew=reward, _xp=xp, _tot=gs.totalEarned;
+      setTimeout(()=>showDeliveryScreen(_ac,_rew,_xp,_tot),350);
+    }
+  }
+
   renderDockPanel(gs.player,station);
-  setMsg('');
+  if(!delivered) setMsg('');
 }
 
 function undock(){ SFX.playUndock();
@@ -656,6 +683,7 @@ function undock(){ SFX.playUndock();
     }
   }
   gameState.dockStation=null;
+  document.getElementById('delivery-overlay').style.display='none';
   document.getElementById('dock-panel').style.display='none';
   document.getElementById('trade-overlay').style.display='none';
   document.getElementById('parking-overlay').style.display='none';
@@ -744,7 +772,20 @@ function completeWarp(){
   gameState.bullets=[];gameState.enemies=[];gameState.particles=[];gameState.loots=[];
   gameState.navTarget=null;
   spawnInitialEnemies();
-  setMsg(`Warp úspěšný! Vítejte v ${g.name}.`,6000);
+
+  // Pokud je aktivní zakázka do této galaxie, nastav navigaci na nejbližší stanici
+  const ac=gameState.player.activeContract;
+  if(ac&&ac.toIsGalaxy&&ac.toGalaxy===g.id){
+    const nearest=FIXED_STATIONS.reduce((best,s)=>{
+      const d=Math.hypot(s.cx-Math.floor(p.x/C.CHUNK),s.cy-Math.floor(p.y/C.CHUNK));
+      return(!best||d<best.d)?{s,d}:best;
+    },null);
+    if(nearest){
+      gameState.navTarget={x:nearest.s.cx*C.CHUNK+C.CHUNK*0.5,y:nearest.s.cy*C.CHUNK+C.CHUNK*0.5,name:nearest.s.name};
+    }
+  }
+
+  setMsg(`Warp úspěšný! Vítejte v ${g.name}.${ac?.toIsGalaxy&&ac.toGalaxy===g.id?' Přistaň na libovolné stanici.':''}`,6000);
   SFX.playWarpJump();
 }
 
@@ -759,6 +800,7 @@ let _pauseStars=null;
 function openPause(){
   if(state!=='playing')return;
   state='paused';
+  SFX.stopEngine();
   _updatePauseStats();
   document.getElementById('pause-screen').style.display='flex';
   _startPauseShipAnim();
@@ -1033,10 +1075,10 @@ function update(dt){
     return;  // hra zmražena
   }
 
-  if(state!=='playing')return;
+  if(state!=='playing'){window._collisionWarn=null;return;}
   const gs=gameState;
   const p=gs.player;
-  if(p.dead)return;
+  if(p.dead){SFX.stopEngine();window._collisionWarn=null;return;}
 
   gs.t+=dt;
   if(shootCd>0)shootCd=Math.max(0,shootCd-dt);
@@ -1102,10 +1144,9 @@ function update(dt){
   const targetZoom=Math.max(0.08,1/(1+spd*0.026));
   camZoom+=(targetZoom-camZoom)*Math.min(1,dt*2.8);
 
-  // Warp boost — počítej čas při vysoké rychlosti → příjezd
+  // Warp boost — počítej čas pokud hráč drží W (warpSecs na mapě = skutečný čas jízdy)
   if(warpPhase==='boosting'){
-    const spdKms=spd*C.SPEED_KMS_FACTOR;
-    if(spdKms>=C.WARP_SPEED_KMS){warpElapsed+=dt;}
+    if(warpBoosting) warpElapsed+=dt;
     if(window.warpTarget&&warpElapsed>=window.warpTarget.warpSecs){completeWarp();return;}
   }
 
@@ -1305,6 +1346,57 @@ function update(dt){
   gs.playTime=(gs.playTime||0)+dt;
   gs._saveTimer=(gs._saveTimer||0)+dt;
   if(gs._saveTimer>30){gs._saveTimer=0;saveGame();}
+
+  // ---- Varovný systém kolize ----
+  updateCollisionWarn(p,gs);
+}
+
+function updateCollisionWarn(p,gs){
+  const WARN_DIST=1400;   // maximální dosah skenování
+  const WARN_ANGLE=0.48;  // poloúhel kužele přídě (~27°)
+  const WARN_TTC=4.5;     // varuj pokud kolize do N sekund
+  const MIN_SPD=2.5;      // ignoruj pokud jdeš pomalu
+
+  const spd=Math.hypot(p.vx,p.vy);
+  if(spd<MIN_SPD){window._collisionWarn=null;return;}
+
+  let best=null; // {label, dist, ttc, urgency}
+
+  const check=(ox,oy,radius,label)=>{
+    const dx=ox-p.x, dy=oy-p.y;
+    const d=Math.hypot(dx,dy)-radius;
+    if(d>WARN_DIST||d<0)return;
+    // Úhel mezi přídí a směrem k objektu
+    const bearing=Math.atan2(dy,dx);
+    const da=Math.abs(angleDiff(p.angle,bearing));
+    if(da>WARN_ANGLE)return;
+    // Uzavírací rychlost (projekce rychlosti na směr k cíli)
+    const closing=(p.vx*dx+p.vy*dy)/Math.max(Math.hypot(dx,dy),1);
+    if(closing<0.8)return;
+    const ttc=Math.max(0,d)/closing;
+    if(ttc>WARN_TTC)return;
+    const urgency=1-ttc/WARN_TTC; // 0..1, vyšší = naléhavější
+    if(!best||urgency>best.urgency) best={label,dist:Math.round(Math.max(0,d)),ttc,urgency};
+  };
+
+  // Skenuj asteroidy
+  gs.chunks.forEach(ch=>{
+    ch.asteroids?.forEach(a=>check(a.x,a.y,a.sz,`ASTEROID`));
+  });
+
+  // Skenuj stanice
+  gs.chunks.forEach(ch=>{
+    const scanSt=(st)=>{
+      if(!st)return;
+      check(st.x,st.y,st.r||80,`STANICE ${st.name}`);
+    };
+    if(!ch.system)return;
+    scanSt(ch.system.station);
+    ch.system.planets?.forEach(pl=>{if(pl.station)scanSt(pl.station);});
+    ch.system.moons?.forEach(mn=>{if(mn.station)scanSt(mn.station);});
+  });
+
+  window._collisionWarn=best;
 }
 
 function hitPlayer(dmg){
@@ -1370,9 +1462,11 @@ function showDeath(){
 }
 
 function _goLobby(){
+  SFX.stopEngine();
   document.getElementById('death-screen').style.display='none';
   document.getElementById('hud').style.display='none';
   document.getElementById('dock-panel').style.display='none';
+  document.getElementById('delivery-overlay').style.display='none';
   document.getElementById('menu').style.display='flex';
   state='menu';gameState=null;activeSlot=-1;window.adminMode=false;
   document.getElementById('admin-hud-badge').style.display='none';
@@ -1402,7 +1496,7 @@ function saveGame(){
     fuel:p.fuel,fuelMax:p.fuelMax,
     fuelReserve:p.fuelReserve,
     credits:p.credits,cargo:p.cargo,cargoCount:p.cargoCount,upgrades:p.upgrades,
-    xp:p.xp,level:p.level,totalEarned:gameState.totalEarned,
+    xp:p.xp,level:p.level,activeContract:p.activeContract||null,totalEarned:gameState.totalEarned,
     galaxyId:window.currentGalaxy||'sol',
     playTime:gameState.playTime||0,
     savedAt:Date.now()
@@ -1790,7 +1884,7 @@ function render(dt,t){
     }
     ctx.font='9px "Courier New", monospace';ctx.shadowBlur=0;
     ctx.fillStyle='rgba(255,149,0,0.6)';
-    const hint=pctSpd<1?`${Math.round(spdKms).toLocaleString('cs')} km/s — drž [W]`:`WARP AKTIVNÍ — přílet ${Math.max(0,window.warpTarget.warpSecs-warpElapsed).toFixed(1)} s`;
+    const hint=!window._warpBoosting?'drž [W] pro warp':`WARP AKTIVNÍ — přílet ${Math.max(0,window.warpTarget.warpSecs-warpElapsed).toFixed(1)} s`;
     ctx.fillText(hint,W/2,52);
     ctx.restore();
   }
