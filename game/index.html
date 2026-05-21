@@ -397,6 +397,78 @@
       <span class="esc-btn-icon">✕</span>
       <span class="esc-btn-label">UKONČIT HRU</span>
     </button>
+    <button class="esc-btn esc-btn-admin" id="btn-pause-admin" style="display:none">
+      <span class="esc-btn-icon">🛠</span>
+      <span class="esc-btn-label">ADMIN</span>
+    </button>
+  </div>
+
+  <!-- Admin panel (overlay uvnitř pause-screen) -->
+  <div id="admin-panel" style="display:none">
+    <div id="admin-panel-box">
+      <div id="admin-panel-header">
+        <span id="admin-panel-title">🛠 ADMIN NASTAVENÍ</span>
+        <button id="btn-admin-panel-close">✕ Zavřít</button>
+      </div>
+      <div id="admin-panel-body">
+        <div class="adm-toggle-row">
+          <div class="adm-toggle-info">
+            <span class="adm-toggle-name">∞ Neomezené palivo</span>
+            <span class="adm-toggle-desc">Nádrž se vždy automaticky doplní na maximum</span>
+          </div>
+          <label class="adm-switch">
+            <input type="checkbox" id="adm-fuel" checked>
+            <span class="adm-slider"></span>
+          </label>
+        </div>
+        <div class="adm-toggle-row">
+          <div class="adm-toggle-info">
+            <span class="adm-toggle-name">🛡 Nezničitelnost</span>
+            <span class="adm-toggle-desc">Trup a štít se nedá poškodit, loď nelze zničit</span>
+          </div>
+          <label class="adm-switch">
+            <input type="checkbox" id="adm-invincible" checked>
+            <span class="adm-slider"></span>
+          </label>
+        </div>
+        <div class="adm-toggle-row">
+          <div class="adm-toggle-info">
+            <span class="adm-toggle-name">💰 Neomezené kredity</span>
+            <span class="adm-toggle-desc">Kredity zůstávají na 999 999 999 Cr</span>
+          </div>
+          <label class="adm-switch">
+            <input type="checkbox" id="adm-credits" checked>
+            <span class="adm-slider"></span>
+          </label>
+        </div>
+        <div class="adm-toggle-row">
+          <div class="adm-toggle-info">
+            <span class="adm-toggle-name">⚡ Super boost</span>
+            <span class="adm-toggle-desc">10× větší maximální rychlost lodi</span>
+          </div>
+          <label class="adm-switch">
+            <input type="checkbox" id="adm-speed">
+            <span class="adm-slider"></span>
+          </label>
+        </div>
+        <div class="adm-toggle-row">
+          <div class="adm-toggle-info">
+            <span class="adm-toggle-name">💀 Nepřátelé na slepo</span>
+            <span class="adm-toggle-desc">Nepřátelé přestanou střílet na hráče</span>
+          </div>
+          <label class="adm-switch">
+            <input type="checkbox" id="adm-noenemies">
+            <span class="adm-slider"></span>
+          </label>
+        </div>
+        <div class="adm-actions">
+          <button class="adm-action-btn" id="adm-btn-repair">🔧 Opravit loď</button>
+          <button class="adm-action-btn" id="adm-btn-addcredits">💰 +1 000 000 Cr</button>
+          <button class="adm-action-btn" id="adm-btn-maxupgrades">⬆ Max upgrady</button>
+          <button class="adm-action-btn" id="adm-btn-levelup">⭐ Level 20</button>
+        </div>
+      </div>
+    </div>
   </div>
 
 </div>

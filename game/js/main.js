@@ -5,8 +5,9 @@ let gameState = null;  // hráč, entity, nav, atd.
 let state = 'menu';    // 'menu' | 'playing' | 'docked' | 'map' | 'galaxy' | 'warping'
 let canvas, W2, H2;    // W,H jsou v render.js
 
-// Admin mode
+// Admin mode — granulární flagy
 window.adminMode = false;
+window.adminFlags = { fuel:true, invincible:true, credits:true, speed:false, noenemies:false };
 
 function openAdminLogin(){
   document.getElementById('admin-overlay').style.display='flex';
@@ -33,22 +34,36 @@ function submitAdminLogin(){
   }
 }
 function _startAdminGame(){
+  // Resetuj flagy na výchozí
+  window.adminFlags={ fuel:true, invincible:true, credits:true, speed:false, noenemies:false };
   activeSlot=-1;
   startGame(false);
   setTimeout(()=>{
     if(!gameState) return;
     const p=gameState.player;
     p.credits=999999999;
-    p.hull=p.hullMax;
-    p.shield=p.shieldMax;
-    p.fuel=p.fuelMax;
-    p.level=20;p.xp=0;
-    // Všechny upgrady na max
+    p.hull=p.hullMax; p.shield=p.shieldMax; p.fuel=p.fuelMax;
+    p.level=20; p.xp=0;
     ['weapons','engines','shields','cargo','hull'].forEach(k=>{ p.upgrades[k]=10; });
     gameState.totalEarned=0;
     document.getElementById('admin-hud-badge').style.display='block';
-    setMsg('⚙ ADMIN REŽIM AKTIVNÍ — neomezené zdroje · nezničitelný · max level · max upgrady',8000);
+    document.getElementById('btn-pause-admin').style.display='flex';
+    setMsg('⚙ ADMIN REŽIM — otevři pauzu pro nastavení testovacího režimu',8000);
   },400);
+}
+
+function openAdminPanel(){
+  // Synchronizuj checkboxy se současným stavem flagů
+  const af=window.adminFlags;
+  document.getElementById('adm-fuel').checked=af.fuel;
+  document.getElementById('adm-invincible').checked=af.invincible;
+  document.getElementById('adm-credits').checked=af.credits;
+  document.getElementById('adm-speed').checked=af.speed;
+  document.getElementById('adm-noenemies').checked=af.noenemies;
+  document.getElementById('admin-panel').style.display='flex';
+}
+function closeAdminPanel(){
+  document.getElementById('admin-panel').style.display='none';
 }
 
 // Light / Dark mode
@@ -295,7 +310,7 @@ function updateEnemies(dt,player){
       e.thrusting=d>150;
       // Střelba
       e.shootCd-=dt;
-      if(d<400&&e.shootCd<=0){
+      if(d<400&&e.shootCd<=0&&!(window.adminMode&&window.adminFlags.noenemies)){
         e.shootCd=1.8+Math.random()*1.5;
         const spread=(Math.random()-.5)*0.08;
         const sa=Math.atan2(player.y-e.y,player.x-e.x)+spread;
@@ -1060,7 +1075,8 @@ function update(dt){
   // Speed cap — v parkovacím režimu velmi nízký, žádný při boost nebo warpu
   if(!boost){
     const spd=Math.hypot(p.vx,p.vy);
-    const maxSpd=parkingMode?3.5:C.MAX_SPD*engMult;
+    const speedMult=(window.adminMode&&window.adminFlags.speed)?10:1;
+    const maxSpd=parkingMode?3.5:C.MAX_SPD*engMult*speedMult;
     if(spd>maxSpd){p.vx*=maxSpd/spd;p.vy*=maxSpd/spd;}
   }
 
@@ -1093,16 +1109,14 @@ function update(dt){
     if(window.warpTarget&&warpElapsed>=window.warpTarget.warpSecs){completeWarp();return;}
   }
 
-  // Admin mode — neomezené zdroje každý tick
+  // Admin mode — granulární flagy
   if(window.adminMode){
-    p.fuel=p.fuelMax;
-    p.hull=p.hullMax;
-    p.shield=p.shieldMax;
-    p.credits=Math.max(p.credits,999999999);
-    p.invTimer=0.5; // nezničitelný
-    p.dead=false;
+    const af=window.adminFlags;
+    if(af.fuel)   { p.fuel=p.fuelMax; }
+    else          { consumeFuel(p,C.FUEL_IDLE); }
+    if(af.invincible){ p.hull=p.hullMax; p.shield=p.shieldMax; p.invTimer=0.5; p.dead=false; }
+    if(af.credits){ p.credits=Math.max(p.credits,999999999); }
   } else {
-    // Idle fuel
     consumeFuel(p,C.FUEL_IDLE);
   }
 
@@ -1958,6 +1972,36 @@ window.addEventListener('load',()=>{
   document.getElementById('btn-admin').onclick=()=>openAdminLogin();
   document.getElementById('btn-admin-close').onclick=()=>closeAdminLogin();
   document.getElementById('btn-admin-login').onclick=()=>submitAdminLogin();
+
+  // Admin panel v pauze
+  document.getElementById('btn-pause-admin').onclick=()=>openAdminPanel();
+  document.getElementById('btn-admin-panel-close').onclick=()=>closeAdminPanel();
+  // Toggles — live update flagů
+  const _af=(id,flag)=>{ document.getElementById(id).onchange=e=>{ window.adminFlags[flag]=e.target.checked; }; };
+  _af('adm-fuel','fuel'); _af('adm-invincible','invincible'); _af('adm-credits','credits');
+  _af('adm-speed','speed'); _af('adm-noenemies','noenemies');
+  // Akční tlačítka
+  document.getElementById('adm-btn-repair').onclick=()=>{
+    if(!gameState)return;
+    const p=gameState.player;
+    p.hull=p.hullMax;p.shield=p.shieldMax;p.fuel=p.fuelMax;
+    setMsg('🔧 Loď opravena na 100%',2500);
+  };
+  document.getElementById('adm-btn-addcredits').onclick=()=>{
+    if(!gameState)return;
+    gameState.player.credits+=1000000;
+    setMsg('💰 +1 000 000 Cr přidáno',2000);
+  };
+  document.getElementById('adm-btn-maxupgrades').onclick=()=>{
+    if(!gameState)return;
+    ['weapons','engines','shields','cargo','hull'].forEach(k=>{ gameState.player.upgrades[k]=10; });
+    setMsg('⬆ Všechny upgrady na maximum',2500);
+  };
+  document.getElementById('adm-btn-levelup').onclick=()=>{
+    if(!gameState)return;
+    gameState.player.level=20;gameState.player.xp=0;
+    setMsg('⭐ Level nastaven na 20',2000);
+  };
   document.getElementById('admin-pass').addEventListener('keydown',e=>{
     if(e.key==='Enter') submitAdminLogin();
   });

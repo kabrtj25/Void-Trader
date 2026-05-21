@@ -191,6 +191,90 @@ body.light #minimap-label{color:rgba(0,0,0,0.4);}
 body.light #btn-theme{background:rgba(255,255,255,0.6);border-color:rgba(0,0,0,0.25);color:#111111;}
 body.light #btn-theme:hover{background:rgba(0,0,0,0.06);border-color:#000;color:#000;}
 
+/* ===== ADMIN IN-GAME PANEL ===== */
+.esc-btn-admin{color:#ff5555 !important;border-top-color:rgba(255,60,60,0.5) !important;}
+.esc-btn-admin:hover{background:rgba(255,40,40,0.08) !important;}
+body.light .esc-btn-admin{color:#cc0000 !important;border-top-color:rgba(180,0,0,0.4) !important;}
+
+#admin-panel{
+  position:absolute;inset:0;z-index:10;
+  background:rgba(0,0,0,0.75);backdrop-filter:blur(4px);
+  display:flex;align-items:center;justify-content:center;
+}
+#admin-panel-box{
+  width:520px;max-height:85vh;overflow-y:auto;
+  background:#08050f;
+  border:1px solid rgba(255,60,60,0.4);
+  border-top:3px solid #ff3c3c;
+  box-shadow:0 0 60px rgba(255,40,40,0.15);
+}
+#admin-panel-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 20px;border-bottom:1px solid rgba(255,60,60,0.15);
+  position:sticky;top:0;background:#08050f;z-index:1;
+}
+#admin-panel-title{font-size:12px;letter-spacing:3px;color:rgba(255,100,100,0.9);}
+#btn-admin-panel-close{
+  background:none;border:1px solid rgba(255,60,60,0.3);
+  color:rgba(255,80,80,0.65);font:10px 'Courier New';letter-spacing:1px;
+  padding:5px 12px;cursor:pointer;
+}
+#btn-admin-panel-close:hover{border-color:#ff5555;color:#ff5555;}
+#admin-panel-body{padding:16px 20px 24px;display:flex;flex-direction:column;gap:4px;}
+
+.adm-toggle-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 0;border-bottom:1px solid rgba(255,60,60,0.07);gap:16px;
+}
+.adm-toggle-row:last-of-type{border-bottom:none;}
+.adm-toggle-info{display:flex;flex-direction:column;gap:4px;flex:1;}
+.adm-toggle-name{font:bold 11px 'Courier New';letter-spacing:1px;color:#e0e0e0;}
+.adm-toggle-desc{font:10px 'Courier New';color:rgba(200,200,200,0.38);letter-spacing:.5px;}
+
+/* Toggle switch */
+.adm-switch{position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0;}
+.adm-switch input{opacity:0;width:0;height:0;}
+.adm-slider{
+  position:absolute;inset:0;cursor:pointer;
+  background:rgba(255,255,255,0.1);border:1px solid rgba(255,60,60,0.25);
+  border-radius:12px;transition:.25s;
+}
+.adm-slider:before{
+  content:'';position:absolute;
+  width:16px;height:16px;left:3px;top:3px;
+  background:rgba(255,255,255,0.35);border-radius:50%;transition:.25s;
+}
+.adm-switch input:checked+.adm-slider{background:rgba(255,50,50,0.35);border-color:rgba(255,60,60,0.7);}
+.adm-switch input:checked+.adm-slider:before{transform:translateX(20px);background:#ff5555;box-shadow:0 0 6px rgba(255,60,60,0.8);}
+
+.adm-actions{
+  display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;
+  padding-top:16px;border-top:1px solid rgba(255,60,60,0.12);
+}
+.adm-action-btn{
+  flex:1;min-width:120px;padding:9px 12px;
+  background:rgba(255,40,40,0.07);border:1px solid rgba(255,60,60,0.28);
+  color:rgba(255,120,120,0.85);font:10px 'Courier New';letter-spacing:1px;
+  cursor:pointer;transition:all .18s;
+}
+.adm-action-btn:hover{background:rgba(255,40,40,0.18);border-color:#ff5555;color:#fff;}
+
+/* light mode admin panel */
+body.light #admin-panel{background:rgba(0,0,0,0.55);}
+body.light #admin-panel-box{background:#fff5f5;border-color:rgba(180,0,0,0.3);border-top-color:#cc0000;box-shadow:0 4px 40px rgba(180,0,0,0.12);}
+body.light #admin-panel-header{background:#fff5f5;border-color:rgba(180,0,0,0.12);}
+body.light #admin-panel-title{color:#cc0000;}
+body.light #btn-admin-panel-close{border-color:rgba(180,0,0,0.25);color:#cc0000;}
+body.light .adm-toggle-name{color:#111;}
+body.light .adm-toggle-desc{color:rgba(0,0,0,0.4);}
+body.light .adm-toggle-row{border-color:rgba(180,0,0,0.07);}
+body.light .adm-slider{background:rgba(0,0,0,0.06);border-color:rgba(180,0,0,0.2);}
+body.light .adm-slider:before{background:rgba(0,0,0,0.25);}
+body.light .adm-switch input:checked+.adm-slider{background:rgba(180,0,0,0.15);border-color:#cc0000;}
+body.light .adm-switch input:checked+.adm-slider:before{background:#cc0000;box-shadow:0 0 6px rgba(180,0,0,0.5);}
+body.light .adm-action-btn{background:rgba(180,0,0,0.06);border-color:rgba(180,0,0,0.25);color:#cc0000;}
+body.light .adm-action-btn:hover{background:rgba(180,0,0,0.14);border-color:#cc0000;color:#000;}
+
 /* ===== ADMIN HUD BADGE ===== */
 #admin-hud-badge{
   position:fixed;top:12px;left:50%;transform:translateX(-50%);
