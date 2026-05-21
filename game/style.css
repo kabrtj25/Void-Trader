@@ -191,6 +191,105 @@ body.light #minimap-label{color:rgba(0,0,0,0.4);}
 body.light #btn-theme{background:rgba(255,255,255,0.6);border-color:rgba(0,0,0,0.25);color:#111111;}
 body.light #btn-theme:hover{background:rgba(0,0,0,0.06);border-color:#000;color:#000;}
 
+/* ===== ADMIN HUD BADGE ===== */
+#admin-hud-badge{
+  position:fixed;top:12px;left:50%;transform:translateX(-50%);
+  background:rgba(180,0,0,0.85);
+  color:#fff;
+  font:bold 9px 'Courier New';letter-spacing:2px;
+  padding:5px 16px;z-index:300;
+  border:1px solid rgba(255,80,80,0.6);
+  box-shadow:0 0 20px rgba(255,0,0,0.35);
+  pointer-events:none;
+  animation:admin-pulse 2s ease-in-out infinite;
+}
+@keyframes admin-pulse{
+  0%,100%{box-shadow:0 0 14px rgba(255,0,0,0.3);}
+  50%{box-shadow:0 0 28px rgba(255,0,0,0.7);}
+}
+
+/* ===== ADMIN BTN ===== */
+#btn-admin{
+  font-size:9px;letter-spacing:2px;
+  color:rgba(255,60,60,0.55);border-color:rgba(255,60,60,0.2);
+}
+#btn-admin:hover{color:rgba(255,80,80,0.9);border-color:rgba(255,80,80,0.5);background:rgba(255,40,40,0.06);}
+body.light #btn-admin{color:rgba(180,0,0,0.6);border-color:rgba(180,0,0,0.2);}
+body.light #btn-admin:hover{color:#aa0000;border-color:rgba(180,0,0,0.5);background:rgba(180,0,0,0.05);}
+
+/* ===== ADMIN OVERLAY ===== */
+#admin-overlay{
+  position:fixed;inset:0;z-index:600;
+  background:rgba(0,0,0,0.85);backdrop-filter:blur(6px);
+  display:flex;align-items:center;justify-content:center;
+}
+#admin-box{
+  width:380px;
+  background:#060a12;
+  border:1px solid rgba(255,60,60,0.35);
+  border-top:3px solid #ff3c3c;
+  box-shadow:0 0 80px rgba(255,40,40,0.12),0 0 20px rgba(0,0,0,0.8);
+}
+#admin-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 20px;border-bottom:1px solid rgba(255,60,60,0.15);
+}
+#admin-title{font-size:11px;letter-spacing:3px;color:rgba(255,80,80,0.85);}
+#btn-admin-close{
+  background:none;border:none;color:rgba(255,80,80,0.5);
+  font-size:14px;cursor:pointer;padding:2px 6px;
+}
+#btn-admin-close:hover{color:#ff5555;}
+#admin-body{
+  padding:28px 28px 24px;
+  display:flex;flex-direction:column;align-items:center;gap:16px;
+}
+#admin-icon{font-size:38px;filter:drop-shadow(0 0 12px rgba(255,60,60,0.5));}
+#admin-desc{
+  font:11px 'Courier New';color:rgba(200,200,200,0.45);
+  letter-spacing:1px;text-align:center;line-height:1.6;
+}
+.admin-field{display:flex;flex-direction:column;gap:5px;width:100%;}
+.admin-label{font:9px 'Courier New';letter-spacing:3px;color:rgba(255,80,80,0.5);}
+.admin-input{
+  background:rgba(255,255,255,0.04);
+  border:1px solid rgba(255,60,60,0.25);
+  color:#e0e0e0;
+  font:13px 'Courier New';
+  padding:9px 12px;
+  outline:none;
+  width:100%;
+  transition:border-color .2s;
+}
+.admin-input:focus{border-color:rgba(255,80,80,0.6);background:rgba(255,255,255,0.06);}
+.admin-input::placeholder{color:rgba(255,255,255,0.18);}
+#admin-error{
+  font:10px 'Courier New';color:#ff5555;
+  letter-spacing:1px;min-height:16px;text-align:center;
+}
+.admin-submit{
+  width:100%;padding:11px;
+  background:rgba(255,40,40,0.12);
+  border:1px solid rgba(255,60,60,0.4);
+  color:rgba(255,100,100,0.9);
+  font:11px 'Courier New';letter-spacing:3px;
+  cursor:pointer;transition:all .2s;margin-top:4px;
+}
+.admin-submit:hover{background:rgba(255,40,40,0.22);border-color:#ff5555;color:#fff;}
+/* light mode */
+body.light #admin-overlay{background:rgba(0,0,0,0.7);}
+body.light #admin-box{background:#fff0f0;border-color:rgba(180,0,0,0.3);border-top-color:#cc0000;box-shadow:0 4px 40px rgba(180,0,0,0.15);}
+body.light #admin-title{color:#cc0000;}
+body.light #btn-admin-close{color:rgba(180,0,0,0.5);}
+body.light #btn-admin-close:hover{color:#cc0000;}
+body.light #admin-desc{color:rgba(0,0,0,0.45);}
+body.light .admin-label{color:rgba(180,0,0,0.55);}
+body.light .admin-input{background:#fff;border-color:rgba(180,0,0,0.2);color:#111;}
+body.light .admin-input:focus{border-color:rgba(180,0,0,0.5);}
+body.light #admin-error{color:#cc0000;}
+body.light .admin-submit{background:rgba(180,0,0,0.08);border-color:rgba(180,0,0,0.3);color:#cc0000;}
+body.light .admin-submit:hover{background:rgba(180,0,0,0.15);border-color:#cc0000;color:#000;}
+
 :root{
   --orange:#ff9500;
   --orange-dim:rgba(255,149,0,0.6);

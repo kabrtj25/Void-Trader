@@ -5,6 +5,52 @@ let gameState = null;  // hráč, entity, nav, atd.
 let state = 'menu';    // 'menu' | 'playing' | 'docked' | 'map' | 'galaxy' | 'warping'
 let canvas, W2, H2;    // W,H jsou v render.js
 
+// Admin mode
+window.adminMode = false;
+
+function openAdminLogin(){
+  document.getElementById('admin-overlay').style.display='flex';
+  document.getElementById('admin-user').value='';
+  document.getElementById('admin-pass').value='';
+  document.getElementById('admin-error').textContent='';
+  setTimeout(()=>document.getElementById('admin-user').focus(),80);
+}
+function closeAdminLogin(){
+  document.getElementById('admin-overlay').style.display='none';
+}
+function submitAdminLogin(){
+  const u=document.getElementById('admin-user').value.trim();
+  const p=document.getElementById('admin-pass').value;
+  const err=document.getElementById('admin-error');
+  if(u==='admin'&&p==='admin1234'){
+    closeAdminLogin();
+    window.adminMode=true;
+    _startAdminGame();
+  } else {
+    err.textContent='⚠ Nesprávné přihlašovací údaje.';
+    document.getElementById('admin-pass').value='';
+    document.getElementById('admin-pass').focus();
+  }
+}
+function _startAdminGame(){
+  activeSlot=-1;
+  startGame(false);
+  setTimeout(()=>{
+    if(!gameState) return;
+    const p=gameState.player;
+    p.credits=999999999;
+    p.hull=p.hullMax;
+    p.shield=p.shieldMax;
+    p.fuel=p.fuelMax;
+    p.level=20;p.xp=0;
+    // Všechny upgrady na max
+    ['weapons','engines','shields','cargo','hull'].forEach(k=>{ p.upgrades[k]=10; });
+    gameState.totalEarned=0;
+    document.getElementById('admin-hud-badge').style.display='block';
+    setMsg('⚙ ADMIN REŽIM AKTIVNÍ — neomezené zdroje · nezničitelný · max level · max upgrady',8000);
+  },400);
+}
+
 // Light / Dark mode
 window.lightMode = localStorage.getItem('st_theme') === 'light';
 (function applyTheme(){
@@ -1047,8 +1093,18 @@ function update(dt){
     if(window.warpTarget&&warpElapsed>=window.warpTarget.warpSecs){completeWarp();return;}
   }
 
-  // Idle fuel
-  consumeFuel(p,C.FUEL_IDLE);
+  // Admin mode — neomezené zdroje každý tick
+  if(window.adminMode){
+    p.fuel=p.fuelMax;
+    p.hull=p.hullMax;
+    p.shield=p.shieldMax;
+    p.credits=Math.max(p.credits,999999999);
+    p.invTimer=0.5; // nezničitelný
+    p.dead=false;
+  } else {
+    // Idle fuel
+    consumeFuel(p,C.FUEL_IDLE);
+  }
 
   // Invincibility
   if(p.invTimer>0)p.invTimer=Math.max(0,p.invTimer-dt);
@@ -1304,7 +1360,8 @@ function _goLobby(){
   document.getElementById('hud').style.display='none';
   document.getElementById('dock-panel').style.display='none';
   document.getElementById('menu').style.display='flex';
-  state='menu';gameState=null;activeSlot=-1;
+  state='menu';gameState=null;activeSlot=-1;window.adminMode=false;
+  document.getElementById('admin-hud-badge').style.display='none';
   initMenuStars();
 }
 
@@ -1898,6 +1955,15 @@ window.addEventListener('load',()=>{
 
   // Menu tlačítka
   document.getElementById('btn-play').onclick=()=>openSlotScreen();
+  document.getElementById('btn-admin').onclick=()=>openAdminLogin();
+  document.getElementById('btn-admin-close').onclick=()=>closeAdminLogin();
+  document.getElementById('btn-admin-login').onclick=()=>submitAdminLogin();
+  document.getElementById('admin-pass').addEventListener('keydown',e=>{
+    if(e.key==='Enter') submitAdminLogin();
+  });
+  document.getElementById('admin-user').addEventListener('keydown',e=>{
+    if(e.key==='Enter') document.getElementById('admin-pass').focus();
+  });
   const themeBtn=document.getElementById('btn-theme');
   if(themeBtn) themeBtn.onclick=()=>toggleTheme();
   document.getElementById('btn-slots-back').onclick=()=>closeSlotScreen();

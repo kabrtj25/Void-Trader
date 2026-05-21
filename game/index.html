@@ -26,9 +26,34 @@
     <div id="menu-buttons">
       <button class="menu-btn primary" id="btn-play">▶ HRÁT</button>
       <button class="menu-btn" id="btn-help">? NÁPOVĚDA</button>
+      <button class="menu-btn" id="btn-admin">⚙ ADMIN</button>
     </div>
     <div id="menu-footer">SPACE TRADER © 2025 — Nekonečný vesmír</div>
     <button id="btn-theme" title="Přepnout světlý / tmavý režim"><span id="theme-icon">☀</span> <span id="theme-label">LIGHT MODE</span></button>
+  </div>
+</div>
+
+<!-- ADMIN LOGIN -->
+<div id="admin-overlay" style="display:none">
+  <div id="admin-box">
+    <div id="admin-header">
+      <span id="admin-title">⚙ ADMINISTRÁTORSKÝ PŘÍSTUP</span>
+      <button id="btn-admin-close">✕</button>
+    </div>
+    <div id="admin-body">
+      <div id="admin-icon">🔐</div>
+      <div id="admin-desc">Zadejte přihlašovací údaje pro přístup do admin režimu.</div>
+      <div class="admin-field">
+        <label class="admin-label">UŽIVATEL</label>
+        <input type="text" id="admin-user" class="admin-input" placeholder="username" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="admin-field">
+        <label class="admin-label">HESLO</label>
+        <input type="password" id="admin-pass" class="admin-input" placeholder="••••••••">
+      </div>
+      <div id="admin-error"></div>
+      <button id="btn-admin-login" class="admin-submit">PŘIHLÁSIT SE</button>
+    </div>
   </div>
 </div>
 
@@ -93,6 +118,7 @@
 
 <!-- HUD (zobrazí se při hře) -->
 <div id="hud" style="display:none">
+  <div id="admin-hud-badge" style="display:none">⚙ ADMIN REŽIM · ∞ PALIVO · ∞ PENÍZE · NEZNIČITELNÝ</div>
   <!-- Minimapa -->
   <div id="minimap-wrap">
     <canvas id="mm" width="180" height="180"></canvas>
