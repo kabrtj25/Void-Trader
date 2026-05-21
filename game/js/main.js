@@ -16,6 +16,10 @@ let parkingMode = false;
 Object.defineProperty(window,'parkingMode',{get:()=>parkingMode});
 let interiorData = null;
 
+// ---- Systém uložených her (Farming Simulator styl) ----
+const SLOT_KEYS = ['st_save_s1','st_save_s2','st_save_s3','st_save_s4'];
+let activeSlot = -1;
+
 // ===== Systém klávesových zkratek =====
 const DEFAULT_BINDINGS = {
   thrust:  'KeyW',
@@ -167,6 +171,7 @@ function startGame(fromSave=false){
     nearStation:null, dockStation:null,
     dockingState:{approaching:false,align:0,speed:0},
     totalEarned:save?.totalEarned||0,
+    playTime:save?.playTime||0,
     t:0
   };
   window.gameState=gameState;
@@ -1219,7 +1224,8 @@ function update(dt){
     });
   }
 
-  // Autosave každých 30s
+  // Čas hry + autosave každých 30s
+  gs.playTime=(gs.playTime||0)+dt;
   gs._saveTimer=(gs._saveTimer||0)+dt;
   if(gs._saveTimer>30){gs._saveTimer=0;saveGame();}
 }
@@ -1246,18 +1252,263 @@ function showDeath(){
   document.getElementById('death-screen').style.display='flex';
 }
 
-// ---- Save / Load ----
+// ---- Save / Load (slot systém) ----
+function getSaveData(i){try{const r=localStorage.getItem(SLOT_KEYS[i]);return r?JSON.parse(r):null;}catch(e){return null;}}
+
 function saveGame(){
-  if(!gameState||gameState.player.dead)return;
+  if(!gameState||gameState.player.dead||activeSlot<0)return;
   const p=gameState.player;
-  const data={x:p.x,y:p.y,angle:p.angle,hull:p.hull,shield:p.shield,fuel:p.fuel,
+  const data={
+    x:p.x,y:p.y,angle:p.angle,
+    hull:p.hull,hullMax:p.hullMax,
+    shield:p.shield,shieldMax:p.shieldMax,
+    fuel:p.fuel,fuelMax:p.fuelMax,
     fuelReserve:p.fuelReserve,
     credits:p.credits,cargo:p.cargo,cargoCount:p.cargoCount,upgrades:p.upgrades,
-    xp:p.xp,level:p.level,totalEarned:gameState.totalEarned};
-  try{localStorage.setItem(C.SAVE_KEY,JSON.stringify(data));}catch(e){}
+    xp:p.xp,level:p.level,totalEarned:gameState.totalEarned,
+    galaxyId:window.currentGalaxy||'sol',
+    playTime:gameState.playTime||0,
+    savedAt:Date.now()
+  };
+  try{localStorage.setItem(SLOT_KEYS[activeSlot],JSON.stringify(data));}catch(e){}
 }
-function loadSave(){try{const r=localStorage.getItem(C.SAVE_KEY);return r?JSON.parse(r):null;}catch(e){return null;}}
-function hasSave(){return!!localStorage.getItem(C.SAVE_KEY);}
+function loadSave(){return activeSlot>=0?getSaveData(activeSlot):null;}
+function hasSave(){return SLOT_KEYS.some(k=>!!localStorage.getItem(k));}
+
+// ---- Slot screen ----
+function openSlotScreen(){
+  renderSlotCards();
+  document.getElementById('slots-overlay').style.display='flex';
+}
+function closeSlotScreen(){
+  document.getElementById('slots-overlay').style.display='none';
+}
+
+function renderSlotCards(){
+  const grid=document.getElementById('slots-grid');
+  if(!grid)return;
+  grid.innerHTML='';
+  SLOT_KEYS.forEach((key,i)=>{
+    const data=getSaveData(i);
+    const card=document.createElement('div');
+    card.className='slot-card '+(data?'filled':'empty');
+    if(data){
+      const gal=GALAXIES.find(g=>g.id===(data.galaxyId||'sol'));
+      const galName=gal?gal.name:'Sluneční soustava';
+      const galColor=gal?gal.color:'#ffee88';
+      const hullPct=Math.round((data.hull/(data.hullMax||100))*100);
+      const shieldPct=Math.round((data.shield/(data.shieldMax||100))*100);
+      const pt=data.playTime||0;
+      const playH=Math.floor(pt/3600);
+      const playM=Math.floor((pt%3600)/60);
+      const savedStr=data.savedAt?new Date(data.savedAt).toLocaleDateString('cs-CZ',{day:'2-digit',month:'2-digit',year:'numeric'}):'—';
+      const creds=(data.credits||0).toLocaleString('cs-CZ');
+      card.innerHTML=`
+        <div class="sc-slot-num">PILOT ${i+1}</div>
+        <div class="sc-inner">
+          <div class="sc-head-row">
+            <div class="sc-level">LVL ${data.level||1}</div>
+            <div class="sc-credits">${creds} Cr</div>
+          </div>
+          <div class="sc-galaxy-name" style="color:${galColor}">${galName}</div>
+          <div class="sc-stats-row">
+            <span class="sc-stat">⏱ ${playH}h ${String(playM).padStart(2,'0')}m</span>
+            <span class="sc-stat">📅 ${savedStr}</span>
+          </div>
+          <div class="sc-bars">
+            <div class="sc-bar-row">
+              <span class="sc-bar-label">TRUP</span>
+              <div class="sc-bar-track"><div class="sc-bar-fill hull" style="width:${hullPct}%"></div></div>
+              <span class="sc-bar-val">${hullPct}%</span>
+            </div>
+            <div class="sc-bar-row">
+              <span class="sc-bar-label">ŠTÍT</span>
+              <div class="sc-bar-track"><div class="sc-bar-fill shield" style="width:${shieldPct}%"></div></div>
+              <span class="sc-bar-val">${shieldPct}%</span>
+            </div>
+          </div>
+        </div>
+        <div class="sc-actions">
+          <button class="sc-btn sc-btn-load" onclick="startSlot(${i})">▶ POKRAČOVAT</button>
+          <button class="sc-btn sc-btn-delete" onclick="deleteSlot(${i})">✕ SMAZAT</button>
+        </div>`;
+    }else{
+      card.innerHTML=`
+        <div class="sc-slot-num">PILOT ${i+1}</div>
+        <div class="sc-empty-inner">
+          <div class="sc-empty-icon">+</div>
+          <div class="sc-empty-text">PRÁZDNÝ SLOT</div>
+          <div class="sc-empty-sub">Žádná uložená hra</div>
+        </div>
+        <div class="sc-actions">
+          <button class="sc-btn sc-btn-new" onclick="startSlot(${i})">▶ NOVÁ HRA</button>
+        </div>`;
+    }
+    grid.appendChild(card);
+  });
+}
+
+function startSlot(i){
+  activeSlot=i;
+  closeSlotScreen();
+  const isNew=!getSaveData(i);
+  showLoadingScreen(i,isNew,()=>startGame(!isNew));
+}
+
+function deleteSlot(i){
+  if(!confirm(`Opravdu smazat Pilota ${i+1}? Tato akce je nevratná.`))return;
+  try{localStorage.removeItem(SLOT_KEYS[i]);}catch(e){}
+  renderSlotCards();
+}
+
+// ---- Načítací obrazovka ----
+const LOADING_TIPS=[
+  'Drž W pro zrychlení. Ve vesmíru neexistuje tření — musíš sám zastavit.',
+  'Boost (Shift+W) je výkonný, ale rychle spotřebovává palivo. Šetři ho.',
+  'Kupuj zboží levně a prodávej ho draze na jiných stanicích — to je základ obchodu.',
+  'Velké Coriolis stanice mají obří hangár — musíš zaparkovat ručně na vyhrazené molo.',
+  'Nabourat do stanice bez správného zarovnání způsobí katastrofický výbuch. Pozor na úhel.',
+  'Klávesa P aktivuje parkovací režim — loď lépe manévruje a rychleji brzdí.',
+  'Na mapě (M) klikni na stanici pro nastavení navigační šipky na obrazovce.',
+  'Warp pohon (R) tě přenese do jiné galaxie, ale vyžaduje hodně paliva a čas na nabití.',
+  'Upgrade nákladového prostoru ti umožní přepravovat více zboží najednou.',
+  'Nepřátelé jsou nebezpečnější ve vnějších sektorech daleko od středu galaxie.',
+  'Štít se sám regeneruje po chvíli bez zásahu. Trup musíš opravit na stanici.',
+  'Klávesy Q a E aktivují boční trysky — pohyb do stran bez otočení lodi.',
+  'Každá stanice má jiné ceny zboží — sleduj rozdíly a vydělávej na arbitráži.',
+  'Za zničeného nepřítele dostaneš kredity i zkušenostní body. Boj se vyplatí.',
+];
+
+let _loadingStarAnim=null;
+let _loadingTipTimer=null;
+
+function showLoadingScreen(slotIndex,isNew,onDone){
+  const overlay=document.getElementById('loading-overlay');
+  overlay.style.display='flex';
+  overlay.style.opacity='1';
+  overlay.style.transition='';
+
+  // Pilot info
+  document.getElementById('loading-mode-badge').textContent=isNew?'NOVÁ HRA':'NAČÍTÁNÍ PILOTA';
+  document.getElementById('loading-pilot-num').textContent=`PILOT ${slotIndex+1}`;
+
+  let galColor='#ffee88';
+  if(!isNew){
+    const data=getSaveData(slotIndex);
+    if(data){
+      const gal=GALAXIES.find(g=>g.id===(data.galaxyId||'sol'));
+      if(gal){
+        document.getElementById('loading-galaxy-disp').textContent=gal.name;
+        galColor=gal.color;
+      } else {
+        document.getElementById('loading-galaxy-disp').textContent='Sluneční soustava';
+      }
+    } else {
+      document.getElementById('loading-galaxy-disp').textContent='Sluneční soustava';
+    }
+  } else {
+    document.getElementById('loading-galaxy-disp').textContent='Sluneční soustava';
+  }
+
+  // Tint planet glow to galaxy color
+  const gl=document.getElementById('loading-planet-glow');
+  if(gl) gl.style.boxShadow=`0 0 90px 50px ${galColor}22, 0 0 200px 100px ${galColor}11`;
+
+  // Stars canvas
+  _startLoadingStars();
+
+  // Tips rotation
+  _showNextTip();
+  if(_loadingTipTimer)clearInterval(_loadingTipTimer);
+  _loadingTipTimer=setInterval(_showNextTip,4200);
+
+  // Reset bar
+  _setLoadingPct('Inicializace...',0);
+
+  const STEPS=[
+    {label:'Inicializace vesmíru...',        pct:9,  ms:290},
+    {label:'Generování hvězdné soustavy...', pct:24, ms:440},
+    {label:'Mapování okolního prostoru...',  pct:41, ms:360},
+    {label:'Načítání dat stanic...',         pct:57, ms:310},
+    {label:'Spouštění nepřátel...',          pct:70, ms:270},
+    {label:'Kalibrování navigace...',        pct:83, ms:320},
+    {label:'Synchronizace senzorů...',       pct:95, ms:260},
+    {label:'Připraveno!',                    pct:100,ms:520},
+  ];
+
+  let si=0;
+  function runStep(){
+    if(si>=STEPS.length){
+      clearInterval(_loadingTipTimer);
+      onDone();
+      setTimeout(()=>{
+        overlay.style.transition='opacity .5s ease';
+        overlay.style.opacity='0';
+        setTimeout(()=>{
+          overlay.style.display='none';
+          overlay.style.opacity='1';
+          overlay.style.transition='';
+          _stopLoadingStars();
+        },500);
+      },180);
+      return;
+    }
+    const s=STEPS[si++];
+    _setLoadingPct(s.label,s.pct);
+    setTimeout(runStep,s.ms);
+  }
+  setTimeout(runStep,100);
+}
+
+function _setLoadingPct(label,pct){
+  const fill=document.getElementById('loading-bar-fill');
+  const status=document.getElementById('loading-status-text');
+  const pctEl=document.getElementById('loading-pct-text');
+  if(fill)fill.style.width=pct+'%';
+  if(status)status.textContent=label;
+  if(pctEl)pctEl.textContent=pct+' %';
+}
+
+function _showNextTip(){
+  const el=document.getElementById('loading-tip-text');
+  if(!el)return;
+  el.style.opacity='0';
+  setTimeout(()=>{
+    el.textContent=LOADING_TIPS[Math.floor(Math.random()*LOADING_TIPS.length)];
+    el.style.opacity='1';
+  },340);
+}
+
+function _startLoadingStars(){
+  const mc=document.getElementById('loading-stars-canvas');
+  if(!mc)return;
+  mc.width=window.innerWidth;mc.height=window.innerHeight;
+  const mx=mc.getContext('2d');
+  const stars=Array.from({length:280},()=>({
+    x:Math.random()*mc.width, y:Math.random()*mc.height,
+    r:Math.random()*1.5+0.2, bright:0.15+Math.random()*0.85,
+    tw:Math.random()*Math.PI*2, spd:0.3+Math.random()*1.4
+  }));
+  let running=true;
+  _loadingStarAnim={stop:()=>{running=false;}};
+  (function drawFrame(ts){
+    if(!running)return;
+    requestAnimationFrame(drawFrame);
+    mx.clearRect(0,0,mc.width,mc.height);
+    const t=ts/1000;
+    stars.forEach(s=>{
+      const a=s.bright*(0.55+Math.sin(t*s.spd+s.tw)*0.45);
+      mx.globalAlpha=a;
+      mx.fillStyle='#ddeeff';
+      mx.beginPath();mx.arc(s.x,s.y,s.r,0,Math.PI*2);mx.fill();
+    });
+    mx.globalAlpha=1;
+  })(0);
+}
+
+function _stopLoadingStars(){
+  if(_loadingStarAnim){_loadingStarAnim.stop();_loadingStarAnim=null;}
+}
 
 // ---- Hlavní smyčka ----
 function loop(ts){
@@ -1544,12 +1795,12 @@ window.addEventListener('load',()=>{
   initMenuStars();
 
   // Menu tlačítka
-  document.getElementById('btn-new').onclick=()=>startGame(false);
-  document.getElementById('btn-load').onclick=()=>{if(hasSave())startGame(true);else setMsg('Žádná uložená hra',2000);};
+  document.getElementById('btn-play').onclick=()=>openSlotScreen();
+  document.getElementById('btn-slots-back').onclick=()=>closeSlotScreen();
   document.getElementById('btn-help').onclick=()=>openHelp();
   document.getElementById('btn-help-close').onclick=()=>closeHelp();
-  document.getElementById('btn-restart').onclick=()=>{document.getElementById('death-screen').style.display='none';startGame(false);};
-  document.getElementById('btn-menu').onclick=()=>{document.getElementById('death-screen').style.display='none';document.getElementById('menu').style.display='flex';document.getElementById('hud').style.display='none';state='menu';gameState=null;initMenuStars();};
+  document.getElementById('btn-restart').onclick=()=>{document.getElementById('death-screen').style.display='none';if(activeSlot>=0)showLoadingScreen(activeSlot,true,()=>startGame(false));else openSlotScreen();};
+  document.getElementById('btn-menu').onclick=()=>{document.getElementById('death-screen').style.display='none';document.getElementById('slots-overlay').style.display='none';document.getElementById('menu').style.display='flex';document.getElementById('hud').style.display='none';state='menu';gameState=null;activeSlot=-1;initMenuStars();};
   document.getElementById('btn-close-map').onclick=()=>closeMap();
   document.getElementById('btn-close-galaxy').onclick=()=>closeGalaxyMap();
   document.getElementById('btn-cancel-warp').onclick=()=>cancelWarp();
@@ -1584,14 +1835,12 @@ window.addEventListener('load',()=>{
     document.getElementById('hud').style.display='none';
     document.getElementById('dock-panel').style.display='none';
     document.getElementById('menu').style.display='flex';
-    state='menu';gameState=null;initMenuStars();
+    state='menu';gameState=null;activeSlot=-1;initMenuStars();
   };
 
   // Save button
   const sbtn=document.getElementById('btn-save');if(sbtn)sbtn.onclick=()=>{saveGame();setMsg('Hra uložena!',2000);};
 
-  // Load button na menu
-  document.getElementById('btn-load').style.opacity=hasSave()?'1':'0.4';
 
   requestAnimationFrame(loop);
 });

@@ -8,6 +8,9 @@
 </head>
 <body>
 
+<!-- INTRO CINEMATIC -->
+<canvas id="intro-canvas" style="position:fixed;inset:0;width:100%;height:100%;z-index:500;background:#000;display:block;"></canvas>
+
 <!-- HLAVNÍ CANVAS -->
 <canvas id="c"></canvas>
 
@@ -21,11 +24,69 @@
     </div>
     <div id="menu-sub">Elite vesmírný obchod a průzkum · v1.0</div>
     <div id="menu-buttons">
-      <button class="menu-btn primary" id="btn-new">▶ NOVÁ HRA</button>
-      <button class="menu-btn" id="btn-load">↺ POKRAČOVAT</button>
+      <button class="menu-btn primary" id="btn-play">▶ HRÁT</button>
       <button class="menu-btn" id="btn-help">? NÁPOVĚDA</button>
     </div>
     <div id="menu-footer">SPACE TRADER © 2025 — Nekonečný vesmír</div>
+  </div>
+</div>
+
+<!-- SLOT VÝBĚR (Farming Simulator styl) -->
+<div id="slots-overlay" style="display:none">
+  <div id="slots-box">
+    <div id="slots-header">
+      <div id="slots-header-left">
+        <div id="slots-title">// VÝBĚR PILOTA</div>
+        <div id="slots-subtitle">Vyberte slot pro načtení nebo vytvoření nové hry</div>
+      </div>
+      <button id="btn-slots-back">← ZPĚT DO MENU</button>
+    </div>
+    <div id="slots-grid"></div>
+    <div id="slots-footer">
+      <span id="slots-hint">◈ Každý pilot má vlastní uloženou hru — postup, loď, kredity</span>
+    </div>
+  </div>
+</div>
+
+<!-- NAČÍTÁNÍ (Farming Simulator styl) -->
+<div id="loading-overlay" style="display:none">
+  <canvas id="loading-stars-canvas"></canvas>
+  <div id="loading-nebula"></div>
+
+  <!-- Planet scene -->
+  <div id="loading-planet-scene">
+    <div id="loading-planet-glow"></div>
+    <div id="loading-planet-body"></div>
+    <div id="loading-moon"></div>
+  </div>
+
+  <!-- Info panel – upper left -->
+  <div id="loading-info-panel">
+    <div id="loading-logo">
+      <span class="ll-space">SPACE</span>
+      <span class="ll-trader">TRADER</span>
+    </div>
+    <div id="loading-divider"></div>
+    <div id="loading-pilot-block">
+      <div id="loading-mode-badge">NOVÁ HRA</div>
+      <div id="loading-pilot-num">PILOT 1</div>
+      <div id="loading-galaxy-disp">Sluneční soustava</div>
+    </div>
+  </div>
+
+  <!-- Bottom bar – FS style -->
+  <div id="loading-bottom-bar">
+    <div id="loading-tip-row">
+      <span id="loading-tip-badge">TIP</span>
+      <span id="loading-tip-text">Načítání tipů...</span>
+    </div>
+    <div id="loading-progress-row">
+      <span id="loading-status-text">Inicializace...</span>
+      <div id="loading-bar-track">
+        <div id="loading-bar-fill"></div>
+      </div>
+      <span id="loading-pct-text">0 %</span>
+    </div>
   </div>
 </div>
 
@@ -405,6 +466,7 @@
   </div>
 </div>
 
+<script src="js/intro.js"></script>
 <script src="js/config.js"></script>
 <script src="js/world.js"></script>
 <script src="js/render.js"></script>

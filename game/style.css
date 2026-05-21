@@ -740,3 +740,353 @@ canvas{display:block;}
 #parking-status{
   font-size:11px;color:rgba(0,200,200,0.38);letter-spacing:3px;
 }
+
+/* ========== SLOT VÝBĚR (Farming Simulator styl) ========== */
+#slots-overlay{
+  position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:110;
+  background:
+    radial-gradient(ellipse at 15% 60%,rgba(8,20,60,0.70) 0%,transparent 50%),
+    radial-gradient(ellipse at 85% 20%,rgba(35,8,65,0.55) 0%,transparent 45%),
+    radial-gradient(ellipse at center,#010c18 0%,#000204 100%);
+  animation:slots-fadein 0.22s ease;
+}
+@keyframes slots-fadein{from{opacity:0;transform:scale(0.97);}to{opacity:1;transform:scale(1);}}
+
+#slots-box{
+  display:flex;flex-direction:column;gap:24px;
+  width:min(960px,95vw);max-height:90vh;
+  padding:32px 36px;
+  background:rgba(0,4,14,0.88);
+  border:1px solid rgba(255,149,0,0.3);
+  border-top:3px solid var(--orange);
+  box-shadow:0 0 60px rgba(255,149,0,0.10),0 0 120px rgba(0,0,0,0.7),inset 0 0 40px rgba(255,149,0,0.03);
+}
+
+#slots-header{
+  display:flex;align-items:flex-end;justify-content:space-between;
+  border-bottom:1px solid rgba(255,149,0,0.15);
+  padding-bottom:18px;
+}
+#slots-header-left{display:flex;flex-direction:column;gap:5px;}
+#slots-title{
+  font-size:20px;letter-spacing:5px;color:var(--orange);font-weight:bold;
+  text-shadow:0 0 22px rgba(255,149,0,0.55);
+}
+#slots-subtitle{font-size:10px;color:rgba(232,160,96,0.45);letter-spacing:2px;}
+
+#btn-slots-back{
+  background:transparent;border:1px solid rgba(255,149,0,0.25);border-left:2px solid rgba(255,149,0,0.5);
+  color:rgba(232,160,96,0.65);font-family:'Courier New',monospace;font-size:11px;letter-spacing:2px;
+  padding:8px 16px;cursor:pointer;transition:all .2s;
+}
+#btn-slots-back:hover{
+  background:rgba(255,149,0,0.08);color:var(--orange);
+  border-color:rgba(255,149,0,0.5);box-shadow:0 0 14px rgba(255,149,0,0.12);
+}
+
+#slots-grid{
+  display:grid;grid-template-columns:repeat(2,1fr);gap:16px;
+}
+
+/* ---- Karta slotu ---- */
+.slot-card{
+  display:flex;flex-direction:column;
+  border:1px solid rgba(255,149,0,0.18);
+  background:rgba(0,6,20,0.7);
+  transition:border-color .2s,box-shadow .2s,transform .15s;
+  position:relative;overflow:hidden;
+}
+.slot-card::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(255,149,0,0.025) 0%,transparent 60%);
+  pointer-events:none;
+}
+.slot-card.empty{
+  border-style:dashed;border-color:rgba(255,149,0,0.12);
+  background:rgba(0,4,14,0.45);
+}
+.slot-card.filled:hover{
+  border-color:rgba(255,149,0,0.5);
+  box-shadow:0 0 28px rgba(255,149,0,0.12),inset 0 0 18px rgba(255,149,0,0.04);
+  transform:translateY(-2px);
+}
+.slot-card.empty:hover{
+  border-color:rgba(0,212,255,0.3);
+  box-shadow:0 0 20px rgba(0,212,255,0.07);
+  transform:translateY(-2px);
+}
+
+/* Číslo slotu */
+.sc-slot-num{
+  font-size:9px;letter-spacing:4px;
+  padding:8px 14px 6px;
+  color:rgba(255,149,0,0.35);
+  border-bottom:1px solid rgba(255,149,0,0.08);
+  background:rgba(255,149,0,0.03);
+}
+.slot-card.filled .sc-slot-num{color:rgba(255,149,0,0.5);}
+
+/* Vnitřek — naplněná karta */
+.sc-inner{flex:1;padding:14px 16px;display:flex;flex-direction:column;gap:10px;}
+
+.sc-head-row{display:flex;justify-content:space-between;align-items:baseline;}
+.sc-level{
+  font-size:22px;font-weight:bold;color:var(--orange);letter-spacing:1px;
+  text-shadow:0 0 14px rgba(255,149,0,0.4);
+}
+.sc-credits{font-size:14px;color:var(--gold);letter-spacing:1px;}
+
+.sc-galaxy-name{
+  font-size:11px;letter-spacing:2px;color:var(--cyan);
+  text-shadow:0 0 10px rgba(0,212,255,0.3);
+}
+
+.sc-stats-row{display:flex;gap:16px;}
+.sc-stat{font-size:10px;color:rgba(232,160,96,0.45);letter-spacing:1px;}
+
+/* Stavové pruhy */
+.sc-bars{display:flex;flex-direction:column;gap:5px;margin-top:2px;}
+.sc-bar-row{display:flex;align-items:center;gap:8px;}
+.sc-bar-label{font-size:9px;letter-spacing:2px;color:rgba(232,160,96,0.4);width:36px;}
+.sc-bar-track{flex:1;height:4px;background:rgba(255,255,255,0.07);border-radius:2px;overflow:hidden;}
+.sc-bar-fill{height:100%;border-radius:2px;transition:width .4s;}
+.sc-bar-fill.hull{background:linear-gradient(90deg,#cc4400,#ff6600);}
+.sc-bar-fill.shield{background:linear-gradient(90deg,#0055cc,#4488ff);}
+.sc-bar-val{font-size:9px;color:rgba(232,160,96,0.35);width:28px;text-align:right;}
+
+/* Vnitřek — prázdná karta */
+.sc-empty-inner{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:24px 16px;gap:8px;
+}
+.sc-empty-icon{
+  font-size:36px;color:rgba(0,212,255,0.18);line-height:1;
+  text-shadow:0 0 20px rgba(0,212,255,0.1);
+}
+.sc-empty-text{font-size:12px;letter-spacing:3px;color:rgba(232,160,96,0.3);}
+.sc-empty-sub{font-size:10px;color:rgba(232,160,96,0.18);letter-spacing:1px;}
+
+/* Akční tlačítka */
+.sc-actions{
+  display:flex;gap:0;border-top:1px solid rgba(255,149,0,0.08);
+}
+.sc-btn{
+  flex:1;padding:10px 8px;
+  font-family:'Courier New',monospace;font-size:10px;letter-spacing:2px;
+  cursor:pointer;transition:all .18s;border:none;border-radius:0;
+  background:transparent;
+}
+.sc-btn-load{
+  color:rgba(232,160,96,0.8);border-right:1px solid rgba(255,149,0,0.1);
+}
+.sc-btn-load:hover{background:rgba(255,149,0,0.1);color:var(--orange);}
+.sc-btn-delete{
+  color:rgba(255,60,60,0.45);max-width:80px;
+}
+.sc-btn-delete:hover{background:rgba(255,30,30,0.08);color:rgba(255,80,80,0.9);}
+.sc-btn-new{
+  color:rgba(0,212,255,0.65);
+}
+.sc-btn-new:hover{background:rgba(0,212,255,0.07);color:var(--cyan);}
+
+#slots-footer{
+  text-align:center;
+  padding-top:10px;border-top:1px solid rgba(255,149,0,0.08);
+}
+#slots-hint{font-size:10px;color:rgba(255,149,0,0.25);letter-spacing:2px;}
+
+/* ========== NAČÍTACÍ OBRAZOVKA (Farming Simulator styl) ========== */
+#loading-overlay{
+  position:fixed;inset:0;
+  display:flex;flex-direction:column;
+  z-index:200;overflow:hidden;
+  background:radial-gradient(ellipse at 70% 45%,#040e28 0%,#010408 100%);
+}
+
+#loading-stars-canvas{
+  position:absolute;inset:0;width:100%;height:100%;
+  pointer-events:none;
+}
+
+#loading-nebula{
+  position:absolute;inset:0;pointer-events:none;
+  background:
+    radial-gradient(ellipse at 68% 40%,rgba(30,60,180,0.18) 0%,transparent 50%),
+    radial-gradient(ellipse at 20% 70%,rgba(90,20,140,0.14) 0%,transparent 45%),
+    radial-gradient(ellipse at 85% 75%,rgba(180,60,20,0.08) 0%,transparent 38%);
+  animation:ld-nebula-pulse 7s ease-in-out infinite;
+}
+@keyframes ld-nebula-pulse{
+  0%,100%{opacity:.75;}50%{opacity:1;}
+}
+
+/* --- Planet scene (pravá strana) --- */
+#loading-planet-scene{
+  position:absolute;
+  right:-60px;top:50%;
+  transform:translateY(-50%);
+  width:520px;height:520px;
+  display:flex;align-items:center;justify-content:center;
+  pointer-events:none;
+}
+
+#loading-planet-glow{
+  position:absolute;
+  width:360px;height:360px;border-radius:50%;
+  box-shadow:
+    0 0 90px 50px rgba(70,120,255,0.14),
+    0 0 200px 100px rgba(50,90,255,0.07);
+  animation:ld-planet-glow 4.5s ease-in-out infinite;
+}
+@keyframes ld-planet-glow{
+  0%,100%{opacity:.8;}50%{opacity:1;}
+}
+
+#loading-planet-body{
+  width:240px;height:240px;border-radius:50%;
+  background:radial-gradient(ellipse at 30% 26%,#6688ff 0%,#2244cc 28%,#0a1166 58%,#020210 100%);
+  box-shadow:
+    0 0 45px rgba(80,130,255,0.55),
+    0 0 90px rgba(60,100,255,0.22),
+    inset -28px -14px 40px rgba(0,0,25,0.78);
+  position:relative;z-index:2;
+  animation:ld-planet-drift 14s ease-in-out infinite;
+}
+@keyframes ld-planet-drift{
+  0%,100%{transform:translateY(0);}50%{transform:translateY(-14px);}
+}
+/* Atmosphere rim */
+#loading-planet-body::after{
+  content:'';position:absolute;inset:-8px;border-radius:50%;
+  box-shadow:0 0 22px 6px rgba(100,160,255,0.14);
+}
+/* Surface bands */
+#loading-planet-body::before{
+  content:'';position:absolute;inset:0;border-radius:50%;
+  background:
+    linear-gradient(175deg,rgba(255,255,255,0.05) 0%,transparent 40%),
+    radial-gradient(ellipse at 70% 60%,rgba(100,140,255,0.06) 0%,transparent 50%);
+}
+
+/* Orbiting moon */
+#loading-moon{
+  position:absolute;
+  width:22px;height:22px;border-radius:50%;
+  background:radial-gradient(ellipse at 35% 30%,#aabbcc,#5566aa,#1a1a44);
+  box-shadow:0 0 12px rgba(150,180,255,0.35);
+  z-index:3;
+  animation:ld-moon-orbit 9s linear infinite;
+}
+@keyframes ld-moon-orbit{
+  from{transform:rotate(0deg) translateX(180px) rotate(0deg);}
+  to{transform:rotate(360deg) translateX(180px) rotate(-360deg);}
+}
+
+/* --- Info panel – vlevo nahoře --- */
+#loading-info-panel{
+  position:relative;z-index:10;
+  display:flex;flex-direction:column;gap:22px;
+  padding:48px 0 0 60px;
+  flex:1;
+  max-width:480px;
+}
+
+#loading-logo{
+  display:flex;flex-direction:column;line-height:1;
+}
+.ll-space{
+  font-size:13px;letter-spacing:13px;
+  color:var(--cyan);
+  text-shadow:0 0 22px rgba(0,212,255,0.55);
+}
+.ll-trader{
+  font-size:52px;letter-spacing:9px;font-weight:bold;
+  color:var(--orange);
+  text-shadow:0 0 32px rgba(255,149,0,0.65),0 0 70px rgba(255,149,0,0.22);
+}
+
+#loading-divider{
+  width:55px;height:2px;
+  background:linear-gradient(90deg,var(--orange),transparent);
+}
+
+#loading-pilot-block{display:flex;flex-direction:column;gap:9px;}
+
+#loading-mode-badge{
+  display:inline-block;font-size:9px;letter-spacing:4px;
+  color:var(--orange);
+  border:1px solid rgba(255,149,0,0.4);
+  padding:3px 10px;width:fit-content;
+  background:rgba(255,149,0,0.05);
+}
+
+#loading-pilot-num{
+  font-size:30px;letter-spacing:4px;
+  color:var(--text-bright);
+  text-shadow:0 0 18px rgba(255,204,136,0.3);
+}
+
+#loading-galaxy-disp{
+  font-size:12px;letter-spacing:2px;
+  color:rgba(232,160,96,0.5);
+}
+
+/* --- Bottom bar (FS styl — přes celou šířku úplně dole) --- */
+#loading-bottom-bar{
+  position:absolute;bottom:0;left:0;right:0;
+  z-index:10;
+  background:rgba(0,2,8,0.82);
+  border-top:1px solid rgba(255,149,0,0.14);
+  padding:12px 44px 14px;
+  display:flex;flex-direction:column;gap:9px;
+}
+
+#loading-tip-row{
+  display:flex;align-items:center;gap:12px;
+}
+#loading-tip-badge{
+  flex-shrink:0;
+  font-size:9px;letter-spacing:3px;color:var(--orange);
+  border:1px solid rgba(255,149,0,0.45);padding:2px 8px;
+}
+#loading-tip-text{
+  font-size:11px;color:rgba(232,160,96,0.5);letter-spacing:.5px;
+  transition:opacity .35s ease;
+}
+
+#loading-progress-row{
+  display:flex;align-items:center;gap:14px;
+}
+#loading-status-text{
+  font-size:10px;letter-spacing:2px;
+  color:rgba(232,160,96,0.45);
+  min-width:260px;flex-shrink:0;
+}
+#loading-bar-track{
+  flex:1;height:5px;
+  background:rgba(255,149,0,0.07);
+  border:1px solid rgba(255,149,0,0.13);
+  overflow:hidden;position:relative;
+}
+#loading-bar-fill{
+  height:100%;width:0%;
+  background:linear-gradient(90deg,rgba(220,80,0,0.9),var(--orange),#ffcc44);
+  box-shadow:0 0 10px rgba(255,149,0,0.7),0 0 24px rgba(255,149,0,0.35);
+  transition:width .45s cubic-bezier(.25,.1,.25,1);
+  position:relative;
+}
+#loading-bar-fill::after{
+  content:'';position:absolute;top:0;right:0;bottom:0;width:50px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.45),transparent);
+  animation:ld-shimmer 1.3s ease-in-out infinite;
+}
+@keyframes ld-shimmer{
+  0%{transform:translateX(-50px);opacity:0;}
+  40%{opacity:1;}
+  100%{transform:translateX(30px);opacity:0;}
+}
+#loading-pct-text{
+  font-size:12px;color:var(--orange);letter-spacing:1px;
+  min-width:40px;text-align:right;flex-shrink:0;
+  text-shadow:0 0 10px rgba(255,149,0,0.5);
+}
