@@ -28,6 +28,7 @@
       <button class="menu-btn" id="btn-help">? NÁPOVĚDA</button>
     </div>
     <div id="menu-footer">SPACE TRADER © 2025 — Nekonečný vesmír</div>
+    <button id="btn-theme" title="Přepnout světlý / tmavý režim"><span id="theme-icon">☀</span> <span id="theme-label">LIGHT MODE</span></button>
   </div>
 </div>
 
@@ -374,13 +375,26 @@
 
 </div>
 
-<!-- SMRT -->
+<!-- SMRT — PERMADEATH -->
 <div id="death-screen" style="display:none">
   <div id="death-box">
-    <div id="death-title">LOĎ ZNIČENA</div>
-    <div id="death-sub">Vaše mise skončila</div>
-    <button class="menu-btn primary" id="btn-restart">↺ NOVÁ HRA</button>
-    <button class="menu-btn" id="btn-menu">↩ HLAVNÍ MENU</button>
+    <div id="death-skull">☠</div>
+    <div id="death-title">PILOTE MRTVÝ</div>
+    <div id="death-sub">MISE UKONČENA · PERMANENTNÍ SMRT · SLOT SMAZÁN</div>
+    <div id="death-stats">
+      <div class="ds-row"><span class="ds-label">PILOT</span><span class="ds-val" id="ds-slot">—</span></div>
+      <div class="ds-row"><span class="ds-label">ÚROVEŇ</span><span class="ds-val" id="ds-level">—</span></div>
+      <div class="ds-row"><span class="ds-label">KREDITY</span><span class="ds-val" id="ds-credits">—</span></div>
+      <div class="ds-row"><span class="ds-label">CELKEM VYDĚLANO</span><span class="ds-val" id="ds-earned">—</span></div>
+      <div class="ds-row"><span class="ds-label">ČAS MISE</span><span class="ds-val" id="ds-time">—</span></div>
+      <div class="ds-row"><span class="ds-label">POSLEDNÍ GALAXIE</span><span class="ds-val" id="ds-galaxy">—</span></div>
+      <div class="ds-row ds-score-row"><span class="ds-label">SKÓRE</span><span class="ds-val" id="ds-score">—</span></div>
+    </div>
+    <div id="death-cd-wrap">
+      <div id="death-cd-txt">Návrat do menu za <span id="death-cd-num">8</span>s</div>
+      <div id="death-cd-bg"><div id="death-cd-bar"></div></div>
+    </div>
+    <button class="menu-btn" id="btn-death-lobby" disabled>↩ DO LOBBY</button>
   </div>
 </div>
 

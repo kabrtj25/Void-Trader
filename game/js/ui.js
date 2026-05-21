@@ -297,10 +297,10 @@ function drawBigMap(){
   const cx=MW/2+mapPan.x,cy=MH/2+mapPan.y;
   const baseScale=Math.min(MW,MH)/8000*mapZoom;
   mapCtx.clearRect(0,0,MW,MH);
-  mapCtx.fillStyle='#000408';mapCtx.fillRect(0,0,MW,MH);
+  mapCtx.fillStyle=window.lightMode?'#d8e8ff':'#000408';mapCtx.fillRect(0,0,MW,MH);
   // Grid — hustota podle zoomu
   const gridSpacing=Math.max(8,Math.min(80,40*mapZoom));
-  mapCtx.strokeStyle='rgba(255,149,0,0.05)';mapCtx.lineWidth=0.5;
+  mapCtx.strokeStyle=window.lightMode?'rgba(0,40,160,0.08)':'rgba(255,149,0,0.05)';mapCtx.lineWidth=0.5;
   for(let x=0;x<MW;x+=gridSpacing){mapCtx.beginPath();mapCtx.moveTo(x,0);mapCtx.lineTo(x,MH);mapCtx.stroke();}
   for(let y=0;y<MH;y+=gridSpacing){mapCtx.beginPath();mapCtx.moveTo(0,y);mapCtx.lineTo(MW,y);mapCtx.stroke();}
 
@@ -912,13 +912,13 @@ function drawGalaxyMap(t){
   const g2=galaxyCtx;
 
   g2.clearRect(0,0,GW,GH);
-  g2.fillStyle='#00000e';g2.fillRect(0,0,GW,GH);
+  g2.fillStyle=window.lightMode?'#d0deff':'#00000e';g2.fillRect(0,0,GW,GH);
 
   // Vzdálené pozadí galaxií (dekorativní)
   const bgRng=makeRng(77331);
   for(let i=0;i<80;i++){
     const bx=bgRng()*GW,by=bgRng()*GH;
-    const br=15+bgRng()*70,ba=bgRng()*0.06+0.01;
+    const br=15+bgRng()*70,ba=(bgRng()*0.06+0.01)*(window.lightMode?0.4:1);
     const bAngle=bgRng()*Math.PI;
     const bCols=['rgba(255,200,100,','rgba(150,180,255,','rgba(180,255,200,','rgba(255,160,180,'];
     const bcol=bCols[Math.floor(bgRng()*bCols.length)];
@@ -935,7 +935,7 @@ function drawGalaxyMap(t){
   for(let i=0;i<300;i++){
     const sx=stRng()*GW,sy=stRng()*GH;
     const sa=stRng()*0.4+0.05+Math.sin(t*stRng()*2+i)*0.05;
-    g2.globalAlpha=sa;g2.fillStyle='#e8eeff';
+    g2.globalAlpha=sa;g2.fillStyle=window.lightMode?'#000000':'#e8eeff';
     g2.beginPath();g2.arc(sx,sy,stRng()*0.8+0.1,0,Math.PI*2);g2.fill();
   }
   g2.globalAlpha=1;
@@ -944,7 +944,7 @@ function drawGalaxyMap(t){
 
   // Slabé spojovací čáry mezi galaxiemi
   g2.save();
-  g2.strokeStyle='rgba(255,149,0,0.04)';g2.lineWidth=1;g2.setLineDash([4,12]);
+  g2.strokeStyle=window.lightMode?'rgba(0,40,180,0.08)':'rgba(255,149,0,0.04)';g2.lineWidth=1;g2.setLineDash([4,12]);
   GALAXIES.forEach(ga=>{
     GALAXIES.forEach(gb=>{
       if(ga.id>=gb.id)return;

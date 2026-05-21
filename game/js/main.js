@@ -4,6 +4,24 @@
 let gameState = null;  // hráč, entity, nav, atd.
 let state = 'menu';    // 'menu' | 'playing' | 'docked' | 'map' | 'galaxy' | 'warping'
 let canvas, W2, H2;    // W,H jsou v render.js
+
+// Light / Dark mode
+window.lightMode = localStorage.getItem('st_theme') === 'light';
+(function applyTheme(){
+  if(window.lightMode) document.body.classList.add('light');
+  else document.body.classList.remove('light');
+})();
+
+function toggleTheme(){
+  window.lightMode = !window.lightMode;
+  if(window.lightMode){ document.body.classList.add('light'); localStorage.setItem('st_theme','light'); }
+  else { document.body.classList.remove('light'); localStorage.setItem('st_theme','dark'); }
+  const icon = document.getElementById('theme-icon');
+  const lbl  = document.getElementById('theme-label');
+  if(icon) icon.textContent = window.lightMode ? '🌙' : '☀';
+  if(lbl)  lbl.textContent  = window.lightMode ? 'DARK MODE' : 'LIGHT MODE';
+  initMenuStars();
+}
 let last = 0, frameCount = 0;
 
 // Warp systém
@@ -137,12 +155,12 @@ function isKey(...codes){return codes.some(c=>keys[c]);}
 function startGame(fromSave=false){
   document.getElementById('menu').style.display='none';
   document.getElementById('hud').style.display='block';
-  window.currentGalaxy='sol';
   window.warpTarget=null;
   window._warpArrival=0;
   warpPhase=null;warpTimer=0;warpElapsed=0;parkingMode=false;
 
   const save=fromSave?loadSave():null;
+  window.currentGalaxy=(save?.galaxyId)||'sol';
 
   // Výchozí spawn: u Země (SOL chunk 0,0; sunX=1500,sunY=1500; Země orbit 7000, phase 2.1)
   // earthX = 1500 + cos(2.1)*7000 ≈ 1500-3534 = -2034,  earthY = 1500 + sin(2.1)*7000 ≈ 1500+6042 = 7542
@@ -750,123 +768,104 @@ function _stopPauseShipAnim(){
 function _drawPauseShip(canvas,t){
   const pc=canvas.getContext('2d');
   const pw=canvas.width, ph=canvas.height;
-  const cx=pw/2, cy=ph*0.48;
-  const scale=4.5;
+  const cx=pw/2, cy=ph*0.50;
+  const scale=4.8;
 
-  // Pozadí
   pc.clearRect(0,0,pw,ph);
-  pc.fillStyle='#000408';pc.fillRect(0,0,pw,ph);
 
-  // Hvězdy
-  _pauseStars.forEach(s=>{
-    const tw=0.55+Math.sin(t*s.speed+s.phase)*0.45;
-    pc.globalAlpha=s.bright*tw;
-    pc.fillStyle=s.color;
-    pc.beginPath();pc.arc(s.x,s.y,s.r,0,Math.PI*2);pc.fill();
-  });
-  pc.globalAlpha=1;
+  if(window.lightMode){
+    // Světlé pozadí — bílé s jemným gradientem
+    const bg=pc.createRadialGradient(cx,cy,0,cx,cy,Math.min(pw,ph)*0.7);
+    bg.addColorStop(0,'#ffffff');
+    bg.addColorStop(1,'#e8f0ff');
+    pc.fillStyle=bg;pc.fillRect(0,0,pw,ph);
+    // Jemné hvězdy — černé tečky
+    _pauseStars.forEach(s=>{
+      const tw=0.4+Math.sin(t*s.speed+s.phase)*0.3;
+      pc.globalAlpha=Math.min(1,s.bright*tw*1.8);
+      pc.fillStyle='#000000';
+      pc.beginPath();pc.arc(s.x,s.y,Math.max(s.r,0.4),0,Math.PI*2);pc.fill();
+    });
+    pc.globalAlpha=1;
+  } else {
+    // Tmavé pozadí
+    pc.fillStyle='#000408';pc.fillRect(0,0,pw,ph);
+    _pauseStars.forEach(s=>{
+      const tw=0.55+Math.sin(t*s.speed+s.phase)*0.45;
+      pc.globalAlpha=s.bright*tw;
+      pc.fillStyle=s.color;
+      pc.beginPath();pc.arc(s.x,s.y,s.r,0,Math.PI*2);pc.fill();
+    });
+    pc.globalAlpha=1;
+    // Mlhovina
+    const neb=pc.createRadialGradient(cx,cy,0,cx,cy,Math.min(pw,ph)*0.45);
+    neb.addColorStop(0,'rgba(40,15,80,0.22)');
+    neb.addColorStop(0.5,'rgba(255,80,0,0.07)');
+    neb.addColorStop(1,'transparent');
+    pc.fillStyle=neb;pc.fillRect(0,0,pw,ph);
+  }
 
-  // Mlhovina za lodí
-  const neb=pc.createRadialGradient(cx,cy,0,cx,cy,Math.min(pw,ph)*0.45);
-  neb.addColorStop(0,'rgba(40,15,80,0.22)');
-  neb.addColorStop(0.5,'rgba(255,80,0,0.07)');
-  neb.addColorStop(1,'transparent');
-  pc.fillStyle=neb;pc.fillRect(0,0,pw,ph);
-
-  // Pulzující záře za lodí
   const glowPulse=0.5+Math.sin(t*1.4)*0.5;
-  const glow=pc.createRadialGradient(cx,cy,0,cx,cy,scale*22);
-  glow.addColorStop(0,'rgba(255,120,0,'+(0.15+glowPulse*0.1)+')');
-  glow.addColorStop(1,'transparent');
-  pc.fillStyle=glow;pc.beginPath();pc.arc(cx,cy,scale*22,0,Math.PI*2);pc.fill();
 
-  // === Loď v scale space ===
+  // Záře za motorama
+  const engScreenY=cy+scale*16;
+  const engA=pc.createRadialGradient(cx,engScreenY,0,cx,engScreenY,scale*18);
+  engA.addColorStop(0,'rgba(80,160,255,'+(0.25+glowPulse*0.18)+')');
+  engA.addColorStop(1,'transparent');
+  pc.fillStyle=engA;pc.beginPath();pc.arc(cx,engScreenY,scale*18,0,Math.PI*2);pc.fill();
+
+  // === Raketoplan v scale bloku ===
   pc.save();
   pc.translate(cx,cy);
   pc.scale(scale,scale);
-  // Nose points up: local (0,-16) → screen (cx, cy-16*scale)
 
-  // Motor — idle plamen (v native ship coords)
-  const fl=10+Math.sin(t*9)*5;
-  pc.globalAlpha=0.8+Math.sin(t*11)*0.1;
-  const eg=pc.createLinearGradient(0,12,0,14+fl);
-  eg.addColorStop(0,'rgba(255,150,0,0.95)');
-  eg.addColorStop(0.4,'rgba(255,50,0,0.55)');
-  eg.addColorStop(1,'transparent');
-  pc.fillStyle=eg;
-  pc.beginPath();pc.moveTo(-5,12);pc.lineTo(5,12);pc.lineTo(0,14+fl);pc.fill();
-  pc.globalAlpha=0.5;
-  const eg2=pc.createLinearGradient(0,12,0,14+fl*0.55);
-  eg2.addColorStop(0,'rgba(255,230,120,0.9)');eg2.addColorStop(1,'transparent');
-  pc.fillStyle=eg2;
-  pc.beginPath();pc.moveTo(-2,12);pc.lineTo(2,12);pc.lineTo(0,14+fl*0.55);pc.fill();
+  // 3 SSME plameny (pod motorovou sekcí, y=16)
+  const fl=8+Math.sin(t*11)*4;
+  [-4,0,4].forEach((ex,i)=>{
+    const phase=t*9+i*1.1;
+    const fli=fl+Math.sin(phase)*3;
+    pc.globalAlpha=0.85+Math.sin(phase)*0.1;
+    const eg=pc.createLinearGradient(ex,16,ex,16+fli);
+    eg.addColorStop(0,'rgba(160,210,255,1)');
+    eg.addColorStop(0.2,'rgba(80,160,255,0.85)');
+    eg.addColorStop(0.6,'rgba(40,80,255,0.4)');
+    eg.addColorStop(1,'transparent');
+    pc.fillStyle=eg;
+    pc.beginPath();pc.ellipse(ex,16+fli*.5,1.5+Math.sin(phase)*.3,fli*.55,0,0,Math.PI*2);pc.fill();
+    // Jádro bílé
+    pc.globalAlpha=0.7;
+    const eg2=pc.createLinearGradient(ex,16,ex,16+fli*.4);
+    eg2.addColorStop(0,'rgba(255,255,255,0.95)');eg2.addColorStop(1,'transparent');
+    pc.fillStyle=eg2;
+    pc.beginPath();pc.ellipse(ex,16+fli*.2,.7,fli*.25,0,0,Math.PI*2);pc.fill();
+  });
   pc.globalAlpha=1;
 
-  // Trup
-  pc.shadowColor='rgba(255,149,0,0.55)';pc.shadowBlur=3;
-  pc.fillStyle='#060e22';
-  pc.strokeStyle='#ff9500';pc.lineWidth=0.35;
-  pc.beginPath();pc.moveTo(0,-16);pc.lineTo(10,10);pc.lineTo(5,7);pc.lineTo(-5,7);pc.lineTo(-10,10);pc.closePath();
-  pc.fill();pc.stroke();
-
-  // Panel detaily
-  pc.strokeStyle='rgba(255,149,0,0.28)';pc.lineWidth=0.22;
-  pc.beginPath();pc.moveTo(0,-12);pc.lineTo(4,4);pc.stroke();
-  pc.beginPath();pc.moveTo(0,-12);pc.lineTo(-4,4);pc.stroke();
-
-  // Přední okno
-  pc.shadowColor='rgba(100,200,255,0.9)';pc.shadowBlur=4;
-  pc.fillStyle='rgba(100,200,255,0.6)';
-  pc.beginPath();pc.ellipse(0,-5,3,5,0,0,Math.PI*2);pc.fill();
-  pc.shadowBlur=0;
-
-  // Wingtips
-  pc.strokeStyle='#ff9500';pc.lineWidth=0.28;
-  pc.beginPath();pc.moveTo(-10,10);pc.lineTo(-14,14);pc.stroke();
-  pc.beginPath();pc.moveTo(10,10);pc.lineTo(14,14);pc.stroke();
-  // Wingtip navigační světla
-  pc.fillStyle='#ff3300';pc.shadowColor='#ff4400';pc.shadowBlur=3;
-  pc.beginPath();pc.arc(-14,14,1.1,0,Math.PI*2);pc.fill();
-  pc.fillStyle='#00cc44';pc.shadowColor='#00ff66';
-  pc.beginPath();pc.arc(14,14,1.1,0,Math.PI*2);pc.fill();
-  pc.shadowBlur=0;
-
-  // Boční tryskové pody
-  pc.strokeStyle='rgba(255,149,0,0.45)';pc.lineWidth=0.28;
-  pc.fillStyle='rgba(10,20,40,0.9)';
-  pc.beginPath();pc.rect(11,-4,8,7);pc.fill();pc.stroke();
-  pc.beginPath();pc.rect(-19,-4,8,7);pc.fill();pc.stroke();
-  // Výfukové otvory — idle záře
-  const idleSide=0.15+Math.sin(t*6)*0.1;
-  pc.fillStyle=`rgba(80,180,255,${idleSide})`;pc.shadowColor='#4488ff';pc.shadowBlur=4;
-  pc.beginPath();pc.arc(19,0,2,0,Math.PI*2);pc.fill();
-  pc.beginPath();pc.arc(-19,0,2,0,Math.PI*2);pc.fill();
-  pc.shadowBlur=0;
+  // Raketoplan (volá drawGameShuttle přes dočasný ctx swap)
+  const _savedCtx=ctx;
+  ctx=pc;
+  drawGameShuttle();
+  ctx=_savedCtx;
 
   pc.restore();
 
-  // Štít (v screen coords, mimo scale blok)
+  // Štít
   if(gameState&&gameState.player.shield>0){
     const shPct=gameState.player.shield/gameState.player.shieldMax;
     pc.save();
-    pc.globalAlpha=0.04+shPct*0.18+Math.sin(t*2.2)*0.03;
-    pc.strokeStyle='#4488ff';pc.lineWidth=1.8;
-    pc.shadowColor='#4488ff';pc.shadowBlur=10;
-    pc.beginPath();pc.arc(cx,cy,scale*13.5,0,Math.PI*2);pc.stroke();
+    pc.globalAlpha=0.05+shPct*0.2+Math.sin(t*2.2)*0.03;
+    pc.strokeStyle='#4488ff';pc.lineWidth=2;
+    pc.shadowColor='#4488ff';pc.shadowBlur=12;
+    pc.beginPath();pc.arc(cx,cy,scale*26,0,Math.PI*2);pc.stroke();
     pc.restore();
   }
 
-  // Engine glow aura (pod lodí, v screen coords)
-  const engY=cy+scale*14;
-  const engA=pc.createRadialGradient(cx,engY,0,cx,engY,scale*16);
-  engA.addColorStop(0,'rgba(255,110,0,'+(0.35+glowPulse*0.25)+')');
-  engA.addColorStop(1,'transparent');
-  pc.fillStyle=engA;pc.beginPath();pc.arc(cx,engY,scale*16,0,Math.PI*2);pc.fill();
-
-  // CRT scan lines
-  pc.globalAlpha=0.022;
-  for(let y2=0;y2<ph;y2+=4){pc.fillStyle='#000';pc.fillRect(0,y2,pw,2);}
-  pc.globalAlpha=1;
+  // CRT scan lines (jen v dark mode)
+  if(!window.lightMode){
+    pc.globalAlpha=0.022;
+    for(let y2=0;y2<ph;y2+=4){pc.fillStyle='#000';pc.fillRect(0,y2,pw,2);}
+    pc.globalAlpha=1;
+  }
 }
 
 // ---- Částice ----
@@ -1115,8 +1114,8 @@ function update(dt){
     gs.dockingState={approaching:false,align:0,speed:0,dockable:false};
   }
 
-  // Stanice — kolize s tělem (netrefení do otvoru)
-  if(gs.nearStation&&!gs.dockingState.dockable&&!p.dead){
+  // Stanice — kolize s tělem (netrefení do otvoru); vypnuto během warp letu
+  if(gs.nearStation&&!gs.dockingState.dockable&&!p.dead&&warpPhase!=='boosting'){
     const st=gs.nearStation;
     const d=dist2(p,st);
     const isLarge=st.type==='large';
@@ -1249,7 +1248,56 @@ function addXP(p,amount){
 }
 
 function showDeath(){
+  const p=gameState?.player;
+  const gs=gameState;
+
+  // --- PERMANENTNÍ SMRT: smaž slot okamžitě ---
+  if(activeSlot>=0){
+    try{localStorage.removeItem(SLOT_KEYS[activeSlot]);}catch(e){}
+  }
+
+  // Vyplň statistiky
+  document.getElementById('ds-slot').textContent=activeSlot>=0?`PILOT ${activeSlot+1}`:'—';
+  document.getElementById('ds-level').textContent=String(p?.level||1);
+  document.getElementById('ds-credits').textContent=`${(p?.credits||0).toLocaleString('cs-CZ')} Cr`;
+  document.getElementById('ds-earned').textContent=`${(gs?.totalEarned||0).toLocaleString('cs-CZ')} Cr`;
+  const pt2=gs?.playTime||0;
+  const ph=Math.floor(pt2/3600),pm=Math.floor((pt2%3600)/60),ps=Math.floor(pt2%60);
+  document.getElementById('ds-time').textContent=`${ph}h ${pm.toString().padStart(2,'0')}m ${ps.toString().padStart(2,'0')}s`;
+  const gal=GALAXIES.find(g=>g.id===window.currentGalaxy);
+  document.getElementById('ds-galaxy').textContent=gal?gal.name:'Sluneční soustava';
+  const score=((p?.level||1)*1000)+(p?.credits||0)+(gs?.totalEarned||0);
+  document.getElementById('ds-score').textContent=score.toLocaleString('cs-CZ');
+
   document.getElementById('death-screen').style.display='flex';
+
+  // Odpočet 8 s → auto-return do lobby
+  const CD=8;
+  let cdLeft=CD;
+  const cdNum=document.getElementById('death-cd-num');
+  const cdBar=document.getElementById('death-cd-bar');
+  const lobbyBtn=document.getElementById('btn-death-lobby');
+  lobbyBtn.disabled=true;
+  cdBar.style.transition='none';cdBar.style.width='100%';
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    cdBar.style.transition=`width ${CD}s linear`;cdBar.style.width='0%';
+  }));
+  const cdIv=setInterval(()=>{
+    cdLeft--;cdNum.textContent=cdLeft;
+    if(cdLeft<=0){clearInterval(cdIv);_goLobby();}
+  },1000);
+  // Tlačítko se odemkne po 2s pro ruční skip
+  setTimeout(()=>{if(lobbyBtn.disabled)lobbyBtn.disabled=false;},2000);
+  lobbyBtn.onclick=()=>{clearInterval(cdIv);_goLobby();};
+}
+
+function _goLobby(){
+  document.getElementById('death-screen').style.display='none';
+  document.getElementById('hud').style.display='none';
+  document.getElementById('dock-panel').style.display='none';
+  document.getElementById('menu').style.display='flex';
+  state='menu';gameState=null;activeSlot=-1;
+  initMenuStars();
 }
 
 // ---- Save / Load (slot systém) ----
@@ -1258,8 +1306,18 @@ function getSaveData(i){try{const r=localStorage.getItem(SLOT_KEYS[i]);return r?
 function saveGame(){
   if(!gameState||gameState.player.dead||activeSlot<0)return;
   const p=gameState.player;
+  // Při uložení ve stanici ulož bezpečnou pozici MIMO stanici, ne uvnitř
+  let saveX=p.x,saveY=p.y,saveAngle=p.angle;
+  const dSt=gameState.dockStation;
+  if(dSt){
+    const safeR=dSt.r*1.4+80;
+    const ang=dSt.angle+Math.PI;
+    saveX=dSt.x+Math.cos(ang)*safeR;
+    saveY=dSt.y+Math.sin(ang)*safeR;
+    saveAngle=ang;
+  }
   const data={
-    x:p.x,y:p.y,angle:p.angle,
+    x:saveX,y:saveY,angle:saveAngle,
     hull:p.hull,hullMax:p.hullMax,
     shield:p.shield,shieldMax:p.shieldMax,
     fuel:p.fuel,fuelMax:p.fuelMax,
@@ -1683,10 +1741,10 @@ function initMenuStars(){
     mx.clearRect(0,0,mc.width,mc.height);
     const t=ts/1000;
     stars.forEach(s=>{
-      const alpha=s.bright*(0.6+Math.sin(t*s.speed+s.tw)*0.4);
-      mx.globalAlpha=alpha;
-      mx.fillStyle='#e8eeff';
-      mx.beginPath();mx.arc(s.x,s.y,s.r,0,Math.PI*2);mx.fill();
+      const base=s.bright*(0.6+Math.sin(t*s.speed+s.tw)*0.4);
+      mx.globalAlpha=window.lightMode?Math.min(1,base*2.2):base;
+      mx.fillStyle=window.lightMode?'#000000':'#e8eeff';
+      mx.beginPath();mx.arc(s.x,s.y,window.lightMode?Math.max(s.r,0.5):s.r,0,Math.PI*2);mx.fill();
     });
     mx.globalAlpha=1;
   })(0);
@@ -1794,13 +1852,22 @@ window.addEventListener('load',()=>{
   initGalaxyCanvas();
   initMenuStars();
 
+  // Aplikovat stav ikony tlačítka tématu podle uložené preference
+  (function(){
+    const icon=document.getElementById('theme-icon');
+    const lbl=document.getElementById('theme-label');
+    if(icon) icon.textContent=window.lightMode?'🌙':'☀';
+    if(lbl)  lbl.textContent=window.lightMode?'DARK MODE':'LIGHT MODE';
+  })();
+
   // Menu tlačítka
   document.getElementById('btn-play').onclick=()=>openSlotScreen();
+  const themeBtn=document.getElementById('btn-theme');
+  if(themeBtn) themeBtn.onclick=()=>toggleTheme();
   document.getElementById('btn-slots-back').onclick=()=>closeSlotScreen();
   document.getElementById('btn-help').onclick=()=>openHelp();
   document.getElementById('btn-help-close').onclick=()=>closeHelp();
-  document.getElementById('btn-restart').onclick=()=>{document.getElementById('death-screen').style.display='none';if(activeSlot>=0)showLoadingScreen(activeSlot,true,()=>startGame(false));else openSlotScreen();};
-  document.getElementById('btn-menu').onclick=()=>{document.getElementById('death-screen').style.display='none';document.getElementById('slots-overlay').style.display='none';document.getElementById('menu').style.display='flex';document.getElementById('hud').style.display='none';state='menu';gameState=null;activeSlot=-1;initMenuStars();};
+  // death screen — handler se nastavuje dynamicky v showDeath()
   document.getElementById('btn-close-map').onclick=()=>closeMap();
   document.getElementById('btn-close-galaxy').onclick=()=>closeGalaxyMap();
   document.getElementById('btn-cancel-warp').onclick=()=>cancelWarp();

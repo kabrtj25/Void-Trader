@@ -14,7 +14,7 @@ function inView(sx,sy,pad=200){
 // ---- Pozadí ----
 function renderBackground(chunks,t){
   ctx.save();
-  ctx.fillStyle='#000408';ctx.fillRect(0,0,W,H);
+  ctx.fillStyle=window.lightMode?'#dde8ff':'#000408';ctx.fillRect(0,0,W,H);
   ctx.restore();
 
   // Hvězdy s paralaxou
@@ -27,31 +27,37 @@ function renderBackground(chunks,t){
         const sx=s.x-ox, sy=s.y-oy;
         if(!inView(sx,sy,10))return;
         const twinkle=0.7+Math.sin(t*1.8+s.twinkle)*0.3;
-        ctx.globalAlpha=s.bright*twinkle;
-        if(s.hue===210) ctx.fillStyle='#90b8ff';
-        else if(s.hue===30) ctx.fillStyle='#ffbb60';
-        else if(s.hue===60) ctx.fillStyle='#ffeeaa';
-        else ctx.fillStyle='#e8eeff';
         const r=s.r*layer.scale;
-        ctx.beginPath();ctx.arc(sx,sy,r,0,Math.PI*2);ctx.fill();
-        // Záře pro větší hvězdy
-        if(r>0.85&&s.bright>0.65){
-          ctx.globalAlpha=s.bright*twinkle*0.22;
-          ctx.fillStyle='#ffffff';
-          ctx.beginPath();ctx.arc(sx,sy,r*3,0,Math.PI*2);ctx.fill();
-        }
-        // Křížový záblesk pro nejjasnější hvězdy
-        if(s.sparkle&&r>0.8){
-          ctx.globalAlpha=s.bright*twinkle*0.55;
-          ctx.strokeStyle='#ffffff';ctx.lineWidth=0.6;
-          const sl=r*10;
-          ctx.beginPath();ctx.moveTo(sx-sl,sy);ctx.lineTo(sx+sl,sy);ctx.stroke();
-          ctx.beginPath();ctx.moveTo(sx,sy-sl);ctx.lineTo(sx,sy+sl);ctx.stroke();
-          // Diagonála slabší
-          ctx.globalAlpha=s.bright*twinkle*0.2;
-          const sd=sl*0.5;
-          ctx.beginPath();ctx.moveTo(sx-sd,sy-sd);ctx.lineTo(sx+sd,sy+sd);ctx.stroke();
-          ctx.beginPath();ctx.moveTo(sx+sd,sy-sd);ctx.lineTo(sx-sd,sy+sd);ctx.stroke();
+        if(window.lightMode){
+          // Světlý režim — černé hvězdy, plná viditelnost
+          ctx.globalAlpha=Math.min(1,s.bright*twinkle*1.8);
+          ctx.fillStyle='#000000';
+          ctx.beginPath();ctx.arc(sx,sy,Math.max(r,0.5),0,Math.PI*2);ctx.fill();
+        } else {
+          ctx.globalAlpha=s.bright*twinkle;
+          if(s.hue===210) ctx.fillStyle='#90b8ff';
+          else if(s.hue===30) ctx.fillStyle='#ffbb60';
+          else if(s.hue===60) ctx.fillStyle='#ffeeaa';
+          else ctx.fillStyle='#e8eeff';
+          ctx.beginPath();ctx.arc(sx,sy,r,0,Math.PI*2);ctx.fill();
+          // Záře pro větší hvězdy
+          if(r>0.85&&s.bright>0.65){
+            ctx.globalAlpha=s.bright*twinkle*0.22;
+            ctx.fillStyle='#ffffff';
+            ctx.beginPath();ctx.arc(sx,sy,r*3,0,Math.PI*2);ctx.fill();
+          }
+          // Křížový záblesk pro nejjasnější hvězdy
+          if(s.sparkle&&r>0.8){
+            ctx.globalAlpha=s.bright*twinkle*0.55;
+            ctx.strokeStyle='#ffffff';ctx.lineWidth=0.6;
+            const sl=r*10;
+            ctx.beginPath();ctx.moveTo(sx-sl,sy);ctx.lineTo(sx+sl,sy);ctx.stroke();
+            ctx.beginPath();ctx.moveTo(sx,sy-sl);ctx.lineTo(sx,sy+sl);ctx.stroke();
+            ctx.globalAlpha=s.bright*twinkle*0.2;
+            const sd=sl*0.5;
+            ctx.beginPath();ctx.moveTo(sx-sd,sy-sd);ctx.lineTo(sx+sd,sy+sd);ctx.stroke();
+            ctx.beginPath();ctx.moveTo(sx+sd,sy-sd);ctx.lineTo(sx-sd,sy+sd);ctx.stroke();
+          }
         }
       });
     });
@@ -1051,84 +1057,47 @@ function renderPlayerShip(player,t,sx,sy){
   ctx.save();
   ctx.translate(sx,sy);ctx.rotate(player.angle+Math.PI/2);
 
-  // === BOČNÍ TRYSKY — plameny ===
-  // Strafe vlevo → pravá tryska (výfuk doprava = loď jde doleva)
+  // === BOČNÍ OMS TRYSKY ===
   if(strafeL){
-    const fl=7+Math.random()*5;
-    ctx.globalAlpha=0.75+Math.random()*0.2;
-    const eg=ctx.createLinearGradient(14,2,14+fl,2);
-    eg.addColorStop(0,'rgba(80,200,255,0.95)');eg.addColorStop(0.5,'rgba(40,100,255,0.5)');eg.addColorStop(1,'transparent');
-    ctx.fillStyle=eg;
-    ctx.beginPath();ctx.moveTo(14,-3);ctx.lineTo(14,5);ctx.lineTo(14+fl,1);ctx.fill();
+    const fl=8+Math.random()*6;ctx.globalAlpha=0.7+Math.random()*0.2;
+    const eg=ctx.createLinearGradient(19,0,19+fl,0);
+    eg.addColorStop(0,'rgba(80,200,255,0.9)');eg.addColorStop(1,'transparent');
+    ctx.fillStyle=eg;ctx.beginPath();ctx.moveTo(19,-2.5);ctx.lineTo(19,2.5);ctx.lineTo(19+fl,0);ctx.fill();
     ctx.globalAlpha=1;
   }
-  // Strafe vpravo → levá tryska (výfuk doleva = loď jde doprava)
   if(strafeR){
-    const fl=7+Math.random()*5;
-    ctx.globalAlpha=0.75+Math.random()*0.2;
-    const eg=ctx.createLinearGradient(-14,2,-14-fl,2);
-    eg.addColorStop(0,'rgba(80,200,255,0.95)');eg.addColorStop(0.5,'rgba(40,100,255,0.5)');eg.addColorStop(1,'transparent');
-    ctx.fillStyle=eg;
-    ctx.beginPath();ctx.moveTo(-14,-3);ctx.lineTo(-14,5);ctx.lineTo(-14-fl,1);ctx.fill();
+    const fl=8+Math.random()*6;ctx.globalAlpha=0.7+Math.random()*0.2;
+    const eg=ctx.createLinearGradient(-19,0,-19-fl,0);
+    eg.addColorStop(0,'rgba(80,200,255,0.9)');eg.addColorStop(1,'transparent');
+    ctx.fillStyle=eg;ctx.beginPath();ctx.moveTo(-19,-2.5);ctx.lineTo(-19,2.5);ctx.lineTo(-19-fl,0);ctx.fill();
     ctx.globalAlpha=1;
   }
 
-  // === HLAVNÍ MOTOR ===
+  // === SSME MOTORY (3 zvony) ===
   if(player.thrusting||player.boosting){
     const isBst=player.boosting;
-    const fl=isBst?34:20;
-    const flicker=0.8+Math.random()*0.2;
-    ctx.globalAlpha=0.88;
-    const eg=ctx.createLinearGradient(0,14,0,14+fl*flicker);
-    eg.addColorStop(0,isBst?'rgba(0,180,255,0.98)':'rgba(255,150,0,0.92)');
-    eg.addColorStop(0.35,isBst?'rgba(0,80,255,0.55)':'rgba(255,60,0,0.55)');
-    eg.addColorStop(1,'transparent');
-    ctx.fillStyle=eg;ctx.beginPath();ctx.moveTo(-5,12);ctx.lineTo(5,12);ctx.lineTo(0,14+fl*flicker);ctx.fill();
-    ctx.globalAlpha=0.5;
-    const eg2=ctx.createLinearGradient(0,12,0,22);
-    eg2.addColorStop(0,isBst?'rgba(150,230,255,0.85)':'rgba(255,200,60,0.8)');eg2.addColorStop(1,'transparent');
-    ctx.fillStyle=eg2;ctx.beginPath();ctx.moveTo(-2,12);ctx.lineTo(2,12);ctx.lineTo(0,22);ctx.fill();
+    const flicker=0.82+Math.random()*0.18;
+    const fl=isBst?38:22;
+    // 3 motory ve tvaru delta — rozmístěné
+    [-5,0,5].forEach(ox=>{
+      ctx.globalAlpha=0.85;
+      const eg=ctx.createLinearGradient(ox,13,ox,13+fl*flicker);
+      eg.addColorStop(0,isBst?'rgba(160,230,255,0.95)':'rgba(220,245,255,0.9)');
+      eg.addColorStop(0.25,isBst?'rgba(0,140,255,0.6)':'rgba(180,225,255,0.55)');
+      eg.addColorStop(1,'transparent');
+      ctx.fillStyle=eg;
+      ctx.beginPath();ctx.moveTo(ox-3.5,12);ctx.lineTo(ox+3.5,12);ctx.lineTo(ox,13+fl*flicker);ctx.fill();
+    });
+    // Glow pod přídí
+    ctx.globalAlpha=0.4;
+    const gg=ctx.createRadialGradient(0,13,0,0,13,isBst?22:14);
+    gg.addColorStop(0,isBst?'rgba(100,200,255,0.7)':'rgba(200,230,255,0.5)');gg.addColorStop(1,'transparent');
+    ctx.fillStyle=gg;ctx.beginPath();ctx.arc(0,13,isBst?22:14,0,Math.PI*2);ctx.fill();
     ctx.globalAlpha=1;
   }
 
-  // === TRUP ===
-  ctx.fillStyle='#060e22';ctx.strokeStyle='#ff9500';ctx.lineWidth=1.5;
-  ctx.shadowColor='rgba(255,149,0,0.4)';ctx.shadowBlur=4;
-  ctx.beginPath();ctx.moveTo(0,-16);ctx.lineTo(10,10);ctx.lineTo(5,7);ctx.lineTo(-5,7);ctx.lineTo(-10,10);ctx.closePath();ctx.fill();ctx.stroke();
-  ctx.shadowBlur=0;
-
-  // Detaily na trupu — žebra
-  ctx.strokeStyle='rgba(255,149,0,0.25)';ctx.lineWidth=0.7;
-  ctx.beginPath();ctx.moveTo(0,-11);ctx.lineTo(5,5);ctx.stroke();
-  ctx.beginPath();ctx.moveTo(0,-11);ctx.lineTo(-5,5);ctx.stroke();
-
-  // Přední okno — svítí modře
-  ctx.shadowColor='rgba(100,200,255,0.8)';ctx.shadowBlur=5;
-  ctx.fillStyle='rgba(100,200,255,0.5)';ctx.beginPath();ctx.ellipse(0,-5,3,5,0,0,Math.PI*2);ctx.fill();
-  ctx.shadowBlur=0;
-
-  // === WINGTIPY ===
-  ctx.strokeStyle='#ff9500';ctx.lineWidth=1.1;
-  ctx.beginPath();ctx.moveTo(-10,10);ctx.lineTo(-14,14);ctx.stroke();
-  ctx.beginPath();ctx.moveTo(10,10);ctx.lineTo(14,14);ctx.stroke();
-  // Wingtip navigační světla (červená/zelená)
-  ctx.fillStyle='#ff2020';ctx.shadowColor='#ff4040';ctx.shadowBlur=4;
-  ctx.beginPath();ctx.arc(-14,14,1.5,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle='#00cc44';ctx.shadowColor='#00ff66';
-  ctx.beginPath();ctx.arc(14,14,1.5,0,Math.PI*2);ctx.fill();
-  ctx.shadowBlur=0;
-
-  // === BOČNÍ TRYSKOVÉ PODY ===
-  ctx.strokeStyle='rgba(255,149,0,0.45)';ctx.lineWidth=0.8;
-  ctx.fillStyle='rgba(10,20,40,0.9)';
-  // Pravý pod (vystupuje ze zádi pravého křídla)
-  ctx.beginPath();ctx.rect(11,-4,8,7);ctx.fill();ctx.stroke();
-  // Levý pod
-  ctx.beginPath();ctx.rect(-19,-4,8,7);ctx.fill();ctx.stroke();
-  // Výfukový otvor — bílá tečka
-  ctx.fillStyle='rgba(200,220,255,0.3)';
-  ctx.beginPath();ctx.arc(19,0,1.5,0,Math.PI*2);ctx.fill();
-  ctx.beginPath();ctx.arc(-19,0,1.5,0,Math.PI*2);ctx.fill();
+  // === RAKETOPLAN — Space Shuttle orbiter (zmenšený na herní scale) ===
+  drawGameShuttle();
 
   ctx.restore();
 
@@ -1137,12 +1106,12 @@ function renderPlayerShip(player,t,sx,sy){
     const shA=player.invTimer>0?0.5:0.04+player.shield/player.shieldMax*0.14;
     ctx.save();ctx.globalAlpha=shA;ctx.strokeStyle='#4080ff';ctx.lineWidth=1.5;
     ctx.shadowColor='#4080ff';ctx.shadowBlur=8;
-    ctx.beginPath();ctx.arc(sx,sy,24,0,Math.PI*2);ctx.stroke();ctx.restore();
+    ctx.beginPath();ctx.arc(sx,sy,26,0,Math.PI*2);ctx.stroke();ctx.restore();
   }
   // Blikání při zásahu
   if(player.invTimer>0&&Math.floor(player.invTimer*10)%2===0){
     ctx.save();ctx.globalAlpha=0.2;ctx.fillStyle='#ffffff';
-    ctx.beginPath();ctx.arc(sx,sy,24,0,Math.PI*2);ctx.fill();ctx.restore();
+    ctx.beginPath();ctx.arc(sx,sy,26,0,Math.PI*2);ctx.fill();ctx.restore();
   }
 }
 
@@ -1180,6 +1149,84 @@ function renderVignette(){
   vg.addColorStop(0,'transparent');vg.addColorStop(1,'rgba(0,2,8,0.55)');
   ctx.fillStyle=vg;ctx.fillRect(0,0,W,H);
   ctx.restore();
+}
+
+// ---- Space Shuttle Orbiter — herní loď ----
+// Kreslí se ve vlastním sys. souřadnic: nos nahoře (-Y), konec dole (+Y)
+// ctx musí být již transformován (translate + rotate) jako u starého trupu.
+function drawGameShuttle(){
+  const bh=30,bw=6.5;
+  const bTop=-bh*.5; // -15
+
+  // Delta křídla
+  ctx.fillStyle='#ccd4e6';
+  ctx.beginPath();
+  ctx.moveTo(-bw*.5,1);ctx.lineTo(-21,11);ctx.lineTo(-bw*.5,13);ctx.closePath();ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(bw*.5,1);ctx.lineTo(21,11);ctx.lineTo(bw*.5,13);ctx.closePath();ctx.fill();
+
+  // Tepelné dlaždice — přední hrana křídla (černá)
+  ctx.fillStyle='#181818';
+  ctx.beginPath();
+  ctx.moveTo(-bw*.5,1);ctx.lineTo(-21,11);ctx.lineTo(-19,11);ctx.lineTo(-bw*.5+2,2);ctx.closePath();ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(bw*.5,1);ctx.lineTo(21,11);ctx.lineTo(19,11);ctx.lineTo(bw*.5-2,2);ctx.closePath();ctx.fill();
+
+  // Trup (fuselage)
+  ctx.fillStyle='#d4dcea';
+  ctx.beginPath();
+  if(ctx.roundRect)ctx.roundRect(-bw*.5,bTop,bw,bh,1.8);
+  else ctx.rect(-bw*.5,bTop,bw,bh);
+  ctx.fill();
+
+  // Břicho — černé dlaždice
+  ctx.fillStyle='#1c1c1c';
+  ctx.fillRect(-bw*.5,10,bw,5);
+
+  // Nos — aerodynamický kužel
+  ctx.beginPath();
+  ctx.moveTo(-bw*.5,bTop);
+  ctx.quadraticCurveTo(-bw*.4,bTop-3.5,0,bTop-11);
+  ctx.quadraticCurveTo(bw*.4,bTop-3.5,bw*.5,bTop);
+  ctx.closePath();ctx.fillStyle='#c8d0e4';ctx.fill();
+
+  // Nos — černá špička (tepelný kryt)
+  ctx.beginPath();
+  ctx.moveTo(-bw*.3,bTop-.5);
+  ctx.quadraticCurveTo(0,bTop-11,bw*.3,bTop-.5);
+  ctx.closePath();ctx.fillStyle='#111';ctx.fill();
+
+  // Kokpit — okno
+  ctx.fillStyle='rgba(100,190,255,0.55)';ctx.shadowColor='#88ccff';ctx.shadowBlur=5;
+  ctx.beginPath();ctx.ellipse(0,bTop+4.5,1.9,2.8,0,0,Math.PI*2);ctx.fill();
+  ctx.shadowBlur=0;
+
+  // Svislá ocasní plocha
+  ctx.fillStyle='#bcc8dc';
+  ctx.beginPath();
+  ctx.moveTo(-1,bTop+3);ctx.lineTo(3.5,11);ctx.lineTo(3.5,14);ctx.lineTo(-1,13.5);ctx.closePath();ctx.fill();
+
+  // OMS pody (na zádi po stranách)
+  ctx.fillStyle='#a8b8cc';
+  ctx.beginPath();ctx.ellipse(-bw*.65,8,4.5,7,-.15,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.ellipse(bw*.65,8,4.5,7,.15,0,Math.PI*2);ctx.fill();
+
+  // Motorová sekce (šedá)
+  ctx.fillStyle='#5a6878';
+  ctx.fillRect(-7,11.5,14,4.5);
+
+  // 3 SSME zvony
+  [-4,0,4].forEach(ex=>{
+    ctx.fillStyle='#445566';
+    ctx.beginPath();ctx.ellipse(ex,16,2.2,1.3,0,0,Math.PI*2);ctx.fill();
+  });
+
+  // Wingtip navigační světla
+  ctx.fillStyle='#ff2020';ctx.shadowColor='#ff4040';ctx.shadowBlur=4;
+  ctx.beginPath();ctx.arc(-21,11,1.4,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#00cc44';ctx.shadowColor='#00ff66';
+  ctx.beginPath();ctx.arc(21,11,1.4,0,Math.PI*2);ctx.fill();
+  ctx.shadowBlur=0;
 }
 
 // ---- Warp warm-up: engine stream při odpočtu ----
