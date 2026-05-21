@@ -666,12 +666,38 @@ canvas{display:block;}
 }
 #btn-settings-reset:hover{border-color:rgba(0,212,255,0.6);color:var(--cyan);}
 .settings-note{font:10px 'Courier New';color:rgba(0,200,200,0.25);font-style:italic;}
-#sounds-placeholder{
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  flex:1;padding:60px;gap:16px;
+#sounds-panel{padding:28px 24px;display:flex;flex-direction:column;gap:22px;}
+.snd-row{display:flex;align-items:center;gap:14px;}
+.snd-label{font:11px 'Courier New';color:var(--text);letter-spacing:1px;flex:0 0 220px;}
+.snd-slider{
+  flex:1;-webkit-appearance:none;appearance:none;
+  height:4px;border-radius:2px;
+  background:rgba(0,212,255,0.15);outline:none;cursor:pointer;
 }
-.sounds-icon{font-size:48px;opacity:0.3;}
-.sounds-text{font:12px 'Courier New';color:rgba(0,200,200,0.35);letter-spacing:1px;text-align:center;}
+.snd-slider::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;
+  width:14px;height:14px;border-radius:50%;
+  background:var(--cyan);border:2px solid var(--cyan);
+  box-shadow:0 0 6px var(--cyan);cursor:pointer;
+}
+.snd-slider::-moz-range-thumb{
+  width:14px;height:14px;border-radius:50%;
+  background:var(--cyan);border:2px solid var(--cyan);cursor:pointer;
+}
+.snd-val{font:12px 'Courier New';color:var(--cyan);width:32px;text-align:right;}
+.snd-test-row{display:flex;gap:10px;flex-wrap:wrap;padding-top:8px;border-top:1px solid rgba(0,200,168,0.1);}
+.snd-test-btn{
+  background:none;border:1px solid rgba(0,200,168,0.3);color:rgba(0,200,168,0.7);
+  font:10px 'Courier New';letter-spacing:1px;padding:6px 12px;cursor:pointer;
+  transition:all .18s;
+}
+.snd-test-btn:hover{background:rgba(0,200,168,0.08);border-color:var(--teal);color:var(--teal);}
+body.light .snd-label{color:#111;}
+body.light .snd-slider{background:rgba(0,0,0,0.1);}
+body.light .snd-slider::-webkit-slider-thumb{background:#000;border-color:#000;box-shadow:none;}
+body.light .snd-val{color:#000;}
+body.light .snd-test-btn{border-color:rgba(0,0,0,0.25);color:#111;}
+body.light .snd-test-btn:hover{background:rgba(0,0,0,0.05);border-color:#000;color:#000;}
 
 /* ========== NÁPOVĚDA OVERLAY ========== */
 #help-overlay{

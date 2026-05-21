@@ -418,9 +418,34 @@
         </div>
       </div>
       <div id="stab-sounds-panel" style="display:none">
-        <div id="sounds-placeholder">
-          <div class="sounds-icon">🔊</div>
-          <div class="sounds-text">Zvukový systém bude přidán v budoucí verzi.</div>
+        <div id="sounds-panel">
+          <div class="snd-row">
+            <span class="snd-label">🔊 Hlavní hlasitost</span>
+            <input type="range" class="snd-slider" id="snd-master" min="0" max="100" value="100">
+            <span class="snd-val" id="snd-master-val">100</span>
+          </div>
+          <div class="snd-row">
+            <span class="snd-label">💥 SFX (střelba, exploze)</span>
+            <input type="range" class="snd-slider" id="snd-sfx" min="0" max="100" value="85">
+            <span class="snd-val" id="snd-sfx-val">85</span>
+          </div>
+          <div class="snd-row">
+            <span class="snd-label">🚀 Motor lodi</span>
+            <input type="range" class="snd-slider" id="snd-engine" min="0" max="100" value="55">
+            <span class="snd-val" id="snd-engine-val">55</span>
+          </div>
+          <div class="snd-row">
+            <span class="snd-label">🖱 UI zvuky</span>
+            <input type="range" class="snd-slider" id="snd-ui" min="0" max="100" value="70">
+            <span class="snd-val" id="snd-ui-val">70</span>
+          </div>
+          <div class="snd-test-row">
+            <button class="snd-test-btn" id="snd-test-shoot">▶ Střelba</button>
+            <button class="snd-test-btn" id="snd-test-expl">▶ Exploze</button>
+            <button class="snd-test-btn" id="snd-test-dock">▶ Přistání</button>
+            <button class="snd-test-btn" id="snd-test-warp">▶ Warp</button>
+            <button class="snd-test-btn" id="snd-test-lvl">▶ Level up</button>
+          </div>
         </div>
       </div>
     </div>
@@ -480,6 +505,7 @@
   </div>
 </div>
 
+<script src="js/sound.js"></script>
 <script src="js/intro.js"></script>
 <script src="js/config.js"></script>
 <script src="js/world.js"></script>

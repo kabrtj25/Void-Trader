@@ -286,6 +286,7 @@ function tryShoot(){
     vy:p.vy*0.2+Math.sin(p.angle)*C.BULLET_SPD,
     life:1.4,owner:'player',dmg});
   spawnParticles(bx,by,4,'#ff9500',3,0.3,true);
+  SFX.playShoot();
 }
 
 // ---- Přistání ----
@@ -563,7 +564,7 @@ function updateDocking(dt){
   if(anim.progress>=1)completeDocking(st);
 }
 
-function startDocking(station){
+function startDocking(station){ SFX.playDock();
   const gs=gameState;
   gs.player.vx=0;gs.player.vy=0;
   gs.dockStation=station;
@@ -574,7 +575,7 @@ function startDocking(station){
   setMsg('');
 }
 
-function undock(){
+function undock(){ SFX.playUndock();
   if(!gameState)return;
   state='playing';
   const p=gameState.player;
@@ -644,6 +645,7 @@ function startWarpCountdown(){
   if(fuelPct<g.fuelCost){setMsg(`Nedostatek paliva! Potřebuješ ${g.fuelCost}% nádrže (máš ${Math.floor(fuelPct)}%).`,4000);return;}
   warpPhase='countdown';
   warpTimer=20;
+  SFX.playWarpStart();
   document.getElementById('warp-dest-name').textContent=g.name;
   document.getElementById('warp-countdown-num').textContent='20';
   document.getElementById('warp-bar-fill').style.width='0%';
@@ -682,6 +684,7 @@ function completeWarp(){
   gameState.navTarget=null;
   spawnInitialEnemies();
   setMsg(`Warp úspěšný! Vítejte v ${g.name}.`,6000);
+  SFX.playWarpJump();
 }
 
 function clearNav(){
@@ -929,6 +932,7 @@ function stationCrash(st){
   // Heavy screen shake
   shakeX=(Math.random()-.5)*60;shakeY=(Math.random()-.5)*60;
   p.dead=true;
+  SFX.playExplosion(true);
   setMsg('KOLIZE SE STANICÍ — KATASTROFICKÝ VÝBUCH!',5000);
   setTimeout(showDeath,2400);
 }
@@ -1026,6 +1030,10 @@ function update(dt){
   }
 
   p.thrusting=thrusting;p.boosting=boost;
+
+  // Engine zvuk
+  if(thrusting) SFX.startEngine(boost);
+  else SFX.stopEngine();
 
   // Camera zoom — oddaluje se s rychlostí
   const spd=Math.hypot(p.vx,p.vy);
@@ -1232,11 +1240,11 @@ function update(dt){
 function hitPlayer(dmg){
   const p=gameState.player;
   if(p.invTimer>0)return;
-  if(p.shield>0){p.shield=Math.max(0,p.shield-dmg);spawnParticles(p.x,p.y,6,'#4080ff',2,0.4,true);}
-  else{p.hull=Math.max(0,p.hull-dmg);spawnParticles(p.x,p.y,8,'#ff4400',2.5,0.6,true);p.invTimer=0.7;}
+  if(p.shield>0){p.shield=Math.max(0,p.shield-dmg);spawnParticles(p.x,p.y,6,'#4080ff',2,0.4,true);SFX.playShieldHit();}
+  else{p.hull=Math.max(0,p.hull-dmg);spawnParticles(p.x,p.y,8,'#ff4400',2.5,0.6,true);p.invTimer=0.7;SFX.playHullHit();}
   p.shieldRegenTimer=0;
   if(p.hull<=0&&!p.dead){
-    p.dead=true;spawnExplosion(p.x,p.y,true);
+    p.dead=true;spawnExplosion(p.x,p.y,true);SFX.playExplosion(true);
     setTimeout(showDeath,1200);
   }
 }
@@ -1244,7 +1252,7 @@ function hitPlayer(dmg){
 function addXP(p,amount){
   p.xp+=amount;
   const needed=xpNeeded(p.level);
-  if(p.xp>=needed&&p.level<20){p.xp-=needed;p.level++;setMsg(`LEVEL UP! ${p.level}`,3000);}
+  if(p.xp>=needed&&p.level<20){p.xp-=needed;p.level++;setMsg(`LEVEL UP! ${p.level}`,3000);SFX.playLevelUp();}
 }
 
 function showDeath(){
@@ -1838,6 +1846,32 @@ function openHelp(){document.getElementById('help-overlay').style.display='flex'
 function closeHelp(){document.getElementById('help-overlay').style.display='none';}
 
 // ---- Init ----
+function _initSoundPanel(){
+  const vols = SFX.getVolumes();
+  function bindSlider(id, valId, initVal, setter){
+    const sl = document.getElementById(id);
+    const vl = document.getElementById(valId);
+    if(!sl||!vl) return;
+    sl.value = Math.round(initVal*100);
+    vl.textContent = sl.value;
+    sl.addEventListener('input',()=>{
+      vl.textContent = sl.value;
+      setter(sl.value/100);
+    });
+  }
+  bindSlider('snd-master','snd-master-val', vols.master, SFX.setMasterVol);
+  bindSlider('snd-sfx',   'snd-sfx-val',   vols.sfx,    SFX.setSfxVol);
+  bindSlider('snd-engine','snd-engine-val', vols.engine, SFX.setEngineVol);
+  bindSlider('snd-ui',    'snd-ui-val',     vols.ui,     SFX.setUiVol);
+
+  const tb = (id,fn)=>{ const b=document.getElementById(id); if(b) b.onclick=fn; };
+  tb('snd-test-shoot', ()=>SFX.playShoot());
+  tb('snd-test-expl',  ()=>SFX.playExplosion(true));
+  tb('snd-test-dock',  ()=>SFX.playDock());
+  tb('snd-test-warp',  ()=>SFX.playWarpStart());
+  tb('snd-test-lvl',   ()=>SFX.playLevelUp());
+}
+
 window.addEventListener('load',()=>{
   canvas=document.getElementById('c');
   ctx=canvas.getContext('2d');
@@ -1846,11 +1880,13 @@ window.addEventListener('load',()=>{
   W2=W;H2=H;
   window.addEventListener('resize',()=>{W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight;});
 
+  SFX.init();
   loadBindings();
   initMinimap();
   initMapCanvas();
   initGalaxyCanvas();
   initMenuStars();
+  _initSoundPanel();
 
   // Aplikovat stav ikony tlačítka tématu podle uložené preference
   (function(){
