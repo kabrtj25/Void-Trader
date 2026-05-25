@@ -637,6 +637,7 @@ function startDocking(station){ SFX.playDock();
   parkingMode=false;
   state='docked';
   document.getElementById('hud').style.display='none';
+  if(gs.navTarget&&gs.navTarget.name===station.name) gs.navTarget=null;
 
   // Zkontroluj doručení aktivní zakázky
   const ac=gs.player.activeContract;
@@ -775,7 +776,7 @@ function completeWarp(){
 
   // Pokud je aktivní zakázka do této galaxie, nastav navigaci na nejbližší stanici
   const ac=gameState.player.activeContract;
-  if(ac&&ac.toIsGalaxy&&ac.toGalaxy===g.id){
+  if(ac&&ac.toIsGalaxy&&ac.toGalaxy===g.id&&g.id==='sol'){
     const nearest=FIXED_STATIONS.reduce((best,s)=>{
       const d=Math.hypot(s.cx-Math.floor(p.x/C.CHUNK),s.cy-Math.floor(p.y/C.CHUNK));
       return(!best||d<best.d)?{s,d}:best;

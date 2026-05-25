@@ -854,6 +854,7 @@ function renderContractsTab(player,station){
 function _setContractNav(contract){
   if(!contract||!window.gameState)return;
   const gs=window.gameState;
+  gs.navTarget=null;
   const galaxyId=window.currentGalaxy||'sol';
 
   if(contract.toIsGalaxy){

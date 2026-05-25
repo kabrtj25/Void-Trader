@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="520" viewBox="0 0 1200 520">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f1628"/>
+      <stop offset="50%" stop-color="#080b12"/>
+      <stop offset="100%" stop-color="#05060a"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ff9a55" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#5ce1ff" stop-opacity="0.35"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="520" fill="url(#bg)"/>
+  <rect x="32" y="32" width="1136" height="456" fill="none" stroke="url(#rim)" stroke-width="2" opacity="0.9"/>
+  <text x="600" y="248" text-anchor="middle" fill="#ff9a55" font-family="system-ui,sans-serif" font-size="36" font-weight="700" letter-spacing="0.35em">SPACE TRADER</text>
+  <text x="600" y="292" text-anchor="middle" fill="#5ce1ff" font-family="monospace" font-size="15" opacity="0.85">Replace with your cover art (e.g. cover.jpg)</text>
+</svg>

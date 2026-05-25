@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
+  <defs>
+    <linearGradient id="f" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#121a2e"/>
+      <stop offset="100%" stop-color="#0a0e18"/>
+    </linearGradient>
+  </defs>
+  <rect width="960" height="540" fill="url(#f)"/>
+  <rect x="20" y="20" width="920" height="500" fill="none" stroke="#5ce1ff" stroke-opacity="0.22" stroke-width="1"/>
+  <text x="480" y="278" text-anchor="middle" fill="#8b93a8" font-family="monospace" font-size="17">Gameplay placeholder — add .jpg / .png</text>
+</svg>
