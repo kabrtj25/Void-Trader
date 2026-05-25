@@ -8,3 +8,15 @@ Jirik gay-
 
 
 Goat ja- 
+<<<<<<< HEAD
+=======
+na mape galaxii se ukazuje jiny cas warpu nez realne ten cas
+
+zvuky se prehravaji i napriklad po smrti nebo kdyz letis a dal menu tak se stejne i tak prehravaji
+
+bugla textura a zvuky postranich trysek
+
+ovladani a,d je divny protoze se muzes otacet dokola 
+
+zdrazit cenu upgradu a cesty do jine galaxie(klidne by mohla stat i credity)
+>>>>>>> 7a5920bc5183e685c46e9e5a7d33059176d62621

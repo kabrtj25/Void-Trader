@@ -1,10 +1,11 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { fileURLToPath } from 'url'
-import { createReadStream, existsSync } from 'fs'
+import { createReadStream, existsSync, cpSync } from 'fs'
 import { extname, join } from 'path'
 
 const GAME_DIR = fileURLToPath(new URL('../../../game', import.meta.url))
+const DIST_GAME = fileURLToPath(new URL('./dist/game', import.meta.url))
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -31,6 +32,10 @@ function serveGamePlugin() {
         res.setHeader('Content-Type', MIME[extname(file)] || 'application/octet-stream')
         createReadStream(file).pipe(res)
       })
+    },
+    closeBundle() {
+      cpSync(GAME_DIR, DIST_GAME, { recursive: true })
+      console.log('✓ Hra zkopírována do dist/game/')
     },
   }
 }
