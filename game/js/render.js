@@ -265,7 +265,7 @@ function renderSystems(chunks,t){
 }
 
 // ---- Stanice (Transformers mechanický styl) ----
-function renderStation(st,t,nearDock,dockable){
+function renderStation(st,t,nearDock,dockable,lo){
   const{x:sx,y:sy}=toScreen(st.x,st.y);
   const R=st.r;
   if(!inView(sx,sy,R*5))return;
@@ -461,20 +461,48 @@ function renderStation(st,t,nearDock,dockable){
   // ===== LABEL (bez rotace) =====
   ctx.save();ctx.textAlign='center';
   const labelY=sy-R*2.8;
+  const _lc=lo?.color||st.color;
   if(nearDock){
     ctx.font='bold 14px "Courier New", monospace';
-    ctx.fillStyle=st.color;ctx.shadowColor=st.color;ctx.shadowBlur=8;
-    ctx.fillText(st.name,sx,labelY);ctx.shadowBlur=0;
+    ctx.fillStyle=_lc;ctx.shadowColor=_lc;ctx.shadowBlur=8;
+    ctx.fillText((lo?.prefix||'')+st.name,sx,labelY);ctx.shadowBlur=0;
     ctx.font='11px "Courier New", monospace';
+    const _hint=lo?.dockHint||(dockable?'▶ DOKOVACÍ PORT — VOLNÝ':'▷ Přiblíž se k dokovacímu portu');
     ctx.fillStyle=dockable?'#00ff88':'rgba(255,150,40,0.85)';
-    ctx.fillText(dockable?'▶ DOKOVACÍ PORT — VOLNÝ':'▷ Přiblíž se k dokovacímu portu',sx,labelY-18);
-    ctx.fillStyle=st.color+'80';ctx.font='10px "Courier New", monospace';
-    ctx.fillText('◆'.repeat(st.tier)+'◇'.repeat(Math.max(0,3-st.tier)),sx,sy+R*2.8+12);
+    ctx.fillText(_hint,sx,labelY-18);
+    ctx.fillStyle=_lc+'80';ctx.font='10px "Courier New", monospace';
+    const tier=st.tier||1;
+    ctx.fillText('◆'.repeat(tier)+'◇'.repeat(Math.max(0,3-tier)),sx,sy+R*2.8+12);
   } else {
-    ctx.font='10px "Courier New", monospace';ctx.fillStyle='rgba(255,150,40,0.5)';
-    ctx.fillText(st.name,sx,sy-R*2.0);
+    ctx.font='10px "Courier New", monospace';ctx.fillStyle=lo?.farColor||'rgba(255,150,40,0.5)';
+    ctx.fillText((lo?.farPrefix||'')+st.name,sx,sy-R*2.0);
   }
   ctx.restore();
+}
+
+// ---- Dealerská stanice (loděnice) — stejný vizuál jako normální stanice ----
+function renderDealer(st,t,nearDock,dockable){
+  renderStation(st,t,nearDock,dockable,{
+    prefix:'◈ ',
+    dockHint:dockable?'▶ LODĚNICE — VSTUP':'▷ LODĚNICE — přiblíž se',
+    farColor:(st.color||'#ffaa00')+'88',
+    farPrefix:'⚙ '
+  });
+}
+
+// ---- Garážová stanice — stejný vizuál jako normální stanice ----
+function renderGarage(st,t,nearDock,dockable){
+  const owned=window.gameState?.player?.ownedGarages?.includes(garageKey(st.garageGalaxy,st.garageCx,st.garageCy));
+  const col=st.color||'#00ccff';
+  const dispCol=owned?col:'rgba(0,200,255,0.5)';
+  const buyHint=st.garageCost?`▶ KOUPIT HANGÁR (${st.garageCost.toLocaleString('cs')} Cr)`:'▶ KOUPIT HANGÁR';
+  renderStation(st,t,nearDock,dockable,{
+    color:dispCol,
+    prefix:owned?'◈ ':'⊘ ',
+    dockHint:dockable?(owned?'▶ HANGÁR — VSTUP':buyHint):(owned?'▷ HANGÁR — přiblíž se':'▷ HANGÁR — přiblíž se pro koupi'),
+    farColor:owned?col+'88':'rgba(0,200,255,0.4)',
+    farPrefix:owned?'🏭 ':'🔒 '
+  });
 }
 
 // ---- Velká stanice — Coriolis / Transformers styl ----
@@ -893,6 +921,8 @@ function renderDockingSequence(gs,t){
     renderBackground(gs.chunks,t);
     renderSystems(gs.chunks,t);
     if(st.type==='large')renderLargeStation(st,t,true,false);
+    else if(st.type==='dealer')renderDealer(st,t,true,false);
+    else if(st.type==='garage')renderGarage(st,t,true,false);
     else renderStation(st,t,true,false);
     const{x:shipSX,y:shipSY}=toScreen(p.x,p.y);
     renderPlayerShip(p,t,shipSX,shipSY);
@@ -923,6 +953,8 @@ function renderDockingSequence(gs,t){
   gs.chunks.forEach(ch=>ch.asteroids.forEach(a=>renderAsteroid(a,t)));
   renderParticles([...engineTrails,...gs.particles]);
   if(st.type==='large')renderLargeStation(st,t,true,false);
+  else if(st.type==='dealer')renderDealer(st,t,true,false);
+  else if(st.type==='garage')renderGarage(st,t,true,false);
   else renderStation(st,t,true,false);
   // Loď na skutečné pozici — viditelná jak letí do dokovacího portu
   const{x:shipSX,y:shipSY}=toScreen(p.x,p.y);
@@ -1073,31 +1105,39 @@ function renderPlayerShip(player,t,sx,sy){
     ctx.globalAlpha=1;
   }
 
-  // === SSME MOTORY (3 zvony) ===
+  // === SSME MOTORY (3 zvony) — barva z lodi ===
+  const tCol=player.thrusterColor||'#ff7700';
+  const tColRgb=hexToRgb(tCol)||{r:255,g:119,b:0};
   if(player.thrusting||player.boosting){
     const isBst=player.boosting;
     const flicker=0.82+Math.random()*0.18;
     const fl=isBst?38:22;
-    // 3 motory ve tvaru delta — rozmístěné
-    [-5,0,5].forEach(ox=>{
+    const sc=getShipDef(player.shipType||'viper').scale||1.0;
+    const mOff=Math.round(5*sc);
+    [-mOff,0,mOff].forEach(ox=>{
       ctx.globalAlpha=0.85;
       const eg=ctx.createLinearGradient(ox,13,ox,13+fl*flicker);
-      eg.addColorStop(0,isBst?'rgba(160,230,255,0.95)':'rgba(220,245,255,0.9)');
-      eg.addColorStop(0.25,isBst?'rgba(0,140,255,0.6)':'rgba(180,225,255,0.55)');
+      const r=tColRgb.r,g=tColRgb.g,b=tColRgb.b;
+      eg.addColorStop(0,`rgba(${Math.min(255,r+60)},${Math.min(255,g+60)},${Math.min(255,b+60)},0.95)`);
+      eg.addColorStop(0.3,`rgba(${r},${g},${b},0.6)`);
       eg.addColorStop(1,'transparent');
       ctx.fillStyle=eg;
       ctx.beginPath();ctx.moveTo(ox-3.5,12);ctx.lineTo(ox+3.5,12);ctx.lineTo(ox,13+fl*flicker);ctx.fill();
     });
-    // Glow pod přídí
     ctx.globalAlpha=0.4;
     const gg=ctx.createRadialGradient(0,13,0,0,13,isBst?22:14);
-    gg.addColorStop(0,isBst?'rgba(100,200,255,0.7)':'rgba(200,230,255,0.5)');gg.addColorStop(1,'transparent');
+    gg.addColorStop(0,`rgba(${tColRgb.r},${tColRgb.g},${tColRgb.b},0.7)`);gg.addColorStop(1,'transparent');
     ctx.fillStyle=gg;ctx.beginPath();ctx.arc(0,13,isBst?22:14,0,Math.PI*2);ctx.fill();
     ctx.globalAlpha=1;
   }
 
-  // === RAKETOPLAN — Space Shuttle orbiter (zmenšený na herní scale) ===
-  drawGameShuttle();
+  // === LOĎ — shape dle typu, barva z hráče ===
+  const shipCol=player.shipColor||'#aaccff';
+  const shipId=player.shipType||'viper';
+  const shipScale=getShipDef(shipId).scale||1.0;
+  ctx.save();ctx.scale(shipScale,shipScale);
+  drawGameShuttle(shipCol,shipId);
+  ctx.restore();
 
   ctx.restore();
 
@@ -1154,18 +1194,272 @@ function renderVignette(){
 // ---- Space Shuttle Orbiter — herní loď ----
 // Kreslí se ve vlastním sys. souřadnic: nos nahoře (-Y), konec dole (+Y)
 // ctx musí být již transformován (translate + rotate) jako u starého trupu.
-function drawGameShuttle(){
+function hexToRgb(hex){
+  const r=/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return r?{r:parseInt(r[1],16),g:parseInt(r[2],16),b:parseInt(r[3],16)}:null;
+}
+function blendHull(base,hullHex){
+  // Blenduje bílou barvu s hull barvou (0.35 hull, 0.65 white base)
+  const h=hexToRgb(hullHex)||{r:200,g:210,b:230};
+  const br=hexToRgb(base)||{r:204,g:212,b:230};
+  const ri=Math.round(br.r*0.45+h.r*0.55);
+  const gi=Math.round(br.g*0.45+h.g*0.55);
+  const bi=Math.round(br.b*0.45+h.b*0.55);
+  return `rgb(${ri},${gi},${bi})`;
+}
+
+// ===== 20 LODÍ — vizuální styly =====
+// Každá funkce: souřadnicový střed (0,0), nos nahoru (-Y). Velikost ~±24×±26 px.
+
+function _drawSidewinder(col){
+  ctx.fillStyle=blendHull('#ccddee',col);
+  ctx.beginPath();ctx.moveTo(0,-18);ctx.lineTo(-20,12);ctx.lineTo(0,8);ctx.lineTo(20,12);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#1a1f28';ctx.beginPath();ctx.moveTo(0,-18);ctx.lineTo(-3,-6);ctx.lineTo(3,-6);ctx.closePath();ctx.fill();
+  ctx.fillStyle='rgba(120,210,255,0.65)';ctx.beginPath();ctx.ellipse(0,-10,2.2,3,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#445';ctx.fillRect(-5,9,10,5);
+  ctx.fillStyle='rgba(255,170,60,0.9)';ctx.beginPath();ctx.ellipse(0,14,3.5,2,0,0,Math.PI*2);ctx.fill();
+}
+
+function _drawHauler(col){
+  ctx.fillStyle=blendHull('#bb9944',col);
+  ctx.beginPath();ctx.rect(-15,-10,30,26);ctx.fill();
+  ctx.fillStyle=blendHull('#aa8833',col);
+  ctx.beginPath();ctx.rect(-24,-7,10,19);ctx.fill();
+  ctx.beginPath();ctx.rect(14,-7,10,19);ctx.fill();
+  ctx.fillStyle=blendHull('#cc9933',col);
+  ctx.beginPath();ctx.moveTo(-7,-10);ctx.lineTo(7,-10);ctx.lineTo(5,-20);ctx.lineTo(-5,-20);ctx.closePath();ctx.fill();
+  ctx.fillStyle='rgba(90,180,255,0.55)';ctx.fillRect(-4,-18,8,5);
+  ctx.fillStyle='#445';[-7,0,7].forEach(ex=>{ctx.beginPath();ctx.ellipse(ex,15,2.5,1.8,0,0,Math.PI*2);ctx.fill();});
+}
+
+function _drawScout(col){
+  ctx.fillStyle=blendHull('#44cc88',col);
+  ctx.beginPath();ctx.moveTo(0,-24);ctx.lineTo(-18,8);ctx.lineTo(-3,10);ctx.lineTo(0,14);ctx.lineTo(3,10);ctx.lineTo(18,8);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#0a1a10';ctx.beginPath();ctx.moveTo(0,-24);ctx.lineTo(-3,0);ctx.lineTo(3,0);ctx.closePath();ctx.fill();
+  ctx.fillStyle='rgba(100,255,180,0.6)';ctx.beginPath();ctx.ellipse(0,-14,1.5,4,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#556';ctx.beginPath();ctx.ellipse(0,14,4,2.5,0,0,Math.PI*2);ctx.fill();
+}
+
+function _drawCobra(col){
+  ctx.fillStyle=blendHull('#cc6622',col);
+  ctx.beginPath();ctx.moveTo(0,-22);ctx.lineTo(-14,-8);ctx.lineTo(-14,4);ctx.lineTo(14,4);ctx.lineTo(14,-8);ctx.closePath();ctx.fill();
+  ctx.fillStyle=blendHull('#dd7733',col);
+  ctx.beginPath();ctx.moveTo(-14,4);ctx.lineTo(-21,14);ctx.lineTo(-4,10);ctx.lineTo(0,14);ctx.lineTo(4,10);ctx.lineTo(21,14);ctx.lineTo(14,4);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#200800';ctx.fillRect(-12,-12,24,3);
+  ctx.fillStyle='rgba(255,160,80,0.65)';ctx.beginPath();ctx.ellipse(0,-14,4,3,0,0,Math.PI*2);ctx.fill();
+  [-5,5].forEach(ex=>{ctx.fillStyle='#554';ctx.beginPath();ctx.ellipse(ex,13,2.8,1.8,0,0,Math.PI*2);ctx.fill();});
+}
+
+function _drawEagle(col){
+  ctx.fillStyle=blendHull('#ddcc00',col);
+  ctx.beginPath();ctx.moveTo(0,-22);ctx.lineTo(-22,12);ctx.lineTo(-9,16);ctx.lineTo(0,8);ctx.lineTo(9,16);ctx.lineTo(22,12);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#1a1200';
+  ctx.beginPath();ctx.moveTo(-22,12);ctx.lineTo(-19,12);ctx.lineTo(-9,16);ctx.lineTo(-11,16);ctx.closePath();ctx.fill();
+  ctx.beginPath();ctx.moveTo(22,12);ctx.lineTo(19,12);ctx.lineTo(9,16);ctx.lineTo(11,16);ctx.closePath();ctx.fill();
+  ctx.fillStyle='rgba(255,240,100,0.65)';ctx.beginPath();ctx.ellipse(0,-13,3,4,0,0,Math.PI*2);ctx.fill();
+  [-5,5].forEach(ex=>{ctx.fillStyle='#554433';ctx.beginPath();ctx.ellipse(ex,12,2.5,1.8,0,0,Math.PI*2);ctx.fill();});
+}
+
+function _drawDiamondback(col){
+  ctx.fillStyle=blendHull('#3388dd',col);
+  ctx.beginPath();ctx.moveTo(0,-20);ctx.lineTo(-10,-8);ctx.lineTo(-14,8);ctx.lineTo(-7,14);ctx.lineTo(7,14);ctx.lineTo(14,8);ctx.lineTo(10,-8);ctx.closePath();ctx.fill();
+  ctx.strokeStyle=blendHull('#1133aa',col);ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(0,-20);ctx.lineTo(-10,-8);ctx.lineTo(0,0);ctx.lineTo(10,-8);ctx.lineTo(0,-20);ctx.stroke();
+  ctx.fillStyle='rgba(80,180,255,0.7)';ctx.beginPath();ctx.ellipse(0,-11,3,4,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle=blendHull('#2277cc',col);
+  [-14,14].forEach(s=>{ctx.beginPath();ctx.moveTo(s*0.8,8);ctx.lineTo(s,8);ctx.lineTo(s,14);ctx.lineTo(s*0.8,14);ctx.closePath();ctx.fill();});
+  [-5,5].forEach(ex=>{ctx.fillStyle='#334';ctx.beginPath();ctx.ellipse(ex,14,2.2,1.5,0,0,Math.PI*2);ctx.fill();});
+}
+
+function _drawVulture(col){
+  ctx.fillStyle=blendHull('#cc3366',col);
+  ctx.beginPath();ctx.moveTo(0,-20);ctx.lineTo(-5,-4);ctx.lineTo(-5,6);ctx.lineTo(5,6);ctx.lineTo(5,-4);ctx.closePath();ctx.fill();
+  ctx.fillStyle=blendHull('#bb2255',col);
+  [-11,11].forEach(bx=>{
+    ctx.beginPath();ctx.moveTo(bx*0.5,-2);ctx.lineTo(bx,-2);ctx.lineTo(bx,14);ctx.lineTo(bx*0.5,14);ctx.closePath();ctx.fill();
+    ctx.fillStyle='#334';ctx.beginPath();ctx.ellipse(bx,14,2.8,1.8,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle=blendHull('#bb2255',col);
+  });
+  ctx.fillStyle=blendHull('#cc3366',col);
+  ctx.beginPath();ctx.moveTo(-18,0);ctx.lineTo(-5,0);ctx.lineTo(-5,4);ctx.lineTo(-18,4);ctx.closePath();ctx.fill();
+  ctx.beginPath();ctx.moveTo(5,0);ctx.lineTo(18,0);ctx.lineTo(18,4);ctx.lineTo(5,4);ctx.closePath();ctx.fill();
+  ctx.fillStyle='rgba(255,80,120,0.65)';ctx.beginPath();ctx.ellipse(0,-12,3,4,0,0,Math.PI*2);ctx.fill();
+}
+
+function _drawKrait(col){
+  ctx.fillStyle=blendHull('#ee6600',col);
+  ctx.beginPath();ctx.moveTo(-13,-6);ctx.lineTo(13,-6);ctx.lineTo(13,-14);ctx.lineTo(7,-22);ctx.lineTo(-7,-22);ctx.lineTo(-13,-14);ctx.closePath();ctx.fill();
+  ctx.beginPath();ctx.moveTo(-16,6);ctx.lineTo(-13,-6);ctx.lineTo(13,-6);ctx.lineTo(16,6);ctx.lineTo(10,14);ctx.lineTo(-10,14);ctx.closePath();ctx.fill();
+  ctx.fillStyle='rgba(255,160,80,0.65)';ctx.fillRect(-7,-18,14,5);
+  [-16,16].forEach(ex=>{
+    ctx.fillStyle=blendHull('#dd5500',col);
+    ctx.beginPath();ctx.moveTo(ex,2);ctx.lineTo(ex*1.2,2);ctx.lineTo(ex*1.2,14);ctx.lineTo(ex,14);ctx.closePath();ctx.fill();
+    ctx.fillStyle='#554';ctx.beginPath();ctx.ellipse(ex*1.1,14,2.8,1.8,0,0,Math.PI*2);ctx.fill();
+  });
+  ctx.fillStyle='#554';ctx.beginPath();ctx.ellipse(0,14,4.5,2.5,0,0,Math.PI*2);ctx.fill();
+}
+
+function _drawPython(col){
+  ctx.fillStyle=blendHull('#9944dd',col);
+  ctx.beginPath();ctx.ellipse(0,0,11,20,0,0,Math.PI*2);ctx.fill();
+  [-16,16].forEach(ex=>{
+    ctx.fillStyle=blendHull('#8833cc',col);
+    const sx=Math.sign(ex);
+    ctx.beginPath();ctx.moveTo(ex,-13);ctx.lineTo(ex+sx*5,-11);ctx.lineTo(ex+sx*5,10);ctx.lineTo(ex,11);ctx.closePath();ctx.fill();
+    ctx.fillStyle='#554';ctx.beginPath();ctx.ellipse(ex+sx*4,11,3.2,2,0,0,Math.PI*2);ctx.fill();
+  });
+  ctx.fillStyle=blendHull('#aa55ee',col);
+  ctx.beginPath();ctx.moveTo(-5,-20);ctx.lineTo(0,-26);ctx.lineTo(5,-20);ctx.closePath();ctx.fill();
+  ctx.fillStyle='rgba(190,120,255,0.65)';ctx.fillRect(-4,-16,8,6);
+  ctx.fillStyle='#554';ctx.beginPath();ctx.ellipse(0,16,4,2.5,0,0,Math.PI*2);ctx.fill();
+}
+
+function _drawMamba(col){
+  ctx.fillStyle=blendHull('#ee1133',col);
+  ctx.beginPath();ctx.moveTo(0,-22);ctx.lineTo(-24,10);ctx.lineTo(-5,12);ctx.lineTo(0,6);ctx.lineTo(5,12);ctx.lineTo(24,10);ctx.closePath();ctx.fill();
+  ctx.fillStyle=blendHull('#ff2244',col);
+  ctx.beginPath();ctx.moveTo(0,-22);ctx.lineTo(-2,8);ctx.lineTo(2,8);ctx.closePath();ctx.fill();
+  [-6,6].forEach(ex=>{
+    ctx.fillStyle='#443';ctx.fillRect(ex-2.5,10,5,5);
+    ctx.fillStyle='rgba(255,60,90,0.9)';ctx.beginPath();ctx.ellipse(ex,15,2.8,1.8,0,0,Math.PI*2);ctx.fill();
+  });
+  ctx.fillStyle='rgba(255,100,130,0.65)';ctx.beginPath();ctx.ellipse(0,-14,2,4,0,0,Math.PI*2);ctx.fill();
+}
+
+function _drawFalcon(col){
+  ctx.fillStyle=blendHull('#dd2255',col);
+  ctx.beginPath();ctx.rect(-4.5,-20,9,36);ctx.fill();
+  [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([sx,sy])=>{
+    ctx.fillStyle=blendHull('#cc1144',col);
+    ctx.beginPath();
+    ctx.moveTo(sx*4.5,-16*Math.sign(sy));ctx.lineTo(sx*20,-10*Math.sign(sy));
+    ctx.lineTo(sx*20,-4*Math.sign(sy));ctx.lineTo(sx*4.5,-8*Math.sign(sy));
+    ctx.closePath();ctx.fill();
+    ctx.fillStyle='#443';ctx.beginPath();ctx.ellipse(sx*20,-7*Math.sign(sy),3,2,0,0,Math.PI*2);ctx.fill();
+  });
+  ctx.fillStyle='rgba(255,80,100,0.7)';ctx.beginPath();ctx.ellipse(0,-12,2.5,3.5,0,0,Math.PI*2);ctx.fill();
+}
+
+function _drawAsp(col){
+  ctx.fillStyle=blendHull('#44bbdd',col);
+  ctx.beginPath();ctx.rect(-5.5,-22,11,30);ctx.fill();
+  [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([sx,sy])=>{
+    ctx.fillStyle=blendHull('#33aacc',col);
+    const oy=sy*2-8;
+    ctx.beginPath();ctx.moveTo(sx*5.5,oy);ctx.lineTo(sx*20,oy-6);ctx.lineTo(sx*20,oy);ctx.lineTo(sx*5.5,oy+4);ctx.closePath();ctx.fill();
+    ctx.fillStyle='#334';ctx.beginPath();ctx.ellipse(sx*20,oy-3,2.2,1.6,0,0,Math.PI*2);ctx.fill();
+  });
+  ctx.fillStyle='rgba(60,200,255,0.7)';ctx.beginPath();ctx.ellipse(0,-14,3.5,5,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#334';ctx.beginPath();ctx.ellipse(0,7,4.5,3,0,0,Math.PI*2);ctx.fill();
+}
+
+function _drawClipper(col){
+  ctx.fillStyle=blendHull('#22aacc',col);
+  ctx.beginPath();ctx.moveTo(0,-24);ctx.lineTo(-3.5,-18);ctx.lineTo(-3.5,12);ctx.lineTo(0,14);ctx.lineTo(3.5,12);ctx.lineTo(3.5,-18);ctx.closePath();ctx.fill();
+  ctx.fillStyle=blendHull('#1188bb',col);
+  ctx.beginPath();ctx.moveTo(-3.5,-8);ctx.lineTo(-22,-2);ctx.lineTo(-22,4);ctx.lineTo(-7,10);ctx.lineTo(-3.5,10);ctx.closePath();ctx.fill();
+  ctx.beginPath();ctx.moveTo(3.5,-8);ctx.lineTo(22,-2);ctx.lineTo(22,4);ctx.lineTo(7,10);ctx.lineTo(3.5,10);ctx.closePath();ctx.fill();
+  [-22,22].forEach(wx=>{ctx.fillStyle='rgba(60,200,255,0.7)';ctx.beginPath();ctx.arc(wx,1,2,0,Math.PI*2);ctx.fill();});
+  ctx.fillStyle='rgba(60,200,255,0.7)';ctx.beginPath();ctx.ellipse(0,-18,2.5,4,0,0,Math.PI*2);ctx.fill();
+  [-3,3].forEach(ex=>{ctx.fillStyle='#334';ctx.beginPath();ctx.ellipse(ex,13,2.2,1.6,0,0,Math.PI*2);ctx.fill();});
+}
+
+function _drawFerDeLance(col){
+  ctx.fillStyle=blendHull('#ddaa22',col);
+  ctx.beginPath();ctx.moveTo(0,-26);ctx.bezierCurveTo(-9,-16,-11,4,-9,14);ctx.lineTo(9,14);ctx.bezierCurveTo(11,4,9,-16,0,-26);ctx.closePath();ctx.fill();
+  ctx.fillStyle=blendHull('#cc9900',col);
+  ctx.beginPath();ctx.moveTo(-9,2);ctx.lineTo(-22,10);ctx.lineTo(-18,16);ctx.lineTo(-9,12);ctx.closePath();ctx.fill();
+  ctx.beginPath();ctx.moveTo(9,2);ctx.lineTo(22,10);ctx.lineTo(18,16);ctx.lineTo(9,12);ctx.closePath();ctx.fill();
+  ctx.fillStyle='rgba(255,220,100,0.7)';ctx.beginPath();ctx.ellipse(0,-16,3,5,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#554';ctx.beginPath();ctx.ellipse(0,14,4.5,2.8,0,0,Math.PI*2);ctx.fill();
+}
+
+function _drawType7(col){
+  ctx.fillStyle=blendHull('#dd8800',col);
+  ctx.beginPath();ctx.rect(-20,-14,40,30);ctx.fill();
+  ctx.fillStyle=blendHull('#cc7700',col);ctx.fillRect(-13,-14,26,6);
+  ctx.fillStyle=blendHull('#ee9900',col);
+  ctx.beginPath();ctx.moveTo(-5,-14);ctx.lineTo(5,-14);ctx.lineTo(4,-23);ctx.lineTo(-4,-23);ctx.closePath();ctx.fill();
+  ctx.fillStyle='rgba(255,180,80,0.65)';ctx.fillRect(-3,-23,6,4);
+  ctx.fillStyle='#554';[-11,-4,4,11].forEach(ex=>{ctx.beginPath();ctx.ellipse(ex,15,2.8,1.8,0,0,Math.PI*2);ctx.fill();});
+}
+
+function _drawImperialCutter(col){
+  ctx.fillStyle=blendHull('#ddaa00',col);
+  ctx.beginPath();ctx.moveTo(0,-22);ctx.lineTo(-18,0);ctx.lineTo(0,16);ctx.lineTo(18,0);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#221a00';
+  ctx.beginPath();ctx.moveTo(-18,0);ctx.lineTo(-15,0);ctx.lineTo(-2,16);ctx.lineTo(0,16);ctx.closePath();ctx.fill();
+  ctx.beginPath();ctx.moveTo(18,0);ctx.lineTo(15,0);ctx.lineTo(2,16);ctx.lineTo(0,16);ctx.closePath();ctx.fill();
+  ctx.fillStyle=blendHull('#cc9900',col);
+  ctx.beginPath();ctx.moveTo(-18,0);ctx.lineTo(-26,-2);ctx.lineTo(-22,8);ctx.lineTo(-13,8);ctx.closePath();ctx.fill();
+  ctx.beginPath();ctx.moveTo(18,0);ctx.lineTo(26,-2);ctx.lineTo(22,8);ctx.lineTo(13,8);ctx.closePath();ctx.fill();
+  [-24,24].forEach(ex=>{ctx.fillStyle='#554';ctx.beginPath();ctx.ellipse(ex,3,2.8,1.8,0,0,Math.PI*2);ctx.fill();});
+  ctx.fillStyle='rgba(255,220,80,0.7)';ctx.beginPath();ctx.ellipse(0,-14,3,4,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#554';ctx.beginPath();ctx.ellipse(0,16,4.5,2.8,0,0,Math.PI*2);ctx.fill();
+}
+
+function _drawAnaconda(col){
+  ctx.fillStyle=blendHull('#dd2222',col);
+  ctx.beginPath();ctx.rect(-7.5,-24,15,44);ctx.fill();
+  ctx.beginPath();ctx.rect(-25,-4,50,12);ctx.fill();
+  ctx.fillStyle=blendHull('#cc1111',col);
+  ctx.beginPath();ctx.rect(-9,-24,18,10);ctx.fill();
+  ctx.fillStyle='rgba(255,80,80,0.7)';ctx.fillRect(-4,-22,8,5);
+  ctx.fillStyle='#443';[-9,-3,3,9].forEach(ex=>{ctx.beginPath();ctx.ellipse(ex,20,2.8,1.8,0,0,Math.PI*2);ctx.fill();});
+  [-23,-18,18,23].forEach(ex=>{ctx.beginPath();ctx.ellipse(ex,2,2.2,1.4,0,0,Math.PI*2);ctx.fill();});
+}
+
+function _drawType9(col){
+  ctx.fillStyle=blendHull('#7788aa',col);
+  ctx.beginPath();
+  for(let i=0;i<6;i++){const a=i/6*Math.PI*2-Math.PI/6;ctx.lineTo(Math.cos(a)*22,Math.sin(a)*22-2);}
+  ctx.closePath();ctx.fill();
+  ctx.fillStyle=blendHull('#5566aa',col);ctx.beginPath();ctx.rect(-3.5,-22,7,44);ctx.fill();
+  ctx.fillStyle='rgba(120,140,220,0.7)';ctx.beginPath();ctx.ellipse(0,-17,4.5,4,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#334';
+  for(let i=0;i<6;i++){
+    const a=i/6*Math.PI*2+Math.PI/2;
+    ctx.beginPath();ctx.ellipse(Math.cos(a)*18,Math.sin(a)*18-2,3.5,2.5,0,0,Math.PI*2);ctx.fill();
+  }
+}
+
+function _drawCarrier(col){
+  ctx.fillStyle=blendHull('#8899ee',col);
+  ctx.beginPath();ctx.rect(-24,-20,48,40);ctx.fill();
+  ctx.fillStyle='#0f1530';ctx.fillRect(-22,-18,44,3);ctx.fillRect(-22,15,44,3);
+  ctx.fillStyle=blendHull('#7788dd',col);ctx.fillRect(-4,-20,8,9);
+  ctx.strokeStyle='rgba(180,200,255,0.4)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(-22,0);ctx.lineTo(22,0);ctx.stroke();
+  ctx.fillStyle='rgba(0,0,60,0.7)';[-12,-4,4,12].forEach(bx=>{ctx.fillRect(bx-3.5,4,7,10);});
+  ctx.fillStyle='#334';[-18,-8,8,18].forEach(ex=>{ctx.beginPath();ctx.ellipse(ex,20,3,2,0,0,Math.PI*2);ctx.fill();});
+  ctx.fillStyle='rgba(150,180,255,0.7)';ctx.fillRect(-3,-22,6,4);
+}
+
+// Dispatcher
+const SHIP_RENDERERS={
+  sidewinder:_drawSidewinder,hauler:_drawHauler,scout:_drawScout,cobra:_drawCobra,
+  eagle:_drawEagle,diamondback:_drawDiamondback,vulture:_drawVulture,krait:_drawKrait,
+  python:_drawPython,mamba:_drawMamba,falcon:_drawFalcon,asp:_drawAsp,
+  clipper:_drawClipper,fer_de_lance:_drawFerDeLance,type7:_drawType7,
+  imperial_cutter:_drawImperialCutter,anaconda:_drawAnaconda,type9:_drawType9,carrier:_drawCarrier
+};
+
+function drawGameShuttle(hullColor,shipId){
+  const col=hullColor||'#aaccff';
+  const fn=shipId&&SHIP_RENDERERS[shipId];
+  if(fn){fn(col);return;}
+  // Default: Viper (space shuttle design)
   const bh=30,bw=6.5;
   const bTop=-bh*.5; // -15
 
   // Delta křídla
-  ctx.fillStyle='#ccd4e6';
+  ctx.fillStyle=blendHull('#ccd4e6',col);
   ctx.beginPath();
   ctx.moveTo(-bw*.5,1);ctx.lineTo(-21,11);ctx.lineTo(-bw*.5,13);ctx.closePath();ctx.fill();
   ctx.beginPath();
   ctx.moveTo(bw*.5,1);ctx.lineTo(21,11);ctx.lineTo(bw*.5,13);ctx.closePath();ctx.fill();
 
-  // Tepelné dlaždice — přední hrana křídla (černá)
+  // Tepelné dlaždice — přední hrana křídla
   ctx.fillStyle='#181818';
   ctx.beginPath();
   ctx.moveTo(-bw*.5,1);ctx.lineTo(-21,11);ctx.lineTo(-19,11);ctx.lineTo(-bw*.5+2,2);ctx.closePath();ctx.fill();
@@ -1173,7 +1467,7 @@ function drawGameShuttle(){
   ctx.moveTo(bw*.5,1);ctx.lineTo(21,11);ctx.lineTo(19,11);ctx.lineTo(bw*.5-2,2);ctx.closePath();ctx.fill();
 
   // Trup (fuselage)
-  ctx.fillStyle='#d4dcea';
+  ctx.fillStyle=blendHull('#d4dcea',col);
   ctx.beginPath();
   if(ctx.roundRect)ctx.roundRect(-bw*.5,bTop,bw,bh,1.8);
   else ctx.rect(-bw*.5,bTop,bw,bh);
@@ -1188,9 +1482,9 @@ function drawGameShuttle(){
   ctx.moveTo(-bw*.5,bTop);
   ctx.quadraticCurveTo(-bw*.4,bTop-3.5,0,bTop-11);
   ctx.quadraticCurveTo(bw*.4,bTop-3.5,bw*.5,bTop);
-  ctx.closePath();ctx.fillStyle='#c8d0e4';ctx.fill();
+  ctx.closePath();ctx.fillStyle=blendHull('#c8d0e4',col);ctx.fill();
 
-  // Nos — černá špička (tepelný kryt)
+  // Nos — černá špička
   ctx.beginPath();
   ctx.moveTo(-bw*.3,bTop-.5);
   ctx.quadraticCurveTo(0,bTop-11,bw*.3,bTop-.5);
@@ -1202,16 +1496,16 @@ function drawGameShuttle(){
   ctx.shadowBlur=0;
 
   // Svislá ocasní plocha
-  ctx.fillStyle='#bcc8dc';
+  ctx.fillStyle=blendHull('#bcc8dc',col);
   ctx.beginPath();
   ctx.moveTo(-1,bTop+3);ctx.lineTo(3.5,11);ctx.lineTo(3.5,14);ctx.lineTo(-1,13.5);ctx.closePath();ctx.fill();
 
-  // OMS pody (na zádi po stranách)
-  ctx.fillStyle='#a8b8cc';
+  // OMS pody
+  ctx.fillStyle=blendHull('#a8b8cc',col);
   ctx.beginPath();ctx.ellipse(-bw*.65,8,4.5,7,-.15,0,Math.PI*2);ctx.fill();
   ctx.beginPath();ctx.ellipse(bw*.65,8,4.5,7,.15,0,Math.PI*2);ctx.fill();
 
-  // Motorová sekce (šedá)
+  // Motorová sekce
   ctx.fillStyle='#5a6878';
   ctx.fillRect(-7,11.5,14,4.5);
 

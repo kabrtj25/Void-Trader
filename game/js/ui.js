@@ -162,6 +162,13 @@ function renderHUD(player,nearStation,dockingState,t){
   }
 }
 
+function _roundRect(c,x,y,w,h,r){
+  c.beginPath();c.moveTo(x+r,y);c.lineTo(x+w-r,y);c.quadraticCurveTo(x+w,y,x+w,y+r);
+  c.lineTo(x+w,y+h-r);c.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  c.lineTo(x+r,y+h);c.quadraticCurveTo(x,y+h,x,y+h-r);
+  c.lineTo(x,y+r);c.quadraticCurveTo(x,y,x+r,y);c.closePath();
+}
+
 function hudPanel(x,y,w,h){
   ctx.save();
   ctx.fillStyle='rgba(0,4,22,0.86)';ctx.fillRect(x,y,w,h);
@@ -318,9 +325,14 @@ function initMapCanvas(){
     drawBigMap();
   },{passive:false});
   mapCanvas.addEventListener('mousedown',e=>{mapDragStart={x:e.clientX-mapPan.x,y:e.clientY-mapPan.y};mapCanvas.style.cursor='grabbing';});
-  mapCanvas.addEventListener('mousemove',e=>{if(mapDragStart){mapPan.x=e.clientX-mapDragStart.x;mapPan.y=e.clientY-mapDragStart.y;drawBigMap();}});
+  mapCanvas.addEventListener('mousemove',e=>{
+    if(mapDragStart){mapPan.x=e.clientX-mapDragStart.x;mapPan.y=e.clientY-mapDragStart.y;}
+    const rect=mapCanvas.getBoundingClientRect();
+    _mapHoverX=e.clientX-rect.left;_mapHoverY=e.clientY-rect.top;
+    drawBigMap();
+  });
   mapCanvas.addEventListener('mouseup',()=>{mapDragStart=null;mapCanvas.style.cursor='grab';});
-  mapCanvas.addEventListener('mouseleave',()=>{mapDragStart=null;});
+  mapCanvas.addEventListener('mouseleave',()=>{mapDragStart=null;_mapHoverX=-999;_mapHoverY=-999;drawBigMap();});
   mapCanvas.addEventListener('click',e=>{handleMapClick(e);});
   mapCanvas.style.cursor='grab';
 }
@@ -553,20 +565,119 @@ function drawBigMap(){
     });
   }
 
+  // === DEALERS & GARAGES na mapě — ikony + přiletové okno na hover ===
+  {
+    const gid=window.currentGalaxy||'sol';
+    const dealers=(typeof DEALERS_DATA!=='undefined'?DEALERS_DATA[gid]:null)||[];
+    const garages=(typeof GARAGES_DATA!=='undefined'?GARAGES_DATA[gid]:null)||[];
+    const p2=window.gameState?.player;
+    let _hoveredPOI=null;
+
+    // --- Loděnice (dealer) ---
+    dealers.forEach(dl=>{
+      const chKey=chunkKey(dl.cx,dl.cy);
+      let stx,sty;
+      if(chunkCache.has(chKey)){const ch=chunkCache.get(chKey);stx=ch.system?.station?.x||(dl.cx*C.CHUNK+C.CHUNK*.65);sty=ch.system?.station?.y||(dl.cy*C.CHUNK+C.CHUNK*.65);}
+      else{stx=dl.cx*C.CHUNK+C.CHUNK*.65;sty=dl.cy*C.CHUNK+C.CHUNK*.65;}
+      const{x:spx,y:spy}=wp(stx-player.x,sty-player.y);
+      if(spx<-20||spx>MW+20||spy<-20||spy>MH+20)return;
+      const hovered=Math.hypot(_mapHoverX-spx,_mapHoverY-spy)<14;
+      if(hovered)_hoveredPOI={x:spx,y:spy,name:dl.name,type:'dealer',sub:'Loděnice — prodej lodí',extra:`20 lodí v katalogu`,col:'#ffaa00'};
+      mapCtx.save();
+      mapCtx.globalAlpha=hovered?1:0.8;
+      // Diamond icon
+      const r=hovered?9:6;
+      mapCtx.strokeStyle='#ffaa00';mapCtx.lineWidth=hovered?2:1.5;
+      mapCtx.shadowColor='#ffaa00';mapCtx.shadowBlur=hovered?14:6;
+      mapCtx.fillStyle='rgba(255,170,0,0.15)';
+      mapCtx.beginPath();mapCtx.moveTo(spx,spy-r);mapCtx.lineTo(spx+r*0.75,spy);mapCtx.lineTo(spx,spy+r);mapCtx.lineTo(spx-r*0.75,spy);mapCtx.closePath();
+      mapCtx.fill();mapCtx.stroke();
+      mapCtx.shadowBlur=0;
+      // Small 🚀 text center
+      mapCtx.font=`${hovered?9:8}px "Courier New",monospace`;mapCtx.textAlign='center';mapCtx.fillStyle='#ffdd88';
+      mapCtx.fillText('🚀',spx,spy+3);
+      mapCtx.restore();
+    });
+
+    // --- Garáže ---
+    garages.forEach(gr=>{
+      const chKey=chunkKey(gr.cx,gr.cy);
+      let stx,sty;
+      if(chunkCache.has(chKey)){const ch=chunkCache.get(chKey);stx=ch.system?.station?.x||(gr.cx*C.CHUNK+C.CHUNK*.65);sty=ch.system?.station?.y||(gr.cy*C.CHUNK+C.CHUNK*.65);}
+      else{stx=gr.cx*C.CHUNK+C.CHUNK*.65;sty=gr.cy*C.CHUNK+C.CHUNK*.65;}
+      const{x:spx,y:spy}=wp(stx-player.x,sty-player.y);
+      if(spx<-20||spx>MW+20||spy<-20||spy>MH+20)return;
+      const owned=p2?.ownedGarages?.includes(garageKey(gid,gr.cx,gr.cy));
+      const hovered=Math.hypot(_mapHoverX-spx,_mapHoverY-spy)<14;
+      const hexCol=owned?'#00ff88':'#00ccff';
+      if(hovered)_hoveredPOI={x:spx,y:spy,name:gr.name,type:'garage',sub:owned?'Garáž — vlastníš':'Garáž — zakoupit',extra:owned?'Kapacita 3–6 lodí':`Cena: ${gr.cost.toLocaleString('cs')} Cr`,col:hexCol,owned};
+      mapCtx.save();
+      mapCtx.globalAlpha=hovered?1:0.8;
+      const r=hovered?8:6;
+      mapCtx.strokeStyle=hexCol;mapCtx.lineWidth=hovered?2:1.5;
+      mapCtx.shadowColor=hexCol;mapCtx.shadowBlur=hovered?14:6;
+      mapCtx.fillStyle=owned?'rgba(0,255,136,0.12)':'rgba(0,200,255,0.1)';
+      mapCtx.beginPath();
+      for(let i=0;i<6;i++){const a=i*Math.PI/3-Math.PI/6;mapCtx.lineTo(spx+Math.cos(a)*r,spy+Math.sin(a)*r);}
+      mapCtx.closePath();mapCtx.fill();mapCtx.stroke();
+      mapCtx.shadowBlur=0;
+      mapCtx.font=`${hovered?9:7}px sans-serif`;mapCtx.textAlign='center';mapCtx.fillStyle=hexCol;
+      mapCtx.fillText(owned?'✓':'H',spx,spy+3);
+      mapCtx.restore();
+    });
+
+    // --- Přiletové okno (hover tooltip) ---
+    if(_hoveredPOI){
+      const {x:hx,y:hy,name,type,sub,extra,col}=_hoveredPOI;
+      const tw=200,th=72,pad=10;
+      // Position: prefer right/below cursor, avoid edges
+      let bx=hx+18,by=hy-th/2;
+      if(bx+tw>MW-10)bx=hx-tw-18;
+      if(by<10)by=10;
+      if(by+th>MH-60)by=MH-60-th;
+      mapCtx.save();
+      // Panel
+      mapCtx.fillStyle=window.lightMode?'rgba(240,248,255,0.97)':'rgba(4,8,24,0.97)';
+      mapCtx.strokeStyle=col;mapCtx.lineWidth=1.5;
+      mapCtx.shadowColor=col;mapCtx.shadowBlur=12;
+      _roundRect(mapCtx,bx,by,tw,th,4);mapCtx.fill();mapCtx.stroke();
+      mapCtx.shadowBlur=0;
+      // Top accent line
+      mapCtx.fillStyle=col;mapCtx.fillRect(bx+1.5,by+1.5,tw-3,2);
+      // Name
+      mapCtx.font='bold 11px "Courier New",monospace';mapCtx.textAlign='left';
+      mapCtx.fillStyle=window.lightMode?'#000022':col;
+      mapCtx.fillText(name,bx+pad,by+pad+10);
+      // Type line
+      mapCtx.font='9px "Courier New",monospace';
+      mapCtx.fillStyle=window.lightMode?'rgba(0,30,80,0.55)':'rgba(200,220,255,0.55)';
+      mapCtx.fillText(sub,bx+pad,by+pad+26);
+      // Extra info
+      mapCtx.fillStyle=window.lightMode?'rgba(0,0,0,0.4)':'rgba(200,220,255,0.4)';
+      mapCtx.fillText(extra,bx+pad,by+pad+42);
+      // Type badge top right
+      mapCtx.font='bold 8px "Courier New",monospace';mapCtx.textAlign='right';
+      mapCtx.fillStyle=col;
+      mapCtx.fillText(type==='dealer'?'◇ LODĚNICE':'⬡ GARÁŽ',bx+tw-pad,by+pad+10);
+      mapCtx.restore();
+    }
+  }
+
   // === LEGENDA — panel dole ===
   const legH=44,legY2=MH-legH;
   mapCtx.save();
-  mapCtx.fillStyle='rgba(0,3,14,0.88)';mapCtx.fillRect(0,legY2,MW,legH);
-  mapCtx.strokeStyle='rgba(255,149,0,0.2)';mapCtx.lineWidth=1;
+  mapCtx.fillStyle=window.lightMode?'rgba(220,235,255,0.93)':'rgba(0,3,14,0.88)';mapCtx.fillRect(0,legY2,MW,legH);
+  mapCtx.strokeStyle=window.lightMode?'rgba(0,40,160,0.15)':'rgba(255,149,0,0.2)';mapCtx.lineWidth=1;
   mapCtx.beginPath();mapCtx.moveTo(0,legY2);mapCtx.lineTo(MW,legY2);mapCtx.stroke();
 
   const legItems=[
-    {icon:null,color:'#ffee88',  label:'☀ Hvězda / Slunce'},
-    {icon:'hex',color:'#ff9500', label:'◆ Malá stanice (Transformer)'},
-    {icon:'ring',color:'#00d4ff',label:'◎ Velká stanice (Coriolis)'},
-    {icon:'ring',color:'#aa44ff',label:'◎ Coriolis — neobjeveno (55% průhlednost)'},
-    {icon:null,color:'#ff9500',  label:'▶ Hráč'},
-    {icon:null,color:'#00ff88',  label:'◈ Cílová navigace'},
+    {icon:null,   color:'#ffee88', label:'☀ Hvězda'},
+    {icon:'hex',  color:'#ff9500', label:'◆ Stanice'},
+    {icon:'ring', color:'#00d4ff', label:'◎ Coriolis'},
+    {icon:'diamond',color:'#ffaa00',label:'◇ Loděnice'},
+    {icon:'hexagon',color:'#00ccff',label:'⬡ Garáž'},
+    {icon:null,   color:'#ff9500', label:'▶ Hráč'},
+    {icon:null,   color:'#00ff88', label:'◈ Navigace'},
   ];
   const legPad=16,legSpacing=MW/legItems.length;
   mapCtx.font='10px "Courier New",monospace';mapCtx.textAlign='center';
@@ -590,6 +701,17 @@ function drawBigMap(){
       for(let j=0;j<4;j++){const a=(j/4)*Math.PI*2+Math.PI/8;
         mapCtx.beginPath();mapCtx.moveTo(lx+Math.cos(a)*2.5,ly+Math.sin(a)*2.5);
         mapCtx.lineTo(lx+Math.cos(a)*5.2,ly+Math.sin(a)*5.2);mapCtx.stroke();}
+    } else if(li.icon==='diamond'){
+      mapCtx.strokeStyle=li.color;mapCtx.lineWidth=1.5;
+      mapCtx.shadowColor=li.color;mapCtx.shadowBlur=4;
+      mapCtx.beginPath();mapCtx.moveTo(lx,ly-6);mapCtx.lineTo(lx+5,ly);mapCtx.lineTo(lx,ly+6);mapCtx.lineTo(lx-5,ly);mapCtx.closePath();mapCtx.stroke();
+      mapCtx.shadowBlur=0;
+    } else if(li.icon==='hexagon'){
+      mapCtx.strokeStyle=li.color;mapCtx.lineWidth=1.5;
+      mapCtx.shadowColor=li.color;mapCtx.shadowBlur=4;
+      mapCtx.beginPath();
+      for(let j=0;j<6;j++){const a=j*Math.PI/3-Math.PI/6;mapCtx.lineTo(lx+Math.cos(a)*6,ly+Math.sin(a)*6);}
+      mapCtx.closePath();mapCtx.stroke();mapCtx.shadowBlur=0;
     } else {
       mapCtx.fillStyle=li.color;
       if(li.label.startsWith('▶')){
@@ -601,7 +723,7 @@ function drawBigMap(){
       }
     }
     // Text
-    mapCtx.fillStyle='rgba(200,220,255,0.7)';mapCtx.textAlign='center';
+    mapCtx.fillStyle=window.lightMode?'rgba(0,20,60,0.65)':'rgba(200,220,255,0.7)';mapCtx.textAlign='center';
     mapCtx.fillText(li.label,lx,ly+18);
     mapCtx.restore();
   });
@@ -677,14 +799,98 @@ function handleMapClick(e){
 // ---- Tab switching ----
 function switchDockTab(tab){
   document.querySelectorAll('.dtab').forEach(btn=>{
-    const map={services:'SERVIS',contracts:'ZAKÁZKY',upgrades:'UPGRADY'};
-    btn.classList.toggle('active',btn.textContent.trim()===map[tab]);
+    const txt=btn.textContent.trim();
+    const match=(tab==='services'&&(txt==='SERVIS'||txt.includes('SERVIS')))||
+                 (tab==='contracts'&&(txt==='ZAKÁZKY'||txt.includes('ZAKÁZKY')))||
+                 (tab==='upgrades'&&(txt==='UPGRADY'||txt.includes('UPGRADY')))||
+                 (tab==='dealer'&&txt.includes('LODĚNICE'))||
+                 (tab==='garage'&&(txt.includes('HANGÁR')||txt.includes('KOUPIT')))||
+                 (tab==='tuning'&&txt.includes('TUNING'))||
+                 (tab==='vylepšení'&&txt.includes('VYLEPŠENÍ'));
+    btn.classList.toggle('active',match);
   });
   ['services','contracts','upgrades'].forEach(id=>{
     const el=document.getElementById('dtab-'+id);
     if(!el)return;
     el.style.display=id===tab?'block':'none';
   });
+  // Dynamický obsah
+  const body=document.getElementById('dock-body');
+  ['dtab-dealer','dtab-garage','dtab-tuning','dtab-vylepšení'].forEach(id=>{
+    const old=document.getElementById(id);if(old)old.remove();
+  });
+  if(tab==='dealer'){
+    const div=document.createElement('div');div.id='dtab-dealer';
+    div.innerHTML='<div class="dock-fullscreen-hint">🚀 <b>Loděnice</b> — katalog 20 lodí<br><button class="svc-btn" style="margin-top:16px;width:100%;font-size:14px;padding:14px" onclick="openShipShop()">OTEVŘÍT KATALOG LODÍ →</button></div>';
+    body.appendChild(div);
+  } else if(tab==='garage'){
+    const gs=window.gameState;if(!gs)return;
+    const st=gs.dockStation;const p=gs.player;
+    if(!st||st.type!=='garage')return;
+    const gKey=garageKey(st.garageGalaxy,st.garageCx,st.garageCy);
+    const owned=p.ownedGarages.includes(gKey);
+    const div=document.createElement('div');div.id='dtab-garage';
+    if(!owned){
+      div.innerHTML=`<div class="dock-fullscreen-hint">
+        <div style="font-size:32px;margin-bottom:12px">🏭</div>
+        <div style="font-size:18px;font-weight:bold;color:#00ccff;margin-bottom:8px">${st.name}</div>
+        <div style="color:rgba(200,220,255,0.7);margin-bottom:20px">Kapacita: 3–6 lodí · Expandovatelný hangár</div>
+        <div style="font-size:24px;font-weight:bold;color:#ffcc00;margin-bottom:8px">${st.garageCost.toLocaleString('cs')} Cr</div>
+        <button class="svc-btn" style="margin-top:8px;width:100%;font-size:14px;padding:14px;background:rgba(0,200,255,0.2);border-color:#00ccff;color:#00ccff"
+          onclick="buyGarage(window.gameState?.dockStation)">💰 KOUPIT HANGÁR</button>
+        <div style="margin-top:12px;color:rgba(150,170,200,0.6);font-size:11px">Máš ${p.credits.toLocaleString('cs')} Cr</div>
+      </div>`;
+    } else {
+      const ships=getGarageShips(p,gKey);
+      const cap=getGarageCapacity(p,gKey);
+      div.innerHTML=`<div class="dock-fullscreen-hint">
+        <button class="svc-btn" style="margin-top:8px;width:100%;font-size:13px;padding:12px" onclick="openGarageMenu()">🏭 SPRÁVA HANGÁRU (${ships.length}/${cap} lodí) →</button>
+      </div>`;
+    }
+    body.appendChild(div);
+  } else if(tab==='vylepšení'){
+    const gs=window.gameState;if(!gs)return;
+    const p=gs.player;
+    const div=document.createElement('div');div.id='dtab-vylepšení';
+    div.style.cssText='overflow-y:auto;max-height:calc(100vh - 200px);padding:2px 0';
+    // Upgrades
+    let html='<div style="font-size:10px;color:rgba(255,150,40,0.6);letter-spacing:1.5px;margin:6px 0 6px;text-transform:uppercase">Upgrady</div>';
+    const upgRows=[];
+    UPGRADES.forEach(upg=>{
+      const lvl=p.upgrades[upg.id]||0,maxed=lvl>=upg.max;
+      const cost=Math.ceil(upg.cost*Math.pow(1.7,lvl));
+      const pips=Array.from({length:upg.max},(_,i)=>`<span class="pip${i<lvl?' on':''}"></span>`).join('');
+      const btnId=`vyl-btn-${upg.id}`;
+      html+=`<div class="upgrade-row"><span class="uname">${upg.name}</span><span class="udesc">${upg.desc}</span><div class="upips">${pips}</div><span class="ucost">${maxed?'MAX':cost+' Cr'}</span>${!maxed?`<button id="${btnId}" class="ubtn" ${p.credits<cost?'disabled':''}>↑</button>`:''}</div>`;
+      if(!maxed)upgRows.push({upg,cost,btnId});
+    });
+    // Visual tuning
+    const hc=p.shipColor||getShipDef(p.shipType||'viper').color||'#99bbff';
+    const tc=p.thrusterColor||getShipDef(p.shipType||'viper').thruster||'#ff7700';
+    const hSwatches=HULL_COLORS.map(c=>`<span class="tun-swatch${c===hc?' selected':''}" style="background:${c};width:16px;height:16px;display:inline-block;cursor:pointer" onclick="window._vylHull('${c}')"></span>`).join('');
+    const tSwatches=THRUST_COLORS.map(c=>`<span class="tun-swatch${c===tc?' selected':''}" style="background:${c};width:16px;height:16px;display:inline-block;cursor:pointer" onclick="window._vylThrust('${c}')"></span>`).join('');
+    html+=`<div style="font-size:10px;color:rgba(255,150,40,0.6);letter-spacing:1.5px;margin:10px 0 6px;text-transform:uppercase">Vizuál lodi</div>
+      <div style="font-size:10px;color:rgba(180,200,255,0.6);margin-bottom:4px">Barva trupu</div>
+      <div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:8px">${hSwatches}</div>
+      <div style="font-size:10px;color:rgba(180,200,255,0.6);margin-bottom:4px">Barva trysek</div>
+      <div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:8px">${tSwatches}</div>
+      <div style="font-size:10px;color:rgba(180,200,255,0.6);margin-bottom:4px">Název lodi</div>
+      <input id="vyl-name" class="tun-input" style="width:100%;box-sizing:border-box;margin-bottom:8px" value="${p.shipCustomName||''}" placeholder="${getShipDef(p.shipType||'viper').name}">
+      <button class="svc-btn" style="width:100%;font-size:12px;padding:8px" onclick="window._vylSave()">✓ ULOŽIT VIZUÁL</button>`;
+    div.innerHTML=html;
+    body.appendChild(div);
+    // Wire upgrade buttons
+    upgRows.forEach(({upg,cost,btnId})=>{
+      const btn=document.getElementById(btnId);
+      if(btn)btn.onclick=()=>{
+        if(p.credits>=cost){p.credits-=cost;p.upgrades[upg.id]=(p.upgrades[upg.id]||0)+1;applyUpgrades(p);
+          if(typeof saveGame==='function')saveGame();switchDockTab('vylepšení');setMsg(`${upg.name} vylepšen!`,2000);}
+      };
+    });
+    window._vylHull=(c)=>{p.shipColor=c;if(typeof saveGame==='function')saveGame();switchDockTab('vylepšení');};
+    window._vylThrust=(c)=>{p.thrusterColor=c;if(typeof saveGame==='function')saveGame();switchDockTab('vylepšení');};
+    window._vylSave=()=>{p.shipCustomName=document.getElementById('vyl-name')?.value.trim()||null;if(typeof saveGame==='function')saveGame();setMsg('Vizuál uložen!',2000);};
+  }
   if(tab==='contracts'&&window.gameState?.dockStation){
     renderContractsTab(window.gameState.player,window.gameState.dockStation);
   }
@@ -694,8 +900,32 @@ function switchDockTab(tab){
 function renderDockPanel(player,station){
   const el=document.getElementById('dock-panel');if(!el)return;
   el.style.display='flex';
-  // Reset na services tab
-  switchDockTab('services');
+
+  // Speciální tapy dle typu stanice
+  const isDealer=station.type==='dealer';
+  const isGarage=station.type==='garage';
+  const dockTabs=document.getElementById('dock-tabs');
+  if(isDealer){
+    dockTabs.innerHTML=`
+      <button class="dtab active" onclick="switchDockTab('dealer')">🚀 LODĚNICE</button>
+      <button class="dtab" onclick="switchDockTab('services')">SERVIS</button>
+      <button class="dtab" onclick="switchDockTab('vylepšení')">⚙ VYLEPŠENÍ</button>`;
+    switchDockTab('dealer');
+  } else if(isGarage){
+    const gKey=garageKey(station.garageGalaxy,station.garageCx,station.garageCy);
+    const owned=player.ownedGarages.includes(gKey);
+    dockTabs.innerHTML=`
+      <button class="dtab active" onclick="switchDockTab('garage')">${owned?'🏭 HANGÁR':'💰 KOUPIT'}</button>
+      <button class="dtab" onclick="switchDockTab('services')">SERVIS</button>
+      ${owned?`<button class="dtab" onclick="switchDockTab('vylepšení')">⚙ VYLEPŠENÍ</button>`:''}`;
+    switchDockTab('garage');
+  } else {
+    dockTabs.innerHTML=`
+      <button class="dtab active" onclick="switchDockTab('services')">SERVIS</button>
+      <button class="dtab" onclick="switchDockTab('contracts')">ZAKÁZKY</button>`;
+    switchDockTab('services');
+  }
+
   document.getElementById('dock-name').textContent=station.name;
   document.getElementById('dock-tier').textContent='◆'.repeat(station.tier)+'◇'.repeat(3-station.tier);
   // Services
@@ -1145,13 +1375,22 @@ function renderTradePanel(player,station){}
 
 
 function applyUpgrades(p){
+  const ship=getShipDef(p.shipType||'viper');
   p.fuelMax=C.FUEL_MAX*(1+0.25*(p.upgrades.fuel||0));
   p.fuelReserveMax=p.fuelMax*0.1;
-  p.shieldMax=100+30*(p.upgrades.shield||0);
-  p.hullMax=100+25*(p.upgrades.hull||0);
+  p.shieldMax=Math.round(100*ship.shieldMult+30*(p.upgrades.shield||0));
+  p.hullMax=Math.round(100*ship.hullMult+25*(p.upgrades.hull||0));
+  // Klamp na aktuální hodnoty
+  p.hull=Math.min(p.hull||p.hullMax,p.hullMax);
+  p.shield=Math.min(p.shield||p.shieldMax,p.shieldMax);
+}
+function getCargoMax(p){
+  const ship=getShipDef(p.shipType||'viper');
+  return ship.cargoBase+5*(p.upgrades.cargo||0);
 }
 
 // ===== GALAXY MAP =====
+let _mapHoverX=-999,_mapHoverY=-999;
 let galaxyCanvas,galaxyCtx,selectedGalaxyId=null,_galaxyAnimId=null;
 
 function initGalaxyCanvas(){
@@ -1348,4 +1587,428 @@ function updateGalaxyInfoPanel(ga){
     setMsg(`Kurz nastaven: ${ga.name}. Stiskni [R] pro spuštění warpových motorů.`,6000);
   };
 }
-function getCargoMax(p){return 10+5*(p.upgrades.cargo||0);}
+
+// ================================================================
+//  SHIP SHOP
+// ================================================================
+let _ssSelectedShip=null;
+
+function openShipShop(){
+  const ov=document.getElementById('ship-shop-overlay');
+  if(!ov||!window.gameState)return;
+  const p=window.gameState.player;
+  document.getElementById('ss-dealer-name').textContent=window.gameState.dockStation?.name||'Loděnice';
+  document.getElementById('ss-credits-hdr').textContent=p.credits.toLocaleString('cs')+' Cr';
+  _ssSelectedShip=null;
+  _renderShipShopList(p);
+  _updateShipShopDetail(p);
+  ov.style.display='flex';
+}
+
+function closeShipShop(){
+  const ov=document.getElementById('ship-shop-overlay');
+  if(ov)ov.style.display='none';
+}
+
+function _renderShipShopList(p){
+  const list=document.getElementById('ss-ship-list');
+  list.innerHTML='';
+  SHIPS.forEach(ship=>{
+    const active=p.shipType===ship.id;
+    const canAfford=ship.cost===0||p.credits>=ship.cost;
+    const div=document.createElement('div');
+    div.className='ss-ship-row'+(_ssSelectedShip?.id===ship.id?' ss-selected':'')+(active?' ss-owned':'');
+    div.innerHTML=`<span class="ss-icon">${ship.icon}</span>
+      <div class="ss-row-info">
+        <div class="ss-row-name">${ship.name}</div>
+        <div class="ss-row-price">${ship.cost===0?'ZÁKLADNÍ':ship.cost.toLocaleString('cs')+' Cr'}</div>
+      </div>
+      <span class="ss-row-tag">${active?'✓ AKT.':canAfford?'':'💸'}</span>`;
+    div.onclick=()=>{_ssSelectedShip=ship;_renderShipShopList(p);_updateShipShopDetail(p);};
+    list.appendChild(div);
+  });
+}
+
+function _updateShipShopDetail(p){
+  const empty=document.getElementById('ss-detail-empty');
+  const content=document.getElementById('ss-detail-content');
+  if(!_ssSelectedShip){empty.style.display='';content.style.display='none';return;}
+  empty.style.display='none';content.style.display='flex';
+  const ship=_ssSelectedShip;
+  document.getElementById('ss-ship-name').textContent=ship.name.toUpperCase();
+  document.getElementById('ss-price').textContent=ship.cost===0?'ZÁKLADNÍ LOĎ':ship.cost.toLocaleString('cs')+' Cr';
+  const stats=document.getElementById('ss-ship-stats');
+  const bp=(v,max)=>Math.min(100,Math.round(v/max*100));
+  stats.innerHTML=`
+    <div class="ss-stat-row"><span class="ss-stat-label">TRUP</span><div class="ss-stat-bar"><div class="ss-stat-fill hull" style="width:${bp(ship.hullMult,2.5)}%"></div></div><span class="ss-stat-val">${ship.hullMult}×</span></div>
+    <div class="ss-stat-row"><span class="ss-stat-label">ŠTÍT</span><div class="ss-stat-bar"><div class="ss-stat-fill shield" style="width:${bp(ship.shieldMult,2.5)}%"></div></div><span class="ss-stat-val">${ship.shieldMult}×</span></div>
+    <div class="ss-stat-row"><span class="ss-stat-label">RYCHLOST</span><div class="ss-stat-bar"><div class="ss-stat-fill speed" style="width:${bp(ship.speedMult,2)}%"></div></div><span class="ss-stat-val">${ship.speedMult}×</span></div>
+    <div class="ss-stat-row"><span class="ss-stat-label">NÁKLAD</span><div class="ss-stat-bar"><div class="ss-stat-fill cargo" style="width:${bp(ship.cargoBase,100)}%"></div></div><span class="ss-stat-val">${ship.cargoBase}t</span></div>`;
+  const active=p.shipType===ship.id;
+  const btn=document.getElementById('ss-buy-btn');
+  const hint=document.getElementById('ss-buy-hint');
+  if(active){
+    btn.disabled=true;btn.textContent='✓ AKTUÁLNÍ LOĎ';hint.textContent='Tuto loď právě pilotujete.';
+  } else if(ship.cost>0&&p.credits<ship.cost){
+    btn.disabled=true;btn.textContent='NEDOSTATEK KREDITŮ';hint.textContent=`Chybí ${(ship.cost-p.credits).toLocaleString('cs')} Cr.`;
+  } else {
+    btn.disabled=false;
+    btn.textContent=ship.cost===0?'PŘESEDNOUT DO VIPER MK.I →':`KOUPIT ${ship.name} →`;
+    hint.textContent=ship.cost>0?`Zbyde: ${(p.credits-ship.cost).toLocaleString('cs')} Cr.`:'Základní loď — zdarma.';
+  }
+  btn.onclick=()=>{
+    if(typeof buyShip==='function')buyShip(ship,p.shipColor,p.thrusterColor,null);
+    document.getElementById('ss-credits-hdr').textContent=p.credits.toLocaleString('cs')+' Cr';
+    _renderShipShopList(p);_updateShipShopDetail(p);
+  };
+  _drawShipPreview('ss-ship-canvas',ship,p.shipColor||ship.color,p.thrusterColor||ship.thruster);
+}
+
+function _drawShipPreview(canvasId,shipDef,hullColor,thrusterColor){
+  const canvas=document.getElementById(canvasId);
+  if(!canvas||typeof drawGameShuttle!=='function')return;
+  const c2=canvas.getContext('2d');
+  const W=canvas.width,H=canvas.height;
+  c2.clearRect(0,0,W,H);
+  c2.fillStyle=window.lightMode?'rgba(200,210,240,0.4)':'rgba(0,0,20,0.7)';
+  c2.fillRect(0,0,W,H);
+  const rng2=makeRng((shipDef.id.charCodeAt(0)||1)*17+31);
+  for(let i=0;i<25;i++){
+    c2.fillStyle=`rgba(200,220,255,${0.08+rng2()*0.15})`;
+    c2.beginPath();c2.arc(rng2()*W,rng2()*H,rng2()*1.2+0.3,0,Math.PI*2);c2.fill();
+  }
+  c2.save();
+  c2.translate(W/2,H/2);
+  c2.scale((shipDef.scale||1)*3.2,(shipDef.scale||1)*3.2);
+  const _savedCtx=ctx;ctx=c2;
+  drawGameShuttle(hullColor||shipDef.color,shipDef.id);
+  ctx=_savedCtx;
+  c2.restore();
+}
+
+// ================================================================
+//  TUNING STUDIO
+// ================================================================
+const HULL_COLORS=['#99bbff','#ff8844','#00ee88','#ffdd00','#ff4466','#aa88ff',
+  '#ffffff','#ff6600','#44ccff','#00ff44','#cccccc','#ff2200','#0066ff','#ffaa44'];
+const THRUST_COLORS=['#ff7700','#00ddff','#ff44aa','#44ff88','#ffffff','#ffff00',
+  '#ff0000','#0088ff','#ff88ff','#00ffff','#ff4400','#44ff00','#8800ff','#ff8800'];
+
+let _tunHullColor='#99bbff';
+let _tunThrustColor='#ff7700';
+let _tunAnimId=null;
+
+function openTuningMenu(){
+  const ov=document.getElementById('tuning-overlay');
+  if(!ov||!window.gameState)return;
+  const p=window.gameState.player;
+  const shipDef=getShipDef(p.shipType||'viper');
+  _tunHullColor=p.shipColor||shipDef.color||'#99bbff';
+  _tunThrustColor=p.thrusterColor||shipDef.thruster||'#ff7700';
+  document.getElementById('tun-ship-type').textContent=shipDef.name.toUpperCase();
+  const nameInput=document.getElementById('tun-name-input');
+  nameInput.value=p.shipCustomName||'';
+  nameInput.oninput=()=>_tunRefreshPreview();
+  _buildSwatches('tun-hull-colors',HULL_COLORS,'hull');
+  _buildSwatches('tun-thrust-colors',THRUST_COLORS,'thrust');
+  document.getElementById('btn-tun-apply').onclick=()=>{
+    p.shipColor=_tunHullColor;p.thrusterColor=_tunThrustColor;
+    p.shipCustomName=document.getElementById('tun-name-input').value.trim()||null;
+    if(typeof saveGame==='function')saveGame();
+    setMsg('Tuning uložen!',2000);
+    closeTuningMenu();
+  };
+  _tunRefreshPreview();
+  ov.style.display='flex';
+}
+
+function closeTuningMenu(){
+  const ov=document.getElementById('tuning-overlay');
+  if(ov)ov.style.display='none';
+  if(_tunAnimId){cancelAnimationFrame(_tunAnimId);_tunAnimId=null;}
+}
+
+function _buildSwatches(containerId,colors,type){
+  const cont=document.getElementById(containerId);
+  cont.innerHTML='';
+  const current=type==='hull'?_tunHullColor:_tunThrustColor;
+  colors.forEach(col=>{
+    const div=document.createElement('div');
+    div.className='tun-swatch'+(col===current?' selected':'');
+    div.style.background=col;
+    div.title=col;
+    div.onclick=()=>{
+      if(type==='hull')_tunHullColor=col;
+      else _tunThrustColor=col;
+      _buildSwatches(containerId,colors,type);
+      _tunRefreshPreview();
+    };
+    cont.appendChild(div);
+  });
+}
+
+function _tunRefreshPreview(){
+  const canvas=document.getElementById('tun-canvas');
+  if(!canvas||typeof drawGameShuttle!=='function')return;
+  const c2=canvas.getContext('2d');
+  const W=canvas.width,H=canvas.height;
+  c2.clearRect(0,0,W,H);
+  c2.fillStyle=window.lightMode?'rgba(210,200,235,0.6)':'rgba(0,0,20,0.7)';
+  c2.fillRect(0,0,W,H);
+  const rng2=makeRng(4219);
+  for(let i=0;i<35;i++){
+    c2.fillStyle=`rgba(200,220,255,${0.07+rng2()*0.12})`;
+    c2.beginPath();c2.arc(rng2()*W,rng2()*H,rng2()*1.5+0.3,0,Math.PI*2);c2.fill();
+  }
+  c2.save();
+  c2.translate(W/2,H/2);
+  const shipDef=getShipDef(window.gameState?.player?.shipType||'viper');
+  c2.scale((shipDef.scale||1)*4,(shipDef.scale||1)*4);
+  const _savedCtx=ctx;ctx=c2;
+  drawGameShuttle(_tunHullColor,window.gameState?.player?.shipType||'viper');
+  ctx=_savedCtx;
+  c2.restore();
+  const customName=document.getElementById('tun-name-input')?.value.trim();
+  document.getElementById('tun-preview-name').textContent=customName||shipDef.name;
+}
+
+// ================================================================
+//  GARAGE MENU (for docked garage)
+// ================================================================
+let _gmGarageKey=null;
+
+function openGarageMenu(){
+  const ov=document.getElementById('garage-menu-overlay');
+  if(!ov||!window.gameState)return;
+  const p=window.gameState.player;
+  const st=window.gameState.dockStation;
+  if(!st||st.type!=='garage')return;
+  _gmGarageKey=garageKey(st.garageGalaxy,st.garageCx,st.garageCy);
+  document.getElementById('gm-garage-name').textContent=st.name;
+  _renderGarageMenuContent(p);
+  ov.style.display='flex';
+}
+
+function closeGarageMenu(){
+  const ov=document.getElementById('garage-menu-overlay');
+  if(ov)ov.style.display='none';
+}
+
+function _renderGarageMenuContent(p){
+  if(!_gmGarageKey)return;
+  const ships=getGarageShips(p,_gmGarageKey);
+  const cap=getGarageCapacity(p,_gmGarageKey);
+  const capVal=document.getElementById('gm-cap-val');
+  if(capVal)capVal.textContent=`${ships.length}/${cap}`;
+  const upgBtn=document.getElementById('btn-gm-upgrade');
+  if(upgBtn){
+    const upgCost=200000+(cap-3)*150000;
+    const canUpg=cap<6&&p.credits>=upgCost;
+    upgBtn.textContent=cap>=6?'MAX KAPACITA':`⬆ ROZŠÍŘIT (+1 SLOT) — ${upgCost.toLocaleString('cs')} Cr`;
+    upgBtn.disabled=cap>=6;
+    upgBtn.onclick=()=>{
+      if(typeof upgradeGarageCapacity==='function')upgradeGarageCapacity(_gmGarageKey);
+      _renderGarageMenuContent(p);
+    };
+  }
+  const parkBtn=document.getElementById('btn-gm-park');
+  if(parkBtn){
+    const full=ships.length>=cap;
+    parkBtn.disabled=full;
+    parkBtn.title=full?'Hangár je plný':'Zaparkovat aktivní loď';
+    parkBtn.onclick=()=>{
+      if(ships.length>=cap){setMsg('Hangár je plný!',2500);return;}
+      p.fleet=p.fleet||[];
+      p.fleet.push({shipType:p.shipType,shipColor:p.shipColor||'#aaccff',thrusterColor:p.thrusterColor||'#ff7700',shipCustomName:p.shipCustomName||null,garageKey:_gmGarageKey,earns:p.shipEarns||0,boughtAt:Date.now()});
+      p.shipType='viper';p.shipColor=getShipDef('viper').color;p.thrusterColor=getShipDef('viper').thruster;p.shipCustomName=null;p.shipEarns=0;
+      applyUpgrades(p);
+      if(typeof saveGame==='function')saveGame();
+      setMsg('Loď zaparkována. Pilotujete Viper Mk.I.',3000);
+      _renderGarageMenuContent(p);
+    };
+  }
+  const grid=document.getElementById('gm-ships-grid');
+  grid.innerHTML='';
+  // Active ship card
+  {
+    const shipDef=getShipDef(p.shipType||'viper');
+    const card=document.createElement('div');
+    card.className='gm-ship-card gm-active';
+    card.innerHTML=`<div class="gmc-name">${p.shipCustomName||shipDef.name}</div>
+      <div class="gmc-type">${shipDef.icon} ${shipDef.name} — AKTIVNÍ LOĎ</div>
+      <div class="gmc-color-strip" style="background:${p.shipColor||shipDef.color}"></div>
+      <div class="gmc-earn">Vydělala: ${(p.shipEarns||0).toLocaleString('cs')} Cr</div>
+      <button class="gmc-btn" onclick="openTuningMenu()">🎨 TUNING →</button>`;
+    grid.appendChild(card);
+  }
+  // Fleet ships in this garage
+  ships.forEach((fs,i)=>{
+    const fleetIdx=(p.fleet||[]).findIndex(s=>s===fs);
+    const shipDef=getShipDef(fs.shipType||'viper');
+    const card=document.createElement('div');
+    card.className='gm-ship-card';
+    card.innerHTML=`<div class="gmc-name">${fs.shipCustomName||shipDef.name}</div>
+      <div class="gmc-type">${shipDef.icon} ${shipDef.name}</div>
+      <div class="gmc-color-strip" style="background:${fs.shipColor||shipDef.color}"></div>
+      <div class="gmc-earn">Vydělala: ${(fs.earns||0).toLocaleString('cs')} Cr</div>
+      <button class="gmc-btn gmc-activate" data-idx="${fleetIdx}">⚡ AKTIVOVAT →</button>`;
+    card.querySelector('.gmc-activate').onclick=()=>{
+      if(typeof activateShipFromFleet==='function')activateShipFromFleet(fleetIdx);
+      _renderGarageMenuContent(window.gameState.player);
+      setMsg(`Loď aktivována!`,2500);
+    };
+    grid.appendChild(card);
+  });
+  // Empty slots
+  for(let i=ships.length+1;i<cap;i++){
+    const slot=document.createElement('div');
+    slot.className='gmc-empty-slot';
+    slot.textContent='[ PRÁZDNÝ SLOT ]';
+    grid.appendChild(slot);
+  }
+}
+
+// ================================================================
+//  FLEET MANAGER (pause menu)
+// ================================================================
+function openFleetManager(){
+  const ov=document.getElementById('fleet-manager-overlay');
+  if(!ov||!window.gameState)return;
+  const p=window.gameState.player;
+  _renderFleetManager(p);
+  ov.style.display='flex';
+}
+
+function closeFleetManager(){
+  const ov=document.getElementById('fleet-manager-overlay');
+  if(ov)ov.style.display='none';
+}
+
+function _renderFleetManager(p){
+  const fleet=p.fleet||[];
+  const total=fleet.length+1; // +1 for active ship
+  document.getElementById('fm-count').textContent=`${total} ${total===1?'loď':'lodi'}`;
+  const grid=document.getElementById('fm-ships-grid');
+  grid.innerHTML='';
+  if(total===0){
+    grid.innerHTML='<div class="fmc-no-ships">Žádné lodi — nakup loď v loděnici nebo garáži.</div>';
+    return;
+  }
+  // Active ship
+  const activeShip=getShipDef(p.shipType||'viper');
+  const activeCard=_buildFleetCard(
+    {shipType:p.shipType,shipColor:p.shipColor,thrusterColor:p.thrusterColor,shipCustomName:p.shipCustomName,earns:p.shipEarns||0,garageKey:null},
+    activeShip,true,-1
+  );
+  grid.appendChild(activeCard);
+  // Fleet ships
+  fleet.forEach((fs,idx)=>{
+    const shipDef=getShipDef(fs.shipType||'viper');
+    const card=_buildFleetCard(fs,shipDef,false,idx);
+    grid.appendChild(card);
+  });
+}
+
+function _resolveGarageName(gKey){
+  if(!gKey)return'—';
+  const parts=gKey.split('_');
+  const gid=parts[0];
+  const cx2=parseInt(parts[1]),cy2=parseInt(parts[2]);
+  const gDef=(typeof GARAGES_DATA!=='undefined'?GARAGES_DATA[gid]||[]:null||[]).find(g=>g.cx===cx2&&g.cy===cy2);
+  const galDef=(typeof GALAXIES!=='undefined'?GALAXIES:null||[]).find(g=>g.id===gid);
+  return (gDef?.name||gKey)+' ('+(galDef?.name||gid)+')';
+}
+
+function _buildFleetCard(fs,shipDef,isActive,fleetIdx){
+  const card=document.createElement('div');
+  card.className='fm-ship-card'+(isActive?' fm-active':'');
+  const locLabel=isActive?'Aktivní loď':'Garáž: '+_resolveGarageName(fs.garageKey);
+  card.innerHTML=`
+    <div class="fmc-header">
+      <span class="fmc-icon">${shipDef.icon}</span>
+      <div class="fmc-title">
+        <div class="fmc-name">${fs.shipCustomName||shipDef.name}</div>
+        <div class="fmc-type">${shipDef.name}${isActive?'':''}</div>
+      </div>
+      ${isActive?'<span class="fmc-active-badge">● AKTIVNÍ</span>':''}
+    </div>
+    <div class="fmc-color-row">
+      <div class="fmc-hull-sw" style="background:${fs.shipColor||shipDef.color}"></div>
+      <div class="fmc-thrust-sw" style="background:${fs.thrusterColor||shipDef.thruster}"></div>
+      <span class="fmc-color-label">TRUP / TRYSKA</span>
+    </div>
+    <div class="fmc-stats">
+      <span class="fmc-stat">TRUP <span>${shipDef.hullMult}×</span></span>
+      <span class="fmc-stat">ŠTÍT <span>${shipDef.shieldMult}×</span></span>
+      <span class="fmc-stat">RYCHLOST <span>${shipDef.speedMult}×</span></span>
+      <span class="fmc-stat">NÁKLAD <span>${shipDef.cargoBase}t</span></span>
+    </div>
+    <div class="fmc-earn">Vydělala: ${(fs.earns||0).toLocaleString('cs')} Cr</div>
+    <div class="fmc-loc">${locLabel}</div>
+    ${!isActive?'<button class="fmc-btn" data-idx="'+fleetIdx+'">⚡ AKTIVOVAT LOĎ →</button>':''}`;
+  if(!isActive){
+    card.querySelector('.fmc-btn').onclick=()=>{
+      if(typeof activateShipFromFleet==='function')activateShipFromFleet(fleetIdx);
+      _renderFleetManager(window.gameState.player);
+    };
+  }
+  return card;
+}
+
+// ================================================================
+//  GARAGE MANAGER (pause menu)
+// ================================================================
+function openGarageManager(){
+  const ov=document.getElementById('garage-manager-overlay');
+  if(!ov||!window.gameState)return;
+  const p=window.gameState.player;
+  _renderGarageManager(p);
+  ov.style.display='flex';
+}
+
+function closeGarageManager(){
+  const ov=document.getElementById('garage-manager-overlay');
+  if(ov)ov.style.display='none';
+}
+
+function _renderGarageManager(p){
+  const owned=p.ownedGarages||[];
+  document.getElementById('gmgr-count').textContent=`${owned.length} ${owned.length===1?'garáž':owned.length<5?'garáže':'garází'}`;
+  const list=document.getElementById('gmgr-list');
+  list.innerHTML='';
+  if(!owned.length){
+    list.innerHTML='<div class="gmgr-no-garages">Žádné garáže — kup hangár v kteroukoli galaxii.</div>';
+    return;
+  }
+  owned.forEach(gKey=>{
+    const parts=gKey.split('_');
+    const gid=parts[0];
+    const cx2=parseInt(parts[1]),cy2=parseInt(parts[2]);
+    const gDef=(GARAGES_DATA[gid]||[]).find(g=>g.cx===cx2&&g.cy===cy2);
+    const galDef=GALAXIES?.find(g=>g.id===gid);
+    const ships=getGarageShips(p,gKey);
+    const cap=getGarageCapacity(p,gKey);
+    const card=document.createElement('div');
+    card.className='gmgr-card';
+    const fillPct=cap>0?Math.round(ships.length/cap*100):0;
+    let shipsHtml='';
+    ships.forEach(fs=>{
+      const sd=getShipDef(fs.shipType||'viper');
+      shipsHtml+=`<div class="gmgr-ship-item"><div class="gmgr-ship-dot" style="background:${fs.shipColor||sd.color}"></div>${fs.shipCustomName||sd.name}</div>`;
+    });
+    for(let i=ships.length;i<cap;i++)shipsHtml+=`<div class="gmgr-empty-slot">— prázdný slot —</div>`;
+    card.innerHTML=`
+      <div class="gmgr-card-header">
+        <span class="gmgr-icon">🏭</span>
+        <span class="gmgr-name">${gDef?.name||gKey}</span>
+        <span class="gmgr-gal-badge">${galDef?.name||gid.toUpperCase()}</span>
+      </div>
+      <div class="gmgr-cap-row">
+        <span class="gmgr-cap-label">Kapacita</span>
+        <div class="gmgr-cap-track"><div class="gmgr-cap-fill" style="width:${fillPct}%"></div></div>
+        <span class="gmgr-cap-val">${ships.length}/${cap}</span>
+      </div>
+      <div class="gmgr-ship-list">${shipsHtml}</div>`;
+    list.appendChild(card);
+  });
+}
