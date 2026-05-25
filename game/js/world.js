@@ -56,7 +56,9 @@ function generateChunk(cx,cy){
   const isSolGal=gid==='sol';
   const fixed=isSolGal?FIXED_STATIONS.find(s=>s.cx===cx&&s.cy===cy):null;
   const fixedLarge=isSolGal?LARGE_STATIONS.find(s=>s.cx===cx&&s.cy===cy):null;
-  const hasSystem=fixed||fixedLarge||rng()<0.40;
+  const dealerDef=findDealer(gid,cx,cy);
+  const garageDef=findGarage(gid,cx,cy);
+  const hasSystem=fixed||fixedLarge||dealerDef||garageDef||rng()<0.40;
   if(hasSystem){
     const sr=makeRng(chunkSeed(cx,cy)+99);
     const starX=wx+sc*0.3+sr()*sc*0.4;
@@ -78,9 +80,31 @@ function generateChunk(cx,cy){
       const r=12+sr()*28;
       planets.push({orbit,phase,period,r,color:pCols[Math.floor(sr()*pCols.length)],atmo:sr()<0.6});
     }
-    // Stanice — velká Coriolis, fixní (Sol) nebo náhodná s tématickým názvem
+    // Stanice — dealer, garáž, velká Coriolis, fixní (Sol) nebo náhodná
     let station=null;
-    if(fixedLarge){
+    if(dealerDef){
+      station={
+        x:starX+250, y:starY+250,
+        name:dealerDef.name, tier:2, color:dealerDef.color,
+        angle:sr()*Math.PI*2, rotSpeed:0.002+sr()*0.004,
+        r:50+sr()*15,
+        type:'dealer',
+        inv:generateInv(sr),
+        fixed:true
+      };
+    } else if(garageDef){
+      station={
+        x:starX+250, y:starY+250,
+        name:garageDef.name, tier:2, color:garageDef.color,
+        angle:sr()*Math.PI*2, rotSpeed:0.002+sr()*0.004,
+        r:55+sr()*15,
+        type:'garage',
+        garageCost:garageDef.cost,
+        inv:generateInv(sr),
+        fixed:true,
+        garageGalaxy:gid, garageCx:cx, garageCy:cy
+      };
+    } else if(fixedLarge){
       station={
         x:starX+500, y:starY+500,
         name:fixedLarge.name, tier:fixedLarge.tier, color:fixedLarge.color,

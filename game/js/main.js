@@ -257,7 +257,18 @@ function startGame(fromSave=false){
     activeContract:save?.activeContract||null,
     invTimer:0, shieldRegenTimer:0,
     thrusting:false, boosting:false,
-    dead:false
+    dead:false,
+    // Lodní systém
+    shipType:save?.shipType||'viper',
+    shipColor:save?.shipColor||'#aaccff',
+    thrusterColor:save?.thrusterColor||'#ff7700',
+    shipCustomName:save?.shipCustomName||null,
+    shipEarns:save?.shipEarns||0,
+    // Garáže a flotila
+    ownedGarages:save?.ownedGarages||[],
+    garageCapacityUpgrades:save?.garageCapacityUpgrades||{},
+    fleet:save?.fleet||[],
+    deathCount:save?.deathCount||0,
   };
   applyUpgrades(player);
 
@@ -655,6 +666,16 @@ function startDocking(station){ SFX.playDock();
   state='docked';
   document.getElementById('hud').style.display='none';
   if(gs.navTarget&&gs.navTarget.name===station.name) gs.navTarget=null;
+  // Garáž — nákup nebo správa
+  if(station.type==='garage'){
+    const key=garageKey(station.garageGalaxy,station.garageCx,station.garageCy);
+    if(!gs.player.ownedGarages.includes(key)){
+      // Nabídnout koupi
+      renderDockPanel(gs.player,station);
+      if(!gs.player.activeContract) setMsg('');
+      return;
+    }
+  }
 
   // Zkontroluj doručení aktivní zakázky
   const ac=gs.player.activeContract;
@@ -1239,9 +1260,11 @@ function update(dt){
     const align=Math.abs(angleDiff(approachAngle,portAngle))*180/Math.PI;
     const speed=Math.hypot(p.vx,p.vy);
     const isLarge=st.type==='large';
-    const dockDist=isLarge?st.r:C.DOCK_DIST;
-    const dockAngle=isLarge?12:C.DOCK_ANGLE;
-    const approachDist=isLarge?st.r*4.5:C.DOCK_DIST*3;
+    // Dealerské a garážové stanice — snadné přistání jako u Coriolis (libovolný úhel)
+    const isFreeDoc=st.type==='dealer'||st.type==='garage';
+    const dockDist=isLarge?st.r:isFreeDoc?st.r*1.6:C.DOCK_DIST;
+    const dockAngle=isLarge?12:isFreeDoc?180:C.DOCK_ANGLE;
+    const approachDist=isLarge?st.r*4.5:isFreeDoc?st.r*5:C.DOCK_DIST*3;
     gs.dockingState={
       approaching:d<approachDist,
       align,speed,
@@ -1251,16 +1274,20 @@ function update(dt){
     gs.dockingState={approaching:false,align:0,speed:0,dockable:false};
   }
 
-  // Stanice — kolize s tělem (netrefení do otvoru); vypnuto během warp letu
+  // Stanice — kolize s tělem; dealer/garáž nemají kolizní destrukci (přijetí odevšud)
   if(gs.nearStation&&!gs.dockingState.dockable&&!p.dead&&warpPhase!=='boosting'){
     const st=gs.nearStation;
     const d=dist2(p,st);
     const isLarge=st.type==='large';
-    const collR=isLarge?st.r*1.05:st.r*1.1;
-    const dockAngleLim=isLarge?12:C.DOCK_ANGLE;
-    const spd=Math.hypot(p.vx,p.vy);
-    if(d<collR&&gs.dockingState.align>=dockAngleLim&&spd>0.8){
-      stationCrash(st);
+    const isFreeDoc=st.type==='dealer'||st.type==='garage';
+    if(isFreeDoc){}  // žádná kolize — přistání z libovolného směru
+    else{
+      const collR=isLarge?st.r*1.05:st.r*1.1;
+      const dockAngleLim=isLarge?12:C.DOCK_ANGLE;
+      const spd=Math.hypot(p.vx,p.vy);
+      if(d<collR&&gs.dockingState.align>=dockAngleLim&&spd>0.8){
+        stationCrash(st);
+      }
     }
   }
 
@@ -1438,53 +1465,190 @@ function addXP(p,amount){
 function showDeath(){
   const p=gameState?.player;
   const gs=gameState;
+  if(!p||!gs)return;
 
-  // --- PERMANENTNÍ SMRT: smaž slot okamžitě ---
-  if(activeSlot>=0){
-    try{localStorage.removeItem(SLOT_KEYS[activeSlot]);}catch(e){}
+  // GTA STYL — respawn s pokutou, bez permanentní smrti
+  const DEATH_FINE=1000000;
+  const lostShip=getShipDef(p.shipType||'viper');
+  const credsBefore=p.credits;
+  const fine=Math.min(DEATH_FINE,Math.max(0,p.credits));
+
+  p.deathCount=(p.deathCount||0)+1;
+  p.credits=Math.max(0,p.credits-DEATH_FINE);
+  p.cargo={};p.cargoCount=0;
+  p.activeContract=null;
+  // Ztráta lodi — vrátit se k výchozímu Viperu
+  const lostShipType=p.shipType;
+  p.shipType='viper';
+  p.shipColor='#aaccff';
+  p.thrusterColor='#ff7700';
+  p.shipCustomName=null;
+  p.shipEarns=0;
+  applyUpgrades(p);
+
+  // Respawn v Sol u Země
+  const EARTH_X=-2034, EARTH_Y=7542;
+  p.hull=p.hullMax;p.shield=p.shieldMax;p.fuel=p.fuelMax;
+  p.fuelReserve=p.fuelReserveMax;
+  p.x=EARTH_X;p.y=EARTH_Y;p.vx=0;p.vy=0;p.angle=-Math.PI/2;
+  p.invTimer=3;p.dead=false;
+  // Teleport do Sol
+  window.currentGalaxy='sol';
+  chunkCache.clear();
+  getChunk(C.SOLAR_CHUNK.cx,C.SOLAR_CHUNK.cy);
+  gs.bullets=[];gs.enemies=[];gs.particles=[];gs.loots=[];gs.stationDebris=[];
+  gs.navTarget=null;
+  updateContractHUD(null);
+  spawnInitialEnemies();
+
+  // Zobraz respawn obrazovku
+  const rspFine=document.getElementById('rsp-fine');
+  if(rspFine)rspFine.textContent=(fine>0?'−':'')+fine.toLocaleString('cs')+' Cr';
+  const rspDeaths=document.getElementById('rsp-deaths');
+  if(rspDeaths)rspDeaths.textContent=p.deathCount;
+  const rspShip=document.getElementById('rsp-ship');
+  if(rspShip)rspShip.textContent=SHIPS[0].icon+' '+SHIPS[0].name;
+  const rspCredits=document.getElementById('rsp-credits');
+  if(rspCredits)rspCredits.textContent=p.credits.toLocaleString('cs')+' Cr';
+
+  const respawnScreen=document.getElementById('respawn-screen');
+  respawnScreen.style.display='flex';
+
+  // Uložit hru
+  saveGame();
+
+  // Přepnout zpět do playing stavu po zavření respawn obrazovky
+  document.getElementById('btn-respawn-continue').onclick=()=>{
+    respawnScreen.style.display='none';
+    state='playing';
+    document.getElementById('hud').style.display='block';
+    setMsg('Respawn v Sluneční soustavě — Viper Mk.I, nový začátek!',5000);
+  };
+
+  state='paused';
+  document.getElementById('hud').style.display='none';
+  SFX.stopEngine();
+}
+
+// ---- Garáže ----
+function buyGarage(station){
+  if(!gameState||!station)return;
+  const gs=gameState,p=gs.player;
+  const key=garageKey(station.garageGalaxy,station.garageCx,station.garageCy);
+  if(p.ownedGarages.includes(key)){setMsg('Tento hangár již vlastníš.',2500);return;}
+  if(p.credits<station.garageCost){setMsg(`Nedostatek kreditů! Potřebuješ ${station.garageCost.toLocaleString('cs')} Cr.`,3000);return;}
+  p.credits-=station.garageCost;
+  p.ownedGarages.push(key);
+  saveGame();
+  setMsg(`✓ Hangár ${station.name} zakoupen!`,3500);
+  SFX.playLevelUp();
+  renderDockPanel(p,station);
+}
+
+function upgradeGarageCapacity(gKey){
+  if(!gameState)return;
+  const p=gameState.player;
+  const cur=p.garageCapacityUpgrades[gKey]||0;
+  if(cur>=3){setMsg('Maximální kapacita hangáru dosažena (6 lodí).',2500);return;}
+  const costs=[150000,250000,400000];
+  const cost=costs[cur];
+  if(p.credits<cost){setMsg(`Nedostatek kreditů! Potřebuješ ${cost.toLocaleString('cs')} Cr.`,3000);return;}
+  p.credits-=cost;
+  p.garageCapacityUpgrades[gKey]=(cur+1);
+  saveGame();
+  setMsg(`✓ Kapacita hangáru rozšířena na ${3+cur+1} lodí!`,3000);
+}
+
+function getGarageCapacity(p,gKey){
+  return 3+(p.garageCapacityUpgrades[gKey]||0);
+}
+
+function getGarageShips(p,gKey){
+  return (p.fleet||[]).filter(s=>s.garageKey===gKey);
+}
+
+// ---- Nákup lodi ----
+function buyShip(shipDef, chosenColor, chosenThruster, chosenName){
+  if(!gameState)return;
+  const gs=gameState,p=gs.player;
+  if(shipDef.cost>0&&p.credits<shipDef.cost){
+    setMsg(`Nedostatek kreditů! Loď stojí ${shipDef.cost.toLocaleString('cs')} Cr.`,3500);return;
   }
+  // Ulož aktuální loď do garáže (pokud vlastní nějakou s místem)
+  const freeGarage=_findFreeGarage(p);
+  if(p.shipType&&p.shipType!=='viper'&&freeGarage){
+    p.fleet.push({
+      shipType:p.shipType,
+      shipColor:p.shipColor||'#aaccff',
+      thrusterColor:p.thrusterColor||'#ff7700',
+      shipCustomName:p.shipCustomName||null,
+      garageKey:freeGarage,
+      earns:p.shipEarns||0,
+      boughtAt:Date.now()
+    });
+    setMsg(`Stará loď uložena do garáže.`,2000);
+  }
+  if(shipDef.cost>0)p.credits-=shipDef.cost;
+  p.shipType=shipDef.id;
+  p.shipColor=chosenColor||shipDef.color;
+  p.thrusterColor=chosenThruster||shipDef.thruster;
+  p.shipCustomName=chosenName||null;
+  p.shipEarns=0;
+  applyUpgrades(p);
+  saveGame();
+  SFX.playLevelUp();
+  setMsg(`✓ ${shipDef.name} zakoupena a přiřazena!`,4000);
+  // Zavři trade overlay pokud je otevřen
+  const to=document.getElementById('ship-shop-overlay');
+  if(to)to.style.display='none';
+  renderDockPanel(p,gameState.dockStation);
+}
 
-  // Vyplň statistiky
-  document.getElementById('ds-slot').textContent=activeSlot>=0?`PILOT ${activeSlot+1}`:'—';
-  document.getElementById('ds-level').textContent=String(p?.level||1);
-  document.getElementById('ds-credits').textContent=`${(p?.credits||0).toLocaleString('cs-CZ')} Cr`;
-  document.getElementById('ds-earned').textContent=`${(gs?.totalEarned||0).toLocaleString('cs-CZ')} Cr`;
-  const pt2=gs?.playTime||0;
-  const ph=Math.floor(pt2/3600),pm=Math.floor((pt2%3600)/60),ps=Math.floor(pt2%60);
-  document.getElementById('ds-time').textContent=`${ph}h ${pm.toString().padStart(2,'0')}m ${ps.toString().padStart(2,'0')}s`;
-  const gal=GALAXIES.find(g=>g.id===window.currentGalaxy);
-  document.getElementById('ds-galaxy').textContent=gal?gal.name:'Sluneční soustava';
-  const score=((p?.level||1)*1000)+(p?.credits||0)+(gs?.totalEarned||0);
-  document.getElementById('ds-score').textContent=score.toLocaleString('cs-CZ');
+function _findFreeGarage(p){
+  for(const gKey of (p.ownedGarages||[])){
+    const cap=getGarageCapacity(p,gKey);
+    const ships=getGarageShips(p,gKey);
+    if(ships.length<cap)return gKey;
+  }
+  return null;
+}
 
-  document.getElementById('death-screen').style.display='flex';
-
-  // Odpočet 8 s → auto-return do lobby
-  const CD=8;
-  let cdLeft=CD;
-  const cdNum=document.getElementById('death-cd-num');
-  const cdBar=document.getElementById('death-cd-bar');
-  const lobbyBtn=document.getElementById('btn-death-lobby');
-  lobbyBtn.disabled=true;
-  cdBar.style.transition='none';cdBar.style.width='100%';
-  requestAnimationFrame(()=>requestAnimationFrame(()=>{
-    cdBar.style.transition=`width ${CD}s linear`;cdBar.style.width='0%';
-  }));
-  const cdIv=setInterval(()=>{
-    cdLeft--;cdNum.textContent=cdLeft;
-    if(cdLeft<=0){clearInterval(cdIv);_goLobby();}
-  },1000);
-  // Tlačítko se odemkne po 2s pro ruční skip
-  setTimeout(()=>{if(lobbyBtn.disabled)lobbyBtn.disabled=false;},2000);
-  lobbyBtn.onclick=()=>{clearInterval(cdIv);_goLobby();};
+// Přesun lodi z garáže do aktivního slotu
+function activateShipFromFleet(fleetIdx){
+  if(!gameState)return;
+  const p=gameState.player;
+  const fleetShip=p.fleet[fleetIdx];
+  if(!fleetShip)return;
+  // Ulož aktuální loď zpět do garáže fleetShipu
+  if(p.shipType!=='viper'){
+    p.fleet.push({
+      shipType:p.shipType,
+      shipColor:p.shipColor,
+      thrusterColor:p.thrusterColor,
+      shipCustomName:p.shipCustomName,
+      garageKey:fleetShip.garageKey,
+      earns:p.shipEarns||0,
+      boughtAt:Date.now()
+    });
+  }
+  p.shipType=fleetShip.shipType;
+  p.shipColor=fleetShip.shipColor;
+  p.thrusterColor=fleetShip.thrusterColor;
+  p.shipCustomName=fleetShip.shipCustomName;
+  p.shipEarns=fleetShip.earns||0;
+  p.fleet.splice(fleetIdx,1);
+  applyUpgrades(p);
+  saveGame();
+  setMsg(`✓ ${getShipDef(p.shipType).name} aktivována!`,3000);
 }
 
 function _goLobby(){
   SFX.stopEngine();
-  document.getElementById('death-screen').style.display='none';
-  document.getElementById('hud').style.display='none';
-  document.getElementById('dock-panel').style.display='none';
-  document.getElementById('delivery-overlay').style.display='none';
+  ['death-screen','hud','dock-panel','delivery-overlay','pause-screen',
+   'ship-shop-overlay','garage-menu-overlay','tuning-overlay',
+   'fleet-manager-overlay','garage-manager-overlay','respawn-screen'].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.style.display='none';
+  });
   document.getElementById('menu').style.display='flex';
   state='menu';gameState=null;activeSlot=-1;window.adminMode=false;
   document.getElementById('admin-hud-badge').style.display='none';
@@ -1517,7 +1681,17 @@ function saveGame(){
     xp:p.xp,level:p.level,activeContract:p.activeContract||null,totalEarned:gameState.totalEarned,
     galaxyId:window.currentGalaxy||'sol',
     playTime:gameState.playTime||0,
-    savedAt:Date.now()
+    savedAt:Date.now(),
+    // Nové fieldy v3
+    shipType:p.shipType||'viper',
+    shipColor:p.shipColor||'#aaccff',
+    thrusterColor:p.thrusterColor||'#ff7700',
+    shipCustomName:p.shipCustomName||null,
+    shipEarns:p.shipEarns||0,
+    ownedGarages:p.ownedGarages||[],
+    garageCapacityUpgrades:p.garageCapacityUpgrades||{},
+    fleet:p.fleet||[],
+    deathCount:p.deathCount||0,
   };
   try{localStorage.setItem(SLOT_KEYS[activeSlot],JSON.stringify(data));}catch(e){}
 }
@@ -1821,6 +1995,8 @@ function render(dt,t){
       const isNear=st===gs.nearStation;
       const dock=isNear&&gs.dockingState?.dockable;
       if(st.type==='large')renderLargeStation(st,t,isNear,dock);
+      else if(st.type==='dealer')renderDealer(st,t,isNear,dock);
+      else if(st.type==='garage')renderGarage(st,t,isNear,dock);
       else renderStation(st,t,isNear,dock);
     };
     drawSt(ch.system.station);
@@ -2126,6 +2302,12 @@ window.addEventListener('load',()=>{
   document.getElementById('btn-slots-back').onclick=()=>closeSlotScreen();
   document.getElementById('btn-help').onclick=()=>openHelp();
   document.getElementById('btn-help-close').onclick=()=>closeHelp();
+  // Nové overlay close tlačítka
+  document.getElementById('btn-ss-close').onclick=()=>{if(typeof closeShipShop==='function')closeShipShop();};
+  document.getElementById('btn-gm-close').onclick=()=>{if(typeof closeGarageMenu==='function')closeGarageMenu();};
+  document.getElementById('btn-tun-close').onclick=()=>{if(typeof closeTuningMenu==='function')closeTuningMenu();};
+  document.getElementById('btn-fm-close').onclick=()=>{if(typeof closeFleetManager==='function')closeFleetManager();};
+  document.getElementById('btn-gmgr-close').onclick=()=>{if(typeof closeGarageManager==='function')closeGarageManager();};
   // death screen — handler se nastavuje dynamicky v showDeath()
   document.getElementById('btn-close-map').onclick=()=>closeMap();
   document.getElementById('btn-close-galaxy').onclick=()=>closeGalaxyMap();
@@ -2149,6 +2331,12 @@ window.addEventListener('load',()=>{
   document.getElementById('btn-pause-map').onclick=()=>{
     closePause();
     openMap();
+  };
+  document.getElementById('btn-pause-fleet').onclick=()=>{
+    if(typeof openFleetManager==='function')openFleetManager();
+  };
+  document.getElementById('btn-pause-garages').onclick=()=>{
+    if(typeof openGarageManager==='function')openGarageManager();
   };
   document.getElementById('btn-pause-save').onclick=()=>{
     saveGame();

@@ -382,6 +382,14 @@
       <span class="esc-btn-label">MAPA GALAXIE</span>
       <span class="esc-btn-key">M</span>
     </button>
+    <button class="esc-btn" id="btn-pause-fleet">
+      <span class="esc-btn-icon">🚀</span>
+      <span class="esc-btn-label">LODI</span>
+    </button>
+    <button class="esc-btn" id="btn-pause-garages">
+      <span class="esc-btn-icon">🏭</span>
+      <span class="esc-btn-label">GARÁŽE</span>
+    </button>
     <button class="esc-btn" id="btn-pause-save">
       <span class="esc-btn-icon">↓</span>
       <span class="esc-btn-label">ULOŽIT HRU</span>
@@ -464,6 +472,128 @@
     </div>
   </div>
 
+</div>
+
+<!-- RESPAWN — GTA STYL -->
+<div id="respawn-screen" style="display:none">
+  <div id="rsp-bg-glow"></div>
+  <div id="respawn-box">
+    <div id="rsp-icon">⚡</div>
+    <div id="rsp-title">LOĎ ZNIČENA</div>
+    <div id="rsp-subtitle">GTA RESPAWN PROTOKOL AKTIVOVÁN</div>
+    <div id="rsp-stats">
+      <div class="rsp-row"><span class="rsp-label">POKUTA ZA ZTRÁTU LODI</span><span class="rsp-val danger" id="rsp-fine">−1 000 000 Cr</span></div>
+      <div class="rsp-row"><span class="rsp-label">POČET SMRTÍ</span><span class="rsp-val" id="rsp-deaths">1</span></div>
+      <div class="rsp-row"><span class="rsp-label">NOVÁ LOĎ</span><span class="rsp-val" id="rsp-ship">🚀 Viper Mk.I</span></div>
+      <div class="rsp-row"><span class="rsp-label">KREDITY PO POKUTĚ</span><span class="rsp-val warn" id="rsp-credits">—</span></div>
+      <div class="rsp-row"><span class="rsp-label">POLOHA RESPAWNU</span><span class="rsp-val">Sol — Sluneční soustava</span></div>
+    </div>
+    <div id="rsp-hint">Jsi naživu, pilote. Příště buď opatrnější.</div>
+    <button id="btn-respawn-continue" class="menu-btn primary">▶ POKRAČOVAT VE HŘE</button>
+  </div>
+</div>
+
+<!-- KATALOG LODÍ (SHIP SHOP) -->
+<div id="ship-shop-overlay" style="display:none">
+  <div id="ss-header">
+    <div id="ss-hdr-left"><span id="ss-dealer-name">LODĚNICE</span></div>
+    <div id="ss-hdr-center">◈ KATALOG LODÍ</div>
+    <div id="ss-hdr-right">
+      <span id="ss-credits-hdr">0 Cr</span>
+      <button id="btn-ss-close">✕ ZAVŘÍT</button>
+    </div>
+  </div>
+  <div id="ss-body">
+    <div id="ss-ship-list"></div>
+    <div id="ss-ship-detail">
+      <div id="ss-detail-empty">← Vyberte loď ze seznamu</div>
+      <div id="ss-detail-content" style="display:none">
+        <div id="ss-preview-wrap"><canvas id="ss-ship-canvas" width="220" height="220"></canvas></div>
+        <div id="ss-ship-name">—</div>
+        <div id="ss-ship-stats"></div>
+        <div id="ss-price-row"><span id="ss-price-label">CENA</span><span id="ss-price">—</span></div>
+        <button id="ss-buy-btn">KOUPIT →</button>
+        <div id="ss-buy-hint"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SPRÁVA GARÁŽE (GARAGE MENU) -->
+<div id="garage-menu-overlay" style="display:none">
+  <div id="gm-header">
+    <div id="gm-hdr-left">
+      <span class="gm-badge">🏭 HANGÁR</span>
+      <span id="gm-garage-name">—</span>
+    </div>
+    <div id="gm-hdr-center">SPRÁVA GARÁŽE</div>
+    <div id="gm-hdr-right"><button id="btn-gm-close">✕ ZAVŘÍT</button></div>
+  </div>
+  <div id="gm-body">
+    <div id="gm-top-bar">
+      <div id="gm-cap-info">Kapacita: <span id="gm-cap-val">0/3</span></div>
+      <button id="btn-gm-upgrade" class="svc-btn">⬆ ROZŠÍŘIT (+1 SLOT)</button>
+      <button id="btn-gm-park" class="svc-btn" style="background:rgba(0,200,100,0.1);border-color:#00cc66;color:#00cc66">🏭 PARKOVAT AKTIVNÍ LOĎ</button>
+    </div>
+    <div id="gm-ships-grid"></div>
+  </div>
+</div>
+
+<!-- TUNING STUDIO -->
+<div id="tuning-overlay" style="display:none">
+  <div id="tun-header">
+    <div id="tun-hdr-left">
+      <span class="tun-badge">🎨 STUDIO</span>
+      <span id="tun-ship-type">VIPER MK.I</span>
+    </div>
+    <div id="tun-hdr-center">TUNING STUDIO</div>
+    <div id="tun-hdr-right"><button id="btn-tun-close">✕ ZAVŘÍT</button></div>
+  </div>
+  <div id="tun-body">
+    <div id="tun-preview-col">
+      <canvas id="tun-canvas" width="280" height="280"></canvas>
+      <div id="tun-preview-name"></div>
+    </div>
+    <div id="tun-controls-col">
+      <div class="tun-section">
+        <div class="tun-section-label">✏ NÁZEV LODI</div>
+        <input type="text" id="tun-name-input" class="tun-input" maxlength="20" placeholder="Vlastní název...">
+      </div>
+      <div class="tun-section">
+        <div class="tun-section-label">🎨 BARVA TRUPU</div>
+        <div id="tun-hull-colors" class="tun-swatch-grid"></div>
+      </div>
+      <div class="tun-section">
+        <div class="tun-section-label">🔥 BARVA TRYSEK</div>
+        <div id="tun-thrust-colors" class="tun-swatch-grid"></div>
+      </div>
+      <button id="btn-tun-apply" class="svc-btn" style="margin-top:20px;width:100%;font-size:15px;padding:16px">✓ ULOŽIT TUNING</button>
+    </div>
+  </div>
+</div>
+
+<!-- SPRÁVA FLOTILY (FLEET MANAGER) -->
+<div id="fleet-manager-overlay" style="display:none">
+  <div id="fm-header">
+    <div id="fm-hdr-left"><span id="fm-count">0 lodí</span></div>
+    <div id="fm-hdr-center">🚀 SPRÁVA FLOTILY — MOJE LODI</div>
+    <div id="fm-hdr-right"><button id="btn-fm-close">✕ ZAVŘÍT</button></div>
+  </div>
+  <div id="fm-body">
+    <div id="fm-ships-grid"></div>
+  </div>
+</div>
+
+<!-- SPRÁVA GARÁZÍ (GARAGE MANAGER) -->
+<div id="garage-manager-overlay" style="display:none">
+  <div id="gmgr-header">
+    <div id="gmgr-hdr-left"><span id="gmgr-count">0 garází</span></div>
+    <div id="gmgr-hdr-center">🏭 SPRÁVA GARÁZÍ — MOJE GARÁŽE</div>
+    <div id="gmgr-hdr-right"><button id="btn-gmgr-close">✕ ZAVŘÍT</button></div>
+  </div>
+  <div id="gmgr-body">
+    <div id="gmgr-list"></div>
+  </div>
 </div>
 
 <!-- SMRT — PERMADEATH -->

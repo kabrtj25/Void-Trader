@@ -1833,3 +1833,273 @@ body.light #dock-tier{color:rgba(0,0,0,0.4);}
 body.light .service-card{background:rgba(255,255,255,0.5);border-color:rgba(0,0,0,0.1);}
 body.light .dtab:nth-child(3).active{background:rgba(0,51,136,0.06);}
 body.light .dtab:hover{background:rgba(0,0,0,0.04);}
+
+/* ===== RESPAWN SCREEN ===== */
+#respawn-screen{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.92);backdrop-filter:blur(8px);}
+#rsp-bg-glow{position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(255,80,0,0.15) 0%,transparent 70%);pointer-events:none;}
+#respawn-box{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;background:rgba(8,4,0,0.97);border:1px solid rgba(255,80,0,0.4);border-radius:4px;padding:40px 60px;min-width:480px;box-shadow:0 0 60px rgba(255,80,0,0.2);}
+#rsp-icon{font-size:64px;margin-bottom:12px;}
+#rsp-title{font:bold 36px "Courier New",monospace;color:#ff5500;text-shadow:0 0 20px rgba(255,85,0,0.8);letter-spacing:4px;margin-bottom:6px;}
+#rsp-subtitle{font:10px "Courier New",monospace;color:rgba(255,120,0,0.6);letter-spacing:2px;margin-bottom:30px;}
+#rsp-stats{width:100%;border-top:1px solid rgba(255,80,0,0.2);padding-top:20px;margin-bottom:24px;}
+.rsp-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,80,0,0.08);}
+.rsp-label{font:9px "Courier New",monospace;color:rgba(200,180,160,0.5);letter-spacing:1px;}
+.rsp-val{font:bold 12px "Courier New",monospace;color:#e0d0c0;}
+.rsp-val.danger{color:#ff5500;}
+.rsp-val.warn{color:#ffcc00;}
+#rsp-hint{font:italic 11px "Courier New",monospace;color:rgba(200,180,160,0.4);margin-bottom:24px;text-align:center;}
+
+/* ===== SHIP SHOP OVERLAY ===== */
+#ship-shop-overlay{position:fixed;inset:0;z-index:400;display:flex;flex-direction:column;background:rgba(0,2,14,0.97);backdrop-filter:blur(12px);}
+#ss-header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:56px;background:rgba(255,170,0,0.06);border-bottom:1px solid rgba(255,170,0,0.18);flex-shrink:0;}
+#ss-dealer-name{font:bold 13px "Courier New",monospace;color:#ffaa00;letter-spacing:2px;}
+#ss-hdr-center{font:bold 15px "Courier New",monospace;color:rgba(200,220,255,0.8);letter-spacing:3px;}
+#ss-credits-hdr{font:bold 13px "Courier New",monospace;color:#ffcc00;margin-right:16px;}
+#btn-ss-close{background:none;border:1px solid rgba(255,80,0,0.4);color:rgba(255,100,0,0.7);font:bold 10px "Courier New",monospace;padding:6px 14px;cursor:pointer;border-radius:2px;letter-spacing:1px;}
+#btn-ss-close:hover{background:rgba(255,80,0,0.1);color:#ff4400;}
+#ss-body{display:flex;flex:1;overflow:hidden;}
+#ss-ship-list{width:260px;flex-shrink:0;overflow-y:auto;border-right:1px solid rgba(255,170,0,0.12);padding:8px;}
+.ss-ship-row{display:flex;align-items:center;gap:10px;padding:11px 13px;border:1px solid rgba(255,170,0,0.1);border-radius:3px;margin-bottom:4px;cursor:pointer;transition:all 0.15s;}
+.ss-ship-row:hover{background:rgba(255,170,0,0.06);border-color:rgba(255,170,0,0.25);}
+.ss-ship-row.ss-selected{background:rgba(255,170,0,0.12);border-color:rgba(255,170,0,0.5);}
+.ss-ship-row.ss-owned{border-color:rgba(0,255,136,0.3);}
+.ss-icon{font-size:20px;}
+.ss-row-info{flex:1;}
+.ss-row-name{font:bold 11px "Courier New",monospace;color:#ddeeff;}
+.ss-row-price{font:9px "Courier New",monospace;color:rgba(255,200,0,0.6);margin-top:2px;}
+.ss-row-tag{font:8px "Courier New",monospace;color:rgba(100,220,100,0.7);}
+#ss-ship-detail{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;overflow-y:auto;}
+#ss-detail-empty{font:10px "Courier New",monospace;color:rgba(150,170,200,0.3);}
+#ss-detail-content{display:flex;flex-direction:column;align-items:center;max-width:400px;width:100%;}
+#ss-preview-wrap{background:rgba(0,10,30,0.7);border:1px solid rgba(100,150,255,0.15);border-radius:4px;padding:14px;margin-bottom:14px;}
+#ss-ship-canvas{display:block;}
+#ss-ship-name{font:bold 18px "Courier New",monospace;color:#ddeeff;letter-spacing:3px;margin-bottom:14px;text-align:center;}
+#ss-ship-stats{width:100%;margin-bottom:18px;}
+.ss-stat-row{display:flex;align-items:center;gap:8px;margin-bottom:7px;}
+.ss-stat-label{font:8px "Courier New",monospace;color:rgba(150,170,200,0.5);width:70px;flex-shrink:0;letter-spacing:1px;}
+.ss-stat-bar{flex:1;height:6px;background:rgba(255,255,255,0.08);border-radius:2px;overflow:hidden;}
+.ss-stat-fill{height:100%;border-radius:2px;transition:width 0.3s;}
+.ss-stat-fill.hull{background:#44cc88;}
+.ss-stat-fill.shield{background:#4488ff;}
+.ss-stat-fill.speed{background:#ffaa00;}
+.ss-stat-fill.cargo{background:#cc88ff;}
+.ss-stat-val{font:bold 9px "Courier New",monospace;color:rgba(200,220,255,0.6);width:32px;text-align:right;}
+#ss-price-row{display:flex;justify-content:space-between;align-items:center;width:100%;padding:11px 0;border-top:1px solid rgba(255,170,0,0.15);border-bottom:1px solid rgba(255,170,0,0.15);margin-bottom:14px;}
+#ss-price-label{font:9px "Courier New",monospace;color:rgba(200,180,0,0.5);letter-spacing:1px;}
+#ss-price{font:bold 18px "Courier New",monospace;color:#ffcc00;}
+#ss-buy-btn{width:100%;padding:13px;background:rgba(255,170,0,0.15);border:1px solid rgba(255,170,0,0.5);color:#ffcc00;font:bold 12px "Courier New",monospace;cursor:pointer;border-radius:2px;letter-spacing:2px;transition:all 0.15s;}
+#ss-buy-btn:hover:not(:disabled){background:rgba(255,170,0,0.3);}
+#ss-buy-btn:disabled{opacity:0.4;cursor:not-allowed;}
+#ss-buy-hint{font:9px "Courier New",monospace;color:rgba(150,170,200,0.4);margin-top:7px;text-align:center;}
+
+/* ===== GARAGE MENU OVERLAY ===== */
+#garage-menu-overlay{position:fixed;inset:0;z-index:400;display:flex;flex-direction:column;background:rgba(0,4,14,0.97);backdrop-filter:blur(12px);}
+#gm-header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:56px;background:rgba(0,200,255,0.05);border-bottom:1px solid rgba(0,200,255,0.15);flex-shrink:0;}
+.gm-badge{font:bold 10px "Courier New",monospace;color:#00ccff;border:1px solid rgba(0,200,255,0.4);padding:2px 8px;border-radius:2px;margin-right:10px;}
+#gm-garage-name{font:bold 13px "Courier New",monospace;color:#ddeeff;letter-spacing:2px;}
+#gm-hdr-center{font:bold 15px "Courier New",monospace;color:rgba(200,220,255,0.8);letter-spacing:3px;}
+#btn-gm-close{background:none;border:1px solid rgba(255,80,0,0.4);color:rgba(255,100,0,0.7);font:bold 10px "Courier New",monospace;padding:6px 14px;cursor:pointer;border-radius:2px;}
+#btn-gm-close:hover{background:rgba(255,80,0,0.1);color:#ff4400;}
+#gm-body{flex:1;overflow-y:auto;padding:24px;}
+#gm-top-bar{display:flex;align-items:center;gap:12px;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid rgba(0,200,255,0.12);flex-wrap:wrap;}
+#gm-cap-info{font:10px "Courier New",monospace;color:rgba(150,200,255,0.5);margin-right:auto;}
+#gm-cap-info span{color:#00ccff;font-weight:bold;font-size:13px;}
+#gm-ships-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;}
+.gm-ship-card{background:rgba(0,20,40,0.7);border:1px solid rgba(0,150,200,0.2);border-radius:4px;padding:16px;display:flex;flex-direction:column;gap:8px;transition:border-color 0.15s;}
+.gm-ship-card:hover{border-color:rgba(0,200,255,0.4);}
+.gm-ship-card.gm-active{border-color:rgba(0,255,136,0.4);background:rgba(0,30,20,0.7);}
+.gmc-name{font:bold 13px "Courier New",monospace;color:#ddeeff;}
+.gmc-type{font:9px "Courier New",monospace;color:rgba(150,180,220,0.5);}
+.gmc-earn{font:9px "Courier New",monospace;color:rgba(255,200,0,0.55);}
+.gmc-color-strip{height:4px;border-radius:2px;margin:4px 0;}
+.gmc-btn{margin-top:4px;padding:8px;background:rgba(0,200,255,0.1);border:1px solid rgba(0,200,255,0.35);color:#00ccff;font:bold 9px "Courier New",monospace;cursor:pointer;border-radius:2px;letter-spacing:1px;transition:all 0.15s;}
+.gmc-btn:hover{background:rgba(0,200,255,0.2);}
+.gmc-btn.gmc-activate{background:rgba(0,200,100,0.1);border-color:rgba(0,200,100,0.35);color:#00cc66;}
+.gmc-btn.gmc-activate:hover{background:rgba(0,200,100,0.2);}
+.gmc-empty-slot{font:9px "Courier New",monospace;color:rgba(100,130,160,0.3);text-align:center;padding:20px;border:1px dashed rgba(100,150,200,0.1);border-radius:4px;}
+
+/* ===== TUNING OVERLAY ===== */
+#tuning-overlay{position:fixed;inset:0;z-index:400;display:flex;flex-direction:column;background:rgba(4,0,14,0.97);backdrop-filter:blur(12px);}
+#tun-header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:56px;background:rgba(200,100,255,0.05);border-bottom:1px solid rgba(200,100,255,0.18);flex-shrink:0;}
+.tun-badge{font:bold 10px "Courier New",monospace;color:#cc88ff;border:1px solid rgba(200,100,255,0.4);padding:2px 8px;border-radius:2px;margin-right:10px;}
+#tun-ship-type{font:bold 13px "Courier New",monospace;color:#ddeeff;letter-spacing:2px;}
+#tun-hdr-center{font:bold 15px "Courier New",monospace;color:rgba(200,220,255,0.8);letter-spacing:3px;}
+#btn-tun-close{background:none;border:1px solid rgba(255,80,0,0.4);color:rgba(255,100,0,0.7);font:bold 10px "Courier New",monospace;padding:6px 14px;cursor:pointer;border-radius:2px;}
+#btn-tun-close:hover{background:rgba(255,80,0,0.1);color:#ff4400;}
+#tun-body{flex:1;display:flex;overflow:hidden;}
+#tun-preview-col{width:320px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;border-right:1px solid rgba(200,100,255,0.12);background:rgba(0,0,10,0.5);padding:24px;}
+#tun-canvas{background:rgba(0,0,20,0.6);border:1px solid rgba(200,100,255,0.15);border-radius:4px;display:block;}
+#tun-preview-name{font:bold 13px "Courier New",monospace;color:#cc88ff;margin-top:12px;letter-spacing:2px;}
+#tun-controls-col{flex:1;overflow-y:auto;padding:24px 32px;}
+.tun-section{margin-bottom:28px;}
+.tun-section-label{font:bold 9px "Courier New",monospace;color:rgba(200,100,255,0.55);letter-spacing:2px;margin-bottom:10px;}
+.tun-input{width:100%;background:rgba(30,0,50,0.6);border:1px solid rgba(200,100,255,0.3);color:#eeddff;font:13px "Courier New",monospace;padding:10px 14px;border-radius:2px;outline:none;box-sizing:border-box;}
+.tun-input:focus{border-color:rgba(200,100,255,0.7);background:rgba(40,0,60,0.7);}
+.tun-swatch-grid{display:flex;flex-wrap:wrap;gap:8px;}
+.tun-swatch{width:40px;height:40px;border-radius:3px;border:2px solid transparent;cursor:pointer;transition:all 0.15s;position:relative;flex-shrink:0;}
+.tun-swatch:hover{transform:scale(1.12);}
+.tun-swatch.selected{border-color:#ffffff;box-shadow:0 0 10px rgba(255,255,255,0.4);}
+.tun-swatch.selected::after{content:'✓';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#fff;font-size:16px;font-weight:bold;text-shadow:0 0 4px rgba(0,0,0,0.9);}
+
+/* ===== FLEET MANAGER OVERLAY ===== */
+#fleet-manager-overlay{position:fixed;inset:0;z-index:400;display:flex;flex-direction:column;background:rgba(0,2,10,0.97);backdrop-filter:blur(12px);}
+#fm-header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:56px;background:rgba(255,170,0,0.04);border-bottom:1px solid rgba(255,170,0,0.15);flex-shrink:0;}
+#fm-count{font:bold 11px "Courier New",monospace;color:rgba(255,170,0,0.6);letter-spacing:1px;}
+#fm-hdr-center{font:bold 15px "Courier New",monospace;color:rgba(200,220,255,0.8);letter-spacing:3px;}
+#btn-fm-close{background:none;border:1px solid rgba(255,80,0,0.4);color:rgba(255,100,0,0.7);font:bold 10px "Courier New",monospace;padding:6px 14px;cursor:pointer;border-radius:2px;}
+#btn-fm-close:hover{background:rgba(255,80,0,0.1);color:#ff4400;}
+#fm-body{flex:1;overflow-y:auto;padding:24px;}
+#fm-ships-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;}
+.fm-ship-card{background:rgba(0,10,28,0.8);border:1px solid rgba(100,130,200,0.2);border-radius:4px;padding:20px;display:flex;flex-direction:column;gap:10px;transition:border-color 0.15s;}
+.fm-ship-card:hover{border-color:rgba(150,170,230,0.35);}
+.fm-ship-card.fm-active{border-color:rgba(255,170,0,0.5);background:rgba(20,12,0,0.8);box-shadow:0 0 20px rgba(255,170,0,0.06);}
+.fmc-header{display:flex;align-items:center;gap:12px;}
+.fmc-icon{font-size:28px;}
+.fmc-title{flex:1;}
+.fmc-name{font:bold 14px "Courier New",monospace;color:#ddeeff;}
+.fmc-type{font:9px "Courier New",monospace;color:rgba(150,180,220,0.45);margin-top:2px;}
+.fmc-active-badge{font:bold 8px "Courier New",monospace;color:#ffaa00;border:1px solid rgba(255,170,0,0.4);padding:2px 8px;border-radius:2px;}
+.fmc-color-row{display:flex;gap:6px;align-items:center;}
+.fmc-hull-sw,.fmc-thrust-sw{width:20px;height:20px;border-radius:2px;border:1px solid rgba(255,255,255,0.2);flex-shrink:0;}
+.fmc-color-label{font:8px "Courier New",monospace;color:rgba(150,170,200,0.4);}
+.fmc-stats{display:grid;grid-template-columns:1fr 1fr;gap:4px;}
+.fmc-stat{font:8px "Courier New",monospace;color:rgba(150,180,220,0.45);}
+.fmc-stat span{color:rgba(200,220,255,0.7);}
+.fmc-loc{font:8px "Courier New",monospace;color:rgba(0,200,255,0.4);}
+.fmc-earn{font:8px "Courier New",monospace;color:rgba(255,200,0,0.5);}
+.fmc-btn{padding:10px;background:rgba(0,200,100,0.1);border:1px solid rgba(0,200,100,0.35);color:#00cc66;font:bold 9px "Courier New",monospace;cursor:pointer;border-radius:2px;letter-spacing:1px;transition:all 0.15s;}
+.fmc-btn:hover{background:rgba(0,200,100,0.2);}
+.fmc-no-ships{font:10px "Courier New",monospace;color:rgba(150,170,200,0.3);text-align:center;padding:60px 20px;}
+
+/* ===== GARAGE MANAGER OVERLAY ===== */
+#garage-manager-overlay{position:fixed;inset:0;z-index:400;display:flex;flex-direction:column;background:rgba(0,4,10,0.97);backdrop-filter:blur(12px);}
+#gmgr-header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:56px;background:rgba(0,200,255,0.04);border-bottom:1px solid rgba(0,200,255,0.14);flex-shrink:0;}
+#gmgr-count{font:bold 11px "Courier New",monospace;color:rgba(0,200,255,0.6);letter-spacing:1px;}
+#gmgr-hdr-center{font:bold 15px "Courier New",monospace;color:rgba(200,220,255,0.8);letter-spacing:3px;}
+#btn-gmgr-close{background:none;border:1px solid rgba(255,80,0,0.4);color:rgba(255,100,0,0.7);font:bold 10px "Courier New",monospace;padding:6px 14px;cursor:pointer;border-radius:2px;}
+#btn-gmgr-close:hover{background:rgba(255,80,0,0.1);color:#ff4400;}
+#gmgr-body{flex:1;overflow-y:auto;padding:24px;}
+#gmgr-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;}
+.gmgr-card{background:rgba(0,14,30,0.8);border:1px solid rgba(0,150,200,0.2);border-radius:4px;padding:20px;}
+.gmgr-card-header{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
+.gmgr-icon{font-size:26px;}
+.gmgr-name{font:bold 13px "Courier New",monospace;color:#ddeeff;flex:1;}
+.gmgr-gal-badge{font:8px "Courier New",monospace;color:#00ccff;border:1px solid rgba(0,200,255,0.3);padding:2px 8px;border-radius:2px;}
+.gmgr-cap-row{display:flex;align-items:center;gap:8px;margin-bottom:12px;}
+.gmgr-cap-label{font:9px "Courier New",monospace;color:rgba(150,200,255,0.4);flex:1;}
+.gmgr-cap-track{flex:2;height:6px;background:rgba(0,200,255,0.1);border-radius:3px;overflow:hidden;}
+.gmgr-cap-fill{height:100%;background:#00ccff;border-radius:3px;transition:width 0.3s;}
+.gmgr-cap-val{font:bold 9px "Courier New",monospace;color:#00ccff;}
+.gmgr-ship-list{display:flex;flex-direction:column;gap:5px;}
+.gmgr-ship-item{display:flex;align-items:center;gap:8px;font:9px "Courier New",monospace;color:rgba(170,200,230,0.6);padding:4px 0;border-bottom:1px solid rgba(0,150,200,0.08);}
+.gmgr-ship-dot{width:12px;height:12px;border-radius:2px;flex-shrink:0;}
+.gmgr-empty-slot{font:9px "Courier New",monospace;color:rgba(100,130,160,0.25);font-style:italic;}
+.gmgr-no-garages{font:11px "Courier New",monospace;color:rgba(100,150,200,0.3);text-align:center;padding:60px 20px;}
+
+/* ===== DOCK FULLSCREEN HINT ===== */
+.dock-fullscreen-hint{padding:24px;text-align:center;font:12px "Courier New",monospace;color:rgba(180,200,230,0.7);}
+
+/* ===== LIGHT MODE — RESPAWN ===== */
+body.light #respawn-screen{background:rgba(240,225,215,0.97);}
+body.light #rsp-bg-glow{background:radial-gradient(ellipse at center,rgba(255,80,0,0.08) 0%,transparent 70%);}
+body.light #respawn-box{background:#fff8f4;border-color:rgba(200,60,0,0.3);}
+body.light #rsp-title{color:#cc3300;text-shadow:none;}
+body.light #rsp-subtitle{color:rgba(160,50,0,0.5);}
+body.light .rsp-label{color:rgba(100,60,40,0.55);}
+body.light .rsp-val{color:#200000;}
+body.light .rsp-val.danger{color:#cc3300;}
+body.light .rsp-val.warn{color:#884400;}
+body.light #rsp-hint{color:rgba(100,60,40,0.38);}
+
+/* ===== LIGHT MODE — SHIP SHOP ===== */
+body.light #ship-shop-overlay{background:rgba(220,230,250,0.97);}
+body.light #ss-header{background:rgba(200,170,0,0.05);border-color:rgba(150,120,0,0.2);}
+body.light #ss-dealer-name{color:#886600;}
+body.light #ss-hdr-center{color:rgba(0,20,80,0.7);}
+body.light #ss-credits-hdr{color:#664400;}
+body.light #ss-ship-list{border-color:rgba(150,130,0,0.15);}
+body.light .ss-ship-row{border-color:rgba(150,130,0,0.12);}
+body.light .ss-ship-row:hover{background:rgba(200,170,0,0.05);}
+body.light .ss-ship-row.ss-selected{background:rgba(200,170,0,0.1);border-color:rgba(150,100,0,0.4);}
+body.light #ss-detail-empty{color:rgba(0,0,0,0.25);}
+body.light #ss-preview-wrap{background:rgba(200,215,250,0.7);border-color:rgba(0,50,150,0.15);}
+body.light #ss-ship-name{color:#000022;}
+body.light .ss-stat-label{color:rgba(0,30,80,0.4);}
+body.light .ss-stat-bar{background:rgba(0,0,0,0.08);}
+body.light .ss-stat-val{color:rgba(0,30,100,0.55);}
+body.light #ss-price-label{color:rgba(100,80,0,0.5);}
+body.light #ss-price{color:#664400;}
+body.light #ss-buy-btn{background:rgba(200,160,0,0.1);border-color:rgba(150,120,0,0.4);color:#884400;}
+body.light #ss-buy-btn:hover:not(:disabled){background:rgba(200,160,0,0.2);}
+body.light #ss-buy-hint{color:rgba(0,0,0,0.3);}
+
+/* ===== LIGHT MODE — GARAGE MENU ===== */
+body.light #garage-menu-overlay{background:rgba(215,230,250,0.97);}
+body.light #gm-header{background:rgba(0,180,220,0.04);border-color:rgba(0,130,170,0.18);}
+body.light .gm-badge{color:#005577;border-color:rgba(0,100,150,0.4);}
+body.light #gm-garage-name{color:#000022;}
+body.light #gm-hdr-center{color:rgba(0,20,70,0.7);}
+body.light #gm-cap-info{color:rgba(0,60,100,0.45);}
+body.light #gm-cap-info span{color:#006688;}
+body.light .gm-ship-card{background:rgba(215,230,250,0.7);border-color:rgba(0,100,150,0.18);}
+body.light .gm-ship-card:hover{border-color:rgba(0,150,200,0.35);}
+body.light .gm-ship-card.gm-active{border-color:rgba(0,140,70,0.4);background:rgba(215,245,225,0.7);}
+body.light .gmc-name{color:#000022;}
+body.light .gmc-type{color:rgba(0,40,80,0.45);}
+body.light .gmc-earn{color:rgba(100,80,0,0.55);}
+body.light .gmc-btn{background:rgba(0,150,200,0.08);border-color:rgba(0,120,170,0.3);color:#005577;}
+body.light .gmc-btn:hover{background:rgba(0,150,200,0.16);}
+body.light .gmc-btn.gmc-activate{background:rgba(0,160,80,0.08);border-color:rgba(0,120,60,0.3);color:#005522;}
+body.light .gmc-btn.gmc-activate:hover{background:rgba(0,160,80,0.16);}
+body.light .gmc-empty-slot{color:rgba(0,0,0,0.2);border-color:rgba(0,0,0,0.08);}
+
+/* ===== LIGHT MODE — TUNING ===== */
+body.light #tuning-overlay{background:rgba(220,210,240,0.97);}
+body.light #tun-header{background:rgba(150,60,200,0.04);border-color:rgba(120,50,180,0.18);}
+body.light .tun-badge{color:#660099;border-color:rgba(120,50,180,0.4);}
+body.light #tun-ship-type{color:#000022;}
+body.light #tun-hdr-center{color:rgba(0,20,70,0.7);}
+body.light #tun-preview-col{background:rgba(210,200,235,0.6);border-color:rgba(120,50,180,0.1);}
+body.light #tun-canvas{background:rgba(200,190,225,0.7);border-color:rgba(120,50,180,0.15);}
+body.light #tun-preview-name{color:#660099;}
+body.light .tun-section-label{color:rgba(100,40,150,0.55);}
+body.light .tun-input{background:rgba(225,210,245,0.7);border-color:rgba(120,50,180,0.25);color:#110022;}
+body.light .tun-input:focus{border-color:rgba(120,50,180,0.55);}
+body.light .tun-swatch.selected{border-color:#330055;}
+
+/* ===== LIGHT MODE — FLEET MANAGER ===== */
+body.light #fleet-manager-overlay{background:rgba(215,225,250,0.97);}
+body.light #fm-header{background:rgba(200,160,0,0.03);border-color:rgba(150,120,0,0.14);}
+body.light #fm-count{color:rgba(130,100,0,0.6);}
+body.light #fm-hdr-center{color:rgba(0,20,70,0.7);}
+body.light .fm-ship-card{background:rgba(215,225,250,0.8);border-color:rgba(0,50,150,0.15);}
+body.light .fm-ship-card:hover{border-color:rgba(0,70,180,0.3);}
+body.light .fm-ship-card.fm-active{border-color:rgba(150,110,0,0.4);background:rgba(250,245,210,0.8);}
+body.light .fmc-name{color:#000022;}
+body.light .fmc-type{color:rgba(0,30,80,0.4);}
+body.light .fmc-active-badge{color:#884400;border-color:rgba(150,110,0,0.4);}
+body.light .fmc-color-label{color:rgba(0,30,80,0.35);}
+body.light .fmc-stat{color:rgba(0,30,80,0.4);}
+body.light .fmc-stat span{color:rgba(0,40,100,0.7);}
+body.light .fmc-loc{color:rgba(0,100,150,0.45);}
+body.light .fmc-earn{color:rgba(100,80,0,0.5);}
+body.light .fmc-btn{background:rgba(0,160,80,0.08);border-color:rgba(0,120,60,0.3);color:#005522;}
+body.light .fmc-btn:hover{background:rgba(0,160,80,0.16);}
+body.light .fmc-no-ships{color:rgba(0,0,0,0.2);}
+
+/* ===== LIGHT MODE — GARAGE MANAGER ===== */
+body.light #garage-manager-overlay{background:rgba(215,230,250,0.97);}
+body.light #gmgr-header{background:rgba(0,160,200,0.03);border-color:rgba(0,120,160,0.14);}
+body.light #gmgr-count{color:rgba(0,100,150,0.6);}
+body.light #gmgr-hdr-center{color:rgba(0,20,70,0.7);}
+body.light .gmgr-card{background:rgba(210,225,250,0.8);border-color:rgba(0,100,150,0.18);}
+body.light .gmgr-name{color:#000022;}
+body.light .gmgr-gal-badge{color:#005577;border-color:rgba(0,100,150,0.3);}
+body.light .gmgr-cap-label{color:rgba(0,50,100,0.4);}
+body.light .gmgr-cap-track{background:rgba(0,150,200,0.08);}
+body.light .gmgr-cap-fill{background:#005577;}
+body.light .gmgr-cap-val{color:#005577;}
+body.light .gmgr-ship-item{color:rgba(0,40,80,0.55);border-color:rgba(0,100,150,0.08);}
+body.light .gmgr-empty-slot{color:rgba(0,0,0,0.2);}
+body.light .gmgr-no-garages{color:rgba(0,0,0,0.2);}
+body.light .dock-fullscreen-hint{color:rgba(0,20,60,0.6);}
