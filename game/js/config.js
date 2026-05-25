@@ -61,12 +61,12 @@ const GOODS = [
 ];
 
 const UPGRADES = [
-  {id:'engine',  name:'Motor',           max:4, cost:800,  desc:'Rychlost +15%'},
-  {id:'shield',  name:'Štít',            max:4, cost:1200, desc:'Štít +30'},
-  {id:'hull',    name:'Pancéřování',     max:3, cost:1000, desc:'Max. HP +25'},
-  {id:'cargo',   name:'Náklad',          max:4, cost:600,  desc:'Náklad +5'},
-  {id:'weapons', name:'Zbraně',          max:3, cost:1500, desc:'DMG +10'},
-  {id:'fuel',    name:'Nádrž',           max:3, cost:700,  desc:'Nádrž +25%'},
+  {id:'engine',  name:'Motor',           max:4, cost:200000,  desc:'Rychlost +15%'},
+  {id:'shield',  name:'Štít',            max:4, cost:300000,  desc:'Štít +30'},
+  {id:'hull',    name:'Pancéřování',     max:3, cost:250000,  desc:'Max. HP +25'},
+  {id:'cargo',   name:'Náklad',          max:4, cost:150000,  desc:'Náklad +5'},
+  {id:'weapons', name:'Zbraně',          max:3, cost:400000,  desc:'DMG +10'},
+  {id:'fuel',    name:'Nádrž',           max:3, cost:175000,  desc:'Nádrž +25%'},
 ];
 
 const CONTRACT_CARGO = [

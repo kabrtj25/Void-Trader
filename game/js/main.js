@@ -83,6 +83,22 @@ function toggleTheme(){
   if(lbl)  lbl.textContent  = window.lightMode ? 'DARK MODE' : 'LIGHT MODE';
   initMenuStars();
 }
+
+function toggleFullscreen(){
+  if(!document.fullscreenElement){
+    document.documentElement.requestFullscreen().catch(()=>{});
+  } else {
+    document.exitFullscreen().catch(()=>{});
+  }
+}
+function _updateFsBtn(){
+  const btn=document.getElementById('btn-fullscreen');
+  if(!btn)return;
+  if(document.fullscreenElement){btn.textContent='⛶ WINDOWED';}
+  else{btn.textContent='⛶ FULLSCREEN';}
+}
+document.addEventListener('fullscreenchange',_updateFsBtn);
+
 let last = 0, frameCount = 0;
 
 // Warp systém
@@ -174,6 +190,7 @@ function consumeFuel(p,amount){
 // Input
 const keys={};
 document.addEventListener('keydown',e=>{
+  if(e.key==='F11'){e.preventDefault();toggleFullscreen();return;}
   if(keys[e.code])return;
   keys[e.code]=true;
 
@@ -2063,7 +2080,8 @@ window.addEventListener('load',()=>{
   })();
 
   // Menu tlačítka
-  document.getElementById('btn-play').onclick=()=>openSlotScreen();
+  document.getElementById('btn-play').onclick=()=>{ if(!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{}); openSlotScreen(); };
+  const fsBtn=document.getElementById('btn-fullscreen'); if(fsBtn) fsBtn.onclick=()=>toggleFullscreen();
   document.getElementById('btn-admin').onclick=()=>openAdminLogin();
   document.getElementById('btn-admin-close').onclick=()=>closeAdminLogin();
   document.getElementById('btn-admin-login').onclick=()=>submitAdminLogin();
