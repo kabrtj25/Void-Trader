@@ -1398,7 +1398,7 @@ function update(dt){
   }
 
   // Stanice — kolize s tělem; dealer/garáž nemají kolizní destrukci (přijetí odevšud)
-  if(gs.nearStation&&!gs.dockingState.dockable&&!p.dead&&warpPhase!=='boosting'){
+  if(gs.nearStation&&!gs.dockingState.dockable&&!p.dead&&warpPhase!=='boosting'&&!gs.autopilot){
     const st=gs.nearStation;
     const d=dist2(p,st);
     const isLarge=st.type==='large';
@@ -1419,7 +1419,7 @@ function update(dt){
     ch.asteroids.forEach(a=>{
       a.x+=a.vx;a.y+=a.vy;a.angle+=a.rot;
       const d=dist2(p,a);
-      if(d<a.sz+14&&p.invTimer<=0){
+      if(d<a.sz+14&&p.invTimer<=0&&!gs.autopilot){
         hitPlayer(6);a.vx*=-1;a.vy*=-1;
         // Odrazi hráče
         p.vx+=(p.x-a.x)*0.02;p.vy+=(p.y-a.y)*0.02;
@@ -1474,7 +1474,7 @@ function update(dt){
         if(hit)break;
       }
     } else {
-      if(p.invTimer<=0&&dist2(b,p)<20){hitPlayer(b.dmg);gs.bullets.splice(i,1);}
+      if(p.invTimer<=0&&!gs.autopilot&&dist2(b,p)<20){hitPlayer(b.dmg);gs.bullets.splice(i,1);}
     }
   }
 
