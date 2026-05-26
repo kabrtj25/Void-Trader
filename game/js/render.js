@@ -1221,15 +1221,32 @@ function _drawSidewinder(col){
 }
 
 function _drawHauler(col){
-  ctx.fillStyle=blendHull('#bb9944',col);
-  ctx.beginPath();ctx.rect(-15,-10,30,26);ctx.fill();
+  // Side cargo pods with bezier rounding
   ctx.fillStyle=blendHull('#aa8833',col);
-  ctx.beginPath();ctx.rect(-24,-7,10,19);ctx.fill();
-  ctx.beginPath();ctx.rect(14,-7,10,19);ctx.fill();
-  ctx.fillStyle=blendHull('#cc9933',col);
-  ctx.beginPath();ctx.moveTo(-7,-10);ctx.lineTo(7,-10);ctx.lineTo(5,-20);ctx.lineTo(-5,-20);ctx.closePath();ctx.fill();
-  ctx.fillStyle='rgba(90,180,255,0.55)';ctx.fillRect(-4,-18,8,5);
-  ctx.fillStyle='#445';[-7,0,7].forEach(ex=>{ctx.beginPath();ctx.ellipse(ex,15,2.5,1.8,0,0,Math.PI*2);ctx.fill();});
+  ctx.beginPath();ctx.moveTo(-14,-4);ctx.lineTo(-22,-4);ctx.bezierCurveTo(-25,-2,-25,10,-22,13);ctx.lineTo(-14,13);ctx.closePath();ctx.fill();
+  ctx.beginPath();ctx.moveTo(14,-4);ctx.lineTo(22,-4);ctx.bezierCurveTo(25,-2,25,10,22,13);ctx.lineTo(14,13);ctx.closePath();ctx.fill();
+  // Pod engines
+  [-22,22].forEach(ex=>{
+    ctx.fillStyle='#554';ctx.beginPath();ctx.ellipse(ex,13,2.8,1.8,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='rgba(255,170,40,0.85)';ctx.beginPath();ctx.ellipse(ex,13,1.6,1,0,0,Math.PI*2);ctx.fill();
+  });
+  // Main cargo hold (wide, slight taper)
+  ctx.fillStyle=blendHull('#cc9944',col);
+  ctx.beginPath();ctx.moveTo(-14,-14);ctx.lineTo(14,-14);ctx.lineTo(14,15);ctx.lineTo(-14,15);ctx.closePath();ctx.fill();
+  // Top section bezier nose
+  ctx.fillStyle=blendHull('#ddaa55',col);
+  ctx.beginPath();ctx.moveTo(-6,-14);ctx.lineTo(6,-14);ctx.bezierCurveTo(5,-18,3,-21,0,-24);ctx.bezierCurveTo(-3,-21,-5,-18,-6,-14);ctx.closePath();ctx.fill();
+  // Cockpit window
+  ctx.fillStyle='rgba(90,180,255,0.7)';ctx.shadowColor='#66aaff';ctx.shadowBlur=4;
+  ctx.beginPath();ctx.ellipse(0,-17,2.8,4,0,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;
+  // Hull panel line
+  ctx.strokeStyle='rgba(0,0,0,0.22)';ctx.lineWidth=0.8;ctx.beginPath();ctx.moveTo(-14,-4);ctx.lineTo(14,-4);ctx.stroke();
+  // Three main engines
+  ctx.fillStyle='#554';[-7,0,7].forEach(ex=>{
+    ctx.beginPath();ctx.ellipse(ex,15,3.2,2,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='rgba(255,170,40,0.85)';ctx.beginPath();ctx.ellipse(ex,15,1.8,1.2,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#554';
+  });
 }
 
 function _drawScout(col){
@@ -1315,53 +1332,112 @@ function _drawPython(col){
 }
 
 function _drawMamba(col){
+  // Ultra-wide delta with sculpted bezier trailing edges
+  ctx.fillStyle=blendHull('#cc0022',col);
+  ctx.beginPath();
+  ctx.moveTo(0,-22);ctx.lineTo(-24,8);
+  ctx.bezierCurveTo(-20,14,-12,14,-5,12);
+  ctx.lineTo(0,8);ctx.lineTo(5,12);
+  ctx.bezierCurveTo(12,14,20,14,24,8);
+  ctx.closePath();ctx.fill();
+  // Leading edge dark stripe
+  ctx.fillStyle='#220005';
+  ctx.beginPath();ctx.moveTo(0,-22);ctx.lineTo(-24,8);ctx.lineTo(-21,8);ctx.lineTo(0,-19);ctx.closePath();ctx.fill();
+  ctx.beginPath();ctx.moveTo(0,-22);ctx.lineTo(24,8);ctx.lineTo(21,8);ctx.lineTo(0,-19);ctx.closePath();ctx.fill();
+  // Central spine nacelle
   ctx.fillStyle=blendHull('#ee1133',col);
-  ctx.beginPath();ctx.moveTo(0,-22);ctx.lineTo(-24,10);ctx.lineTo(-5,12);ctx.lineTo(0,6);ctx.lineTo(5,12);ctx.lineTo(24,10);ctx.closePath();ctx.fill();
-  ctx.fillStyle=blendHull('#ff2244',col);
-  ctx.beginPath();ctx.moveTo(0,-22);ctx.lineTo(-2,8);ctx.lineTo(2,8);ctx.closePath();ctx.fill();
-  [-6,6].forEach(ex=>{
-    ctx.fillStyle='#443';ctx.fillRect(ex-2.5,10,5,5);
-    ctx.fillStyle='rgba(255,60,90,0.9)';ctx.beginPath();ctx.ellipse(ex,15,2.8,1.8,0,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.moveTo(-3,-22);ctx.lineTo(3,-22);ctx.lineTo(2.5,8);ctx.lineTo(-2.5,8);ctx.closePath();ctx.fill();
+  // Cockpit
+  ctx.fillStyle='rgba(255,60,80,0.88)';ctx.shadowColor='#ff2244';ctx.shadowBlur=5;
+  ctx.beginPath();ctx.ellipse(0,-14,2.5,4.5,0,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;
+  // Dual engine pods with glow
+  [-7,7].forEach(ex=>{
+    ctx.fillStyle='#443';ctx.beginPath();ctx.ellipse(ex,12,3.5,2.2,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='rgba(255,60,90,0.9)';ctx.beginPath();ctx.ellipse(ex,12,2.1,1.3,0,0,Math.PI*2);ctx.fill();
   });
-  ctx.fillStyle='rgba(255,100,130,0.65)';ctx.beginPath();ctx.ellipse(0,-14,2,4,0,0,Math.PI*2);ctx.fill();
 }
 
 function _drawFalcon(col){
-  ctx.fillStyle=blendHull('#dd2255',col);
-  ctx.beginPath();ctx.rect(-4.5,-20,9,36);ctx.fill();
-  [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([sx,sy])=>{
-    ctx.fillStyle=blendHull('#cc1144',col);
-    ctx.beginPath();
-    ctx.moveTo(sx*4.5,-16*Math.sign(sy));ctx.lineTo(sx*20,-10*Math.sign(sy));
-    ctx.lineTo(sx*20,-4*Math.sign(sy));ctx.lineTo(sx*4.5,-8*Math.sign(sy));
-    ctx.closePath();ctx.fill();
-    ctx.fillStyle='#443';ctx.beginPath();ctx.ellipse(sx*20,-7*Math.sign(sy),3,2,0,0,Math.PI*2);ctx.fill();
+  // 4 swept wings — X-wing interceptor layout
+  // Forward wings
+  ctx.fillStyle=blendHull('#cc1144',col);
+  ctx.beginPath();ctx.moveTo(-3,-12);ctx.lineTo(-21,-2);ctx.lineTo(-19,4);ctx.lineTo(-3,-4);ctx.closePath();ctx.fill();
+  ctx.beginPath();ctx.moveTo(3,-12);ctx.lineTo(21,-2);ctx.lineTo(19,4);ctx.lineTo(3,-4);ctx.closePath();ctx.fill();
+  // Rear wings
+  ctx.fillStyle=blendHull('#aa0033',col);
+  ctx.beginPath();ctx.moveTo(-3,6);ctx.lineTo(-21,14);ctx.lineTo(-19,20);ctx.lineTo(-3,12);ctx.closePath();ctx.fill();
+  ctx.beginPath();ctx.moveTo(3,6);ctx.lineTo(21,14);ctx.lineTo(19,20);ctx.lineTo(3,12);ctx.closePath();ctx.fill();
+  // Engine pod at each wingtip
+  [[-20,1],[20,1],[-20,17],[20,17]].forEach(([wx,wy])=>{
+    ctx.fillStyle='#332233';ctx.beginPath();ctx.ellipse(wx,wy,3.2,2,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='rgba(255,80,140,0.9)';ctx.beginPath();ctx.ellipse(wx,wy,1.8,1.1,0,0,Math.PI*2);ctx.fill();
   });
-  ctx.fillStyle='rgba(255,80,100,0.7)';ctx.beginPath();ctx.ellipse(0,-12,2.5,3.5,0,0,Math.PI*2);ctx.fill();
+  // Bezier-tapered fuselage
+  ctx.fillStyle=blendHull('#dd2255',col);
+  ctx.beginPath();
+  ctx.moveTo(0,-22);ctx.bezierCurveTo(-4.5,-16,-5,0,-4,14);
+  ctx.lineTo(-3.5,20);ctx.lineTo(3.5,20);ctx.bezierCurveTo(5,0,4.5,-16,0,-22);
+  ctx.closePath();ctx.fill();
+  // Spine line
+  ctx.strokeStyle='rgba(0,0,0,0.2)';ctx.lineWidth=0.8;ctx.beginPath();ctx.moveTo(0,-22);ctx.lineTo(0,20);ctx.stroke();
+  // Cockpit
+  ctx.fillStyle='rgba(255,80,140,0.82)';ctx.shadowColor='#ff2255';ctx.shadowBlur=5;
+  ctx.beginPath();ctx.ellipse(0,-12,2.8,4.5,0,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;
+  // Main engine
+  ctx.fillStyle='#443';ctx.beginPath();ctx.ellipse(0,20,4,2.5,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='rgba(255,80,140,0.9)';ctx.beginPath();ctx.ellipse(0,20,2.4,1.4,0,0,Math.PI*2);ctx.fill();
 }
 
 function _drawAsp(col){
-  ctx.fillStyle=blendHull('#44bbdd',col);
-  ctx.beginPath();ctx.rect(-5.5,-22,11,30);ctx.fill();
-  [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([sx,sy])=>{
-    ctx.fillStyle=blendHull('#33aacc',col);
-    const oy=sy*2-8;
-    ctx.beginPath();ctx.moveTo(sx*5.5,oy);ctx.lineTo(sx*20,oy-6);ctx.lineTo(sx*20,oy);ctx.lineTo(sx*5.5,oy+4);ctx.closePath();ctx.fill();
-    ctx.fillStyle='#334';ctx.beginPath();ctx.ellipse(sx*20,oy-3,2.2,1.6,0,0,Math.PI*2);ctx.fill();
+  // 4 diagonal wing panels (forward + rear sweep)
+  ctx.fillStyle=blendHull('#33aacc',col);
+  ctx.beginPath();ctx.moveTo(-6,-8);ctx.lineTo(-22,-18);ctx.lineTo(-20,-10);ctx.lineTo(-6,-2);ctx.closePath();ctx.fill();
+  ctx.beginPath();ctx.moveTo(6,-8);ctx.lineTo(22,-18);ctx.lineTo(20,-10);ctx.lineTo(6,-2);ctx.closePath();ctx.fill();
+  ctx.beginPath();ctx.moveTo(-6,6);ctx.lineTo(-22,16);ctx.lineTo(-20,22);ctx.lineTo(-6,12);ctx.closePath();ctx.fill();
+  ctx.beginPath();ctx.moveTo(6,6);ctx.lineTo(22,16);ctx.lineTo(20,22);ctx.lineTo(6,12);ctx.closePath();ctx.fill();
+  // Rear engine pods on wingtips
+  [-21,21].forEach(wx=>{
+    ctx.fillStyle='#334';ctx.beginPath();ctx.ellipse(wx,19,2.8,1.8,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='rgba(60,200,255,0.9)';ctx.beginPath();ctx.ellipse(wx,19,1.6,1,0,0,Math.PI*2);ctx.fill();
   });
-  ctx.fillStyle='rgba(60,200,255,0.7)';ctx.beginPath();ctx.ellipse(0,-14,3.5,5,0,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle='#334';ctx.beginPath();ctx.ellipse(0,7,4.5,3,0,0,Math.PI*2);ctx.fill();
+  // Hexagonal explorer hull
+  ctx.fillStyle=blendHull('#44bbdd',col);
+  ctx.beginPath();ctx.moveTo(-8,-22);ctx.lineTo(8,-22);ctx.lineTo(10,-6);ctx.lineTo(8,14);ctx.lineTo(-8,14);ctx.lineTo(-10,-6);ctx.closePath();ctx.fill();
+  // Panoramic cockpit canopy (ASP signature)
+  ctx.fillStyle='rgba(60,200,255,0.88)';ctx.shadowColor='#00aaff';ctx.shadowBlur=7;
+  ctx.beginPath();ctx.moveTo(-6,-22);ctx.lineTo(6,-22);ctx.lineTo(7,-11);ctx.lineTo(-7,-11);ctx.closePath();ctx.fill();ctx.shadowBlur=0;
+  // Sensor spike at nose
+  ctx.fillStyle=blendHull('#55ccee',col);
+  ctx.beginPath();ctx.moveTo(-2,-22);ctx.lineTo(2,-22);ctx.lineTo(0,-26);ctx.closePath();ctx.fill();
+  // Main engine
+  ctx.fillStyle='#334';ctx.beginPath();ctx.ellipse(0,14,5.5,3,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='rgba(60,200,255,0.9)';ctx.beginPath();ctx.ellipse(0,14,3.2,1.8,0,0,Math.PI*2);ctx.fill();
 }
 
 function _drawClipper(col){
-  ctx.fillStyle=blendHull('#22aacc',col);
-  ctx.beginPath();ctx.moveTo(0,-24);ctx.lineTo(-3.5,-18);ctx.lineTo(-3.5,12);ctx.lineTo(0,14);ctx.lineTo(3.5,12);ctx.lineTo(3.5,-18);ctx.closePath();ctx.fill();
+  // Swept Imperial wings
   ctx.fillStyle=blendHull('#1188bb',col);
-  ctx.beginPath();ctx.moveTo(-3.5,-8);ctx.lineTo(-22,-2);ctx.lineTo(-22,4);ctx.lineTo(-7,10);ctx.lineTo(-3.5,10);ctx.closePath();ctx.fill();
-  ctx.beginPath();ctx.moveTo(3.5,-8);ctx.lineTo(22,-2);ctx.lineTo(22,4);ctx.lineTo(7,10);ctx.lineTo(3.5,10);ctx.closePath();ctx.fill();
-  [-22,22].forEach(wx=>{ctx.fillStyle='rgba(60,200,255,0.7)';ctx.beginPath();ctx.arc(wx,1,2,0,Math.PI*2);ctx.fill();});
-  ctx.fillStyle='rgba(60,200,255,0.7)';ctx.beginPath();ctx.ellipse(0,-18,2.5,4,0,0,Math.PI*2);ctx.fill();
-  [-3,3].forEach(ex=>{ctx.fillStyle='#334';ctx.beginPath();ctx.ellipse(ex,13,2.2,1.6,0,0,Math.PI*2);ctx.fill();});
+  ctx.beginPath();ctx.moveTo(-5,-4);ctx.lineTo(-22,0);ctx.lineTo(-22,8);ctx.lineTo(-8,12);ctx.lineTo(-5,12);ctx.closePath();ctx.fill();
+  ctx.beginPath();ctx.moveTo(5,-4);ctx.lineTo(22,0);ctx.lineTo(22,8);ctx.lineTo(8,12);ctx.lineTo(5,12);ctx.closePath();ctx.fill();
+  // Wingtip lights
+  [-22,22].forEach(wx=>{
+    ctx.fillStyle='rgba(60,200,255,0.8)';ctx.shadowColor='#00aaff';ctx.shadowBlur=4;
+    ctx.beginPath();ctx.arc(wx,4,2.2,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;
+  });
+  // Bezier fuselage — sleek Imperial body
+  ctx.fillStyle=blendHull('#22aacc',col);
+  ctx.beginPath();
+  ctx.moveTo(0,-24);ctx.bezierCurveTo(-5.5,-18,-6,-6,-5,10);
+  ctx.lineTo(-5,14);ctx.lineTo(5,14);ctx.bezierCurveTo(6,-6,5.5,-18,0,-24);
+  ctx.closePath();ctx.fill();
+  // Cockpit
+  ctx.fillStyle='rgba(60,200,255,0.82)';ctx.shadowColor='#00aaff';ctx.shadowBlur=5;
+  ctx.beginPath();ctx.ellipse(0,-16,3,5.5,0,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;
+  // Dual engines
+  [-3.5,3.5].forEach(ex=>{
+    ctx.fillStyle='#334';ctx.beginPath();ctx.ellipse(ex,14,2.8,1.8,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='rgba(60,200,255,0.9)';ctx.beginPath();ctx.ellipse(ex,14,1.6,1,0,0,Math.PI*2);ctx.fill();
+  });
 }
 
 function _drawFerDeLance(col){
@@ -1375,13 +1451,35 @@ function _drawFerDeLance(col){
 }
 
 function _drawType7(col){
+  // Side cargo bays with bezier rounding
+  ctx.fillStyle=blendHull('#bb7700',col);
+  ctx.beginPath();ctx.moveTo(-14,-6);ctx.lineTo(-22,-6);ctx.bezierCurveTo(-25,-4,-25,11,-22,14);ctx.lineTo(-14,14);ctx.closePath();ctx.fill();
+  ctx.beginPath();ctx.moveTo(14,-6);ctx.lineTo(22,-6);ctx.bezierCurveTo(25,-4,25,11,22,14);ctx.lineTo(14,14);ctx.closePath();ctx.fill();
+  // Side bay engines
+  [-21,21].forEach(ex=>{
+    ctx.fillStyle='#554';ctx.beginPath();ctx.ellipse(ex,14,3,2,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='rgba(255,170,40,0.85)';ctx.beginPath();ctx.ellipse(ex,14,1.8,1.2,0,0,Math.PI*2);ctx.fill();
+  });
+  // Main cargo hold (slightly tapered)
   ctx.fillStyle=blendHull('#dd8800',col);
-  ctx.beginPath();ctx.rect(-20,-14,40,30);ctx.fill();
-  ctx.fillStyle=blendHull('#cc7700',col);ctx.fillRect(-13,-14,26,6);
-  ctx.fillStyle=blendHull('#ee9900',col);
-  ctx.beginPath();ctx.moveTo(-5,-14);ctx.lineTo(5,-14);ctx.lineTo(4,-23);ctx.lineTo(-4,-23);ctx.closePath();ctx.fill();
-  ctx.fillStyle='rgba(255,180,80,0.65)';ctx.fillRect(-3,-23,6,4);
-  ctx.fillStyle='#554';[-11,-4,4,11].forEach(ex=>{ctx.beginPath();ctx.ellipse(ex,15,2.8,1.8,0,0,Math.PI*2);ctx.fill();});
+  ctx.beginPath();ctx.moveTo(-14,-16);ctx.lineTo(14,-16);ctx.lineTo(14,16);ctx.lineTo(-14,16);ctx.closePath();ctx.fill();
+  // Panel grid detail
+  ctx.strokeStyle='rgba(0,0,0,0.22)';ctx.lineWidth=0.9;
+  ctx.beginPath();ctx.moveTo(-14,-1);ctx.lineTo(14,-1);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(-5,-16);ctx.lineTo(-5,16);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(5,-16);ctx.lineTo(5,16);ctx.stroke();
+  // Forward command tower
+  ctx.fillStyle=blendHull('#ffaa22',col);
+  ctx.beginPath();ctx.moveTo(-6,-16);ctx.lineTo(6,-16);ctx.lineTo(5,-25);ctx.lineTo(-5,-25);ctx.closePath();ctx.fill();
+  // Bridge windows
+  ctx.fillStyle='rgba(255,180,80,0.82)';ctx.shadowColor='#ffaa00';ctx.shadowBlur=5;
+  ctx.fillRect(-3.5,-23.5,7,4);ctx.shadowBlur=0;
+  // Four rear engines
+  ctx.fillStyle='#554';[-9,-3,3,9].forEach(ex=>{
+    ctx.beginPath();ctx.ellipse(ex,16,3.2,2,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='rgba(255,170,40,0.85)';ctx.beginPath();ctx.ellipse(ex,16,1.9,1.2,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#554';
+  });
 }
 
 function _drawImperialCutter(col){
@@ -1399,40 +1497,94 @@ function _drawImperialCutter(col){
 }
 
 function _drawAnaconda(col){
+  // Angular cross-wings
+  ctx.fillStyle=blendHull('#bb1111',col);
+  ctx.beginPath();ctx.moveTo(-7,0);ctx.lineTo(-24,-6);ctx.lineTo(-24,6);ctx.lineTo(-7,8);ctx.closePath();ctx.fill();
+  ctx.beginPath();ctx.moveTo(7,0);ctx.lineTo(24,-6);ctx.lineTo(24,6);ctx.lineTo(7,8);ctx.closePath();ctx.fill();
+  // Wing engine pods
+  [-24,24].forEach(wx=>{
+    ctx.fillStyle='#443';ctx.beginPath();ctx.ellipse(wx,4,3.2,5.5,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='rgba(255,80,80,0.9)';ctx.beginPath();ctx.ellipse(wx,6,1.8,2.8,0,0,Math.PI*2);ctx.fill();
+  });
+  // Bezier spine (serpentine fuselage)
   ctx.fillStyle=blendHull('#dd2222',col);
-  ctx.beginPath();ctx.rect(-7.5,-24,15,44);ctx.fill();
-  ctx.beginPath();ctx.rect(-25,-4,50,12);ctx.fill();
-  ctx.fillStyle=blendHull('#cc1111',col);
-  ctx.beginPath();ctx.rect(-9,-24,18,10);ctx.fill();
-  ctx.fillStyle='rgba(255,80,80,0.7)';ctx.fillRect(-4,-22,8,5);
-  ctx.fillStyle='#443';[-9,-3,3,9].forEach(ex=>{ctx.beginPath();ctx.ellipse(ex,20,2.8,1.8,0,0,Math.PI*2);ctx.fill();});
-  [-23,-18,18,23].forEach(ex=>{ctx.beginPath();ctx.ellipse(ex,2,2.2,1.4,0,0,Math.PI*2);ctx.fill();});
+  ctx.beginPath();
+  ctx.moveTo(-7,-24);ctx.lineTo(7,-24);
+  ctx.bezierCurveTo(9,-14,9,4,8,22);
+  ctx.lineTo(-8,22);ctx.bezierCurveTo(-9,4,-9,-14,-7,-24);
+  ctx.closePath();ctx.fill();
+  // Command module cap
+  ctx.fillStyle=blendHull('#ee3333',col);
+  ctx.beginPath();ctx.moveTo(-5,-24);ctx.lineTo(5,-24);ctx.lineTo(4,-26);ctx.lineTo(-4,-26);ctx.closePath();ctx.fill();
+  // Cockpit window
+  ctx.fillStyle='rgba(255,80,80,0.88)';ctx.shadowColor='#ff2222';ctx.shadowBlur=6;
+  ctx.beginPath();ctx.ellipse(0,-22,3.5,3.5,0,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;
+  // Spine ridge
+  ctx.strokeStyle='rgba(255,120,120,0.22)';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(0,-24);ctx.lineTo(0,22);ctx.stroke();
+  // Engine cluster (4 bells)
+  ctx.fillStyle='#443';[-6,-2,2,6].forEach(ex=>{
+    ctx.beginPath();ctx.ellipse(ex,22,3,2,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='rgba(255,80,80,0.9)';ctx.beginPath();ctx.ellipse(ex,22,1.8,1.2,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#443';
+  });
 }
 
 function _drawType9(col){
+  // Hexagonal main body
   ctx.fillStyle=blendHull('#7788aa',col);
   ctx.beginPath();
   for(let i=0;i<6;i++){const a=i/6*Math.PI*2-Math.PI/6;ctx.lineTo(Math.cos(a)*22,Math.sin(a)*22-2);}
   ctx.closePath();ctx.fill();
-  ctx.fillStyle=blendHull('#5566aa',col);ctx.beginPath();ctx.rect(-3.5,-22,7,44);ctx.fill();
-  ctx.fillStyle='rgba(120,140,220,0.7)';ctx.beginPath();ctx.ellipse(0,-17,4.5,4,0,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle='#334';
+  // Bezier-curved command spine
+  ctx.fillStyle=blendHull('#5566aa',col);
+  ctx.beginPath();
+  ctx.moveTo(-4.5,-20);ctx.lineTo(4.5,-20);
+  ctx.bezierCurveTo(5.5,-12,5.5,10,4.5,20);
+  ctx.lineTo(-4.5,20);ctx.bezierCurveTo(-5.5,10,-5.5,-12,-4.5,-20);
+  ctx.closePath();ctx.fill();
+  // Cockpit dome
+  ctx.fillStyle='rgba(120,140,220,0.85)';ctx.shadowColor='#8899ff';ctx.shadowBlur=5;
+  ctx.beginPath();ctx.ellipse(0,-18,4.5,5,0,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;
+  // 6 engine bells with glow
   for(let i=0;i<6;i++){
-    const a=i/6*Math.PI*2+Math.PI/2;
-    ctx.beginPath();ctx.ellipse(Math.cos(a)*18,Math.sin(a)*18-2,3.5,2.5,0,0,Math.PI*2);ctx.fill();
+    const a=i/6*Math.PI*2+Math.PI/2;const ex=Math.cos(a)*18,ey=Math.sin(a)*18-2;
+    ctx.fillStyle='#334';ctx.beginPath();ctx.ellipse(ex,ey,3.5,2.5,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='rgba(120,140,220,0.85)';ctx.beginPath();ctx.ellipse(ex,ey,2,1.5,0,0,Math.PI*2);ctx.fill();
   }
 }
 
 function _drawCarrier(col){
+  // Engine nacelle pods (sides, bezier-rounded)
+  ctx.fillStyle=blendHull('#6677cc',col);
+  ctx.beginPath();ctx.moveTo(-16,-14);ctx.lineTo(-23,-10);ctx.bezierCurveTo(-25,-6,-25,14,-23,18);ctx.lineTo(-16,18);ctx.closePath();ctx.fill();
+  ctx.beginPath();ctx.moveTo(16,-14);ctx.lineTo(23,-10);ctx.bezierCurveTo(25,-6,25,14,23,18);ctx.lineTo(16,18);ctx.closePath();ctx.fill();
+  // Nacelle engine glows
+  [-23,23].forEach(ex=>{
+    ctx.fillStyle='#334';ctx.beginPath();ctx.ellipse(ex,18,3.5,2.5,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='rgba(140,180,255,0.9)';ctx.beginPath();ctx.ellipse(ex,18,2,1.5,0,0,Math.PI*2);ctx.fill();
+  });
+  // Main hull (slightly tapered)
   ctx.fillStyle=blendHull('#8899ee',col);
-  ctx.beginPath();ctx.rect(-24,-20,48,40);ctx.fill();
-  ctx.fillStyle='#0f1530';ctx.fillRect(-22,-18,44,3);ctx.fillRect(-22,15,44,3);
-  ctx.fillStyle=blendHull('#7788dd',col);ctx.fillRect(-4,-20,8,9);
-  ctx.strokeStyle='rgba(180,200,255,0.4)';ctx.lineWidth=1;
-  ctx.beginPath();ctx.moveTo(-22,0);ctx.lineTo(22,0);ctx.stroke();
-  ctx.fillStyle='rgba(0,0,60,0.7)';[-12,-4,4,12].forEach(bx=>{ctx.fillRect(bx-3.5,4,7,10);});
-  ctx.fillStyle='#334';[-18,-8,8,18].forEach(ex=>{ctx.beginPath();ctx.ellipse(ex,20,3,2,0,0,Math.PI*2);ctx.fill();});
-  ctx.fillStyle='rgba(150,180,255,0.7)';ctx.fillRect(-3,-22,6,4);
+  ctx.beginPath();ctx.moveTo(-16,-20);ctx.lineTo(16,-20);ctx.lineTo(16,20);ctx.lineTo(-16,20);ctx.closePath();ctx.fill();
+  // Bow stripe
+  ctx.fillStyle=blendHull('#aabbff',col);ctx.fillRect(-16,-20,32,5);
+  // Armor panel lines
+  ctx.strokeStyle='rgba(0,0,0,0.28)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(-16,-8);ctx.lineTo(16,-8);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(-16,7);ctx.lineTo(16,7);ctx.stroke();
+  // Flight deck hangar bays
+  ctx.fillStyle='rgba(0,0,40,0.88)';[-11,-4,3].forEach(bx=>{ctx.fillRect(bx,-19,6,11);});
+  // Command tower / island (starboard)
+  ctx.fillStyle=blendHull('#99aaff',col);ctx.beginPath();ctx.rect(8,-20,7,13);ctx.fill();
+  // Bridge windows
+  ctx.fillStyle='rgba(180,220,255,0.82)';ctx.shadowColor='#aaccff';ctx.shadowBlur=4;
+  ctx.fillRect(9,-18,5,4);ctx.shadowBlur=0;
+  // Navigation lights
+  ctx.fillStyle='#ff2020';ctx.shadowColor='#ff4040';ctx.shadowBlur=4;
+  ctx.beginPath();ctx.arc(-16,-20,1.8,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#00cc44';ctx.shadowColor='#00ff66';
+  ctx.beginPath();ctx.arc(16,-20,1.8,0,Math.PI*2);ctx.fill();
+  ctx.shadowBlur=0;
 }
 
 // Dispatcher

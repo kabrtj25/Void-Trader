@@ -121,6 +121,7 @@
 <div id="hud" style="display:none">
   <div id="admin-hud-badge" style="display:none">⚙ ADMIN REŽIM · ∞ PALIVO · ∞ PENÍZE · NEZNIČITELNÝ</div>
   <div id="contract-hud" style="display:none"></div>
+  <div id="ap-hud" style="display:none"><span class="ap-pulse">●</span> AUTOPILOT · <span id="ap-hud-target"></span></div>
   <!-- Minimapa -->
   <div id="minimap-wrap">
     <canvas id="mm" width="180" height="180"></canvas>
@@ -136,7 +137,27 @@
       <span id="map-hint">Kliknutím na stanici nastavíš navigaci</span>
       <button id="btn-close-map">✕ Zavřít [M]</button>
     </div>
-    <canvas id="map-canvas" width="900" height="900"></canvas>
+    <div id="map-main">
+      <canvas id="map-canvas" width="900" height="900"></canvas>
+      <div id="map-side-panel">
+        <div class="msp-section-title">// AUTOPILOT</div>
+        <div id="msp-nav-section">
+          <div class="msp-label">CÍL NAVIGACE</div>
+          <div id="msp-target-name">— žádný cíl —</div>
+          <div id="msp-target-dist"></div>
+        </div>
+        <button id="btn-autopilot" onclick="toggleAutopilot()" disabled>⚡ ZAPNOUT AUTOPILOT</button>
+        <div id="msp-ap-status">○ NEAKTIVNÍ</div>
+        <div id="msp-ap-eta"></div>
+        <div class="msp-divider"></div>
+        <div class="msp-section-title">SYSTÉMY</div>
+        <div class="msp-feat">✓ Automatická navigace</div>
+        <div class="msp-feat">✓ PID řídící systém</div>
+        <div class="msp-feat">✓ Plynné brzdění</div>
+        <div class="msp-feat">✓ Detekce příjezdu</div>
+        <div class="msp-feat-warn">⚠ Ruční vstup přeruší AP</div>
+      </div>
+    </div>
   </div>
 </div>
 

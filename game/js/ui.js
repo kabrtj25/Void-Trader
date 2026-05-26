@@ -305,12 +305,43 @@ function renderMinimap(player,chunks,navTarget,t){
 
 // ---- Velká mapa ----
 let mapCanvas,mapCtx,mapZoom=1,mapPan={x:0,y:0},mapDragStart=null;
+function updateAutopilotUI(){
+  const gs=window.gameState;
+  const nameEl=document.getElementById('msp-target-name');
+  const distEl=document.getElementById('msp-target-dist');
+  const statusEl=document.getElementById('msp-ap-status');
+  const btn=document.getElementById('btn-autopilot');
+  const etaEl=document.getElementById('msp-ap-eta');
+  if(!nameEl)return;
+  if(gs?.navTarget){
+    nameEl.textContent=gs.navTarget.name;
+    const d=gs.player?Math.hypot(gs.navTarget.x-gs.player.x,gs.navTarget.y-gs.player.y):0;
+    if(distEl)distEl.textContent=(d/1000).toFixed(1)+' AU';
+    if(btn)btn.disabled=false;
+    if(etaEl){
+      const spd=gs.player?Math.hypot(gs.player.vx,gs.player.vy):0;
+      etaEl.textContent=spd>3?'ETA: ~'+Math.round(d/(spd*60))+' min':'';
+    }
+  } else {
+    if(nameEl)nameEl.textContent='— žádný cíl —';
+    if(distEl)distEl.textContent='';
+    if(btn)btn.disabled=true;
+    if(etaEl)etaEl.textContent='';
+    if(gs)gs.autopilot=false;
+  }
+  if(gs?.autopilot){
+    if(btn){btn.textContent='■ VYPNOUT AUTOPILOT';btn.classList.add('active');}
+    if(statusEl){statusEl.textContent='● AKTIVNÍ';statusEl.id='msp-ap-status';statusEl.className='on';}
+  } else {
+    if(btn){btn.textContent='⚡ ZAPNOUT AUTOPILOT';btn.classList.remove('active');}
+    if(statusEl){statusEl.textContent='○ NEAKTIVNÍ';statusEl.className='';}
+  }
+}
 function initMapCanvas(){
   mapCanvas=document.getElementById('map-canvas');mapCtx=mapCanvas.getContext('2d');
-  // Fullscreen canvas — celé okno minus header
   const hdr=document.getElementById('map-header');
   const hdrH=hdr?hdr.offsetHeight||48:48;
-  mapCanvas.width=window.innerWidth;
+  mapCanvas.width=Math.max(300,window.innerWidth-240);
   mapCanvas.height=Math.max(300,window.innerHeight-hdrH);
   mapCanvas.addEventListener('wheel',e=>{
     e.preventDefault();
@@ -792,6 +823,7 @@ function handleMapClick(e){
   if(closest){
     window.gameState.navTarget=closest;
     setMsg(`NAVIGACE: ${closest.name}  (${(dist2(player,closest)/1000).toFixed(1)} AU)`,4000);
+    updateAutopilotUI();
     drawBigMap();
   }
 }

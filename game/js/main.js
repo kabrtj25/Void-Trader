@@ -84,10 +84,12 @@ function toggleTheme(){
   initMenuStars();
 }
 
+let _intentionalFsExit=false;
 function toggleFullscreen(){
   if(!document.fullscreenElement){
     document.documentElement.requestFullscreen().catch(()=>{});
   } else {
+    _intentionalFsExit=true;
     document.exitFullscreen().catch(()=>{});
   }
 }
@@ -95,9 +97,19 @@ function _updateFsBtn(){
   const btn=document.getElementById('btn-fullscreen');
   if(!btn)return;
   if(document.fullscreenElement){btn.textContent='⛶ WINDOWED';}
-  else{btn.textContent='⛶ FULLSCREEN';}
+  else{btn.textContent='⛶ FULLSCREEN';_intentionalFsExit=false;}
 }
 document.addEventListener('fullscreenchange',_updateFsBtn);
+// ESC vždy vynutí výstup z fullscreenu na úrovni prohlížeče.
+// Zachytíme klávesi ESC ve fázi capture (ještě uvnitř user-activation okna)
+// a naplánujeme requestFullscreen s malým zpožděním — stále v rámci 5s activation okna.
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&document.fullscreenElement&&!_intentionalFsExit){
+    setTimeout(()=>{
+      if(!document.fullscreenElement)document.documentElement.requestFullscreen().catch(()=>{});
+    },80);
+  }
+},{capture:true});
 
 let last = 0, frameCount = 0;
 
@@ -293,6 +305,7 @@ function startGame(fromSave=false){
     player, chunks:[],
     bullets:[], enemies:[], particles:[], loots:[], stationDebris:[],
     navTarget:null,
+    autopilot:false,
     nearStation:null, dockStation:null,
     dockingState:{approaching:false,align:0,speed:0},
     totalEarned:save?.totalEarned||0,
@@ -756,14 +769,14 @@ function undock(){ SFX.playUndock();
 function openMap(){
   state='map';
   document.getElementById('map-overlay').style.display='flex';
-  // Přizpůsob canvas aktuální velikosti okna
   if(mapCanvas){
     const hdr=document.getElementById('map-header');
     const hdrH=hdr?hdr.offsetHeight||48:48;
-    mapCanvas.width=window.innerWidth;
+    mapCanvas.width=Math.max(300,window.innerWidth-240);
     mapCanvas.height=Math.max(300,window.innerHeight-hdrH);
   }
   drawBigMap();
+  if(typeof updateAutopilotUI==='function')updateAutopilotUI();
 }
 function closeMap(){
   state='playing';
@@ -850,8 +863,83 @@ function completeWarp(){
 }
 
 function clearNav(){
-  if(gameState){gameState.navTarget=null;setMsg('Navigace zrušena.',1500);}
+  if(gameState){
+    gameState.navTarget=null;
+    gameState.autopilot=false;
+    setMsg('Navigace zrušena.',1500);
+    updateApHud();
+  }
 }
+function updateApHud(){
+  const el=document.getElementById('ap-hud');
+  if(!el||!gameState)return;
+  const active=gameState.autopilot&&gameState.navTarget;
+  el.style.display=active?'block':'none';
+  if(active){const t=document.getElementById('ap-hud-target');if(t)t.textContent=gameState.navTarget.name;}
+}
+function tickAutopilot(p,gs,dt){
+  const nt=gs.navTarget;
+  if(!nt){gs.autopilot=false;updateApHud();return;}
+  const dx=nt.x-p.x,dy=nt.y-p.y;
+  const dist=Math.hypot(dx,dy);
+  // Arrived — within docking range
+  if(dist<C.DOCK_DIST*3){
+    gs.autopilot=false;
+    p.vx*=0.65;p.vy*=0.65;
+    setMsg('Autopilot: cíl dosažen ✓ — přistaň manuálně [F].',5000);
+    updateApHud();
+    if(typeof updateAutopilotUI==='function')updateAutopilotUI();
+    return;
+  }
+  const engMult=1+0.15*(p.upgrades?.engine||0);
+  const thrust=C.THRUST*engMult;
+  const maxSpd=C.MAX_SPD*engMult;
+  const curSpd=Math.hypot(p.vx,p.vy);
+  // Braking distance estimate: v²/(2*a)
+  const stopDist=curSpd>0.1?(curSpd*curSpd)/(2*thrust):0;
+  // Desired speed: full throttle when far, smoothly scale down for arrival
+  const desiredSpd=Math.min(maxSpd,Math.max(4,dist/(Math.max(stopDist,1))*maxSpd*0.55));
+  // Target velocity vector
+  const invD=1/dist;
+  const dvx=(dx*invD*desiredSpd)-p.vx;
+  const dvy=(dy*invD*desiredSpd)-p.vy;
+  const dvLen=Math.hypot(dvx,dvy);
+  if(dvLen<0.6){p.thrusting=false;return;}
+  // Angle to apply delta-v
+  const thrustAngle=Math.atan2(dvy,dvx);
+  let da=thrustAngle-p.angle;
+  while(da>Math.PI)da-=2*Math.PI;
+  while(da<-Math.PI)da+=2*Math.PI;
+  p.angle+=Math.max(-C.ROT_SPD*dt,Math.min(C.ROT_SPD*dt,da));
+  // Thrust when aligned within ~40°
+  if(Math.abs(da)<0.7){
+    const eff=Math.cos(da)*Math.min(1,dvLen/8);
+    p.vx+=Math.cos(p.angle)*thrust*eff;
+    p.vy+=Math.sin(p.angle)*thrust*eff;
+    consumeFuel(p,C.FUEL_THRUST*eff);
+    spawnTrail(p);
+    p.thrusting=true;
+  } else {
+    p.thrusting=false;
+  }
+}
+window.toggleAutopilot=function(){
+  const gs=window.gameState;
+  if(!gs)return;
+  if(!gs.navTarget){
+    setMsg('Nejdřív nastav navigaci — klikni na stanici v mapě.',3000);
+    return;
+  }
+  gs.autopilot=!gs.autopilot;
+  if(gs.autopilot){
+    setMsg('Autopilot aktivován → '+gs.navTarget.name,4000);
+    closeMap();
+  } else {
+    setMsg('Autopilot deaktivován.',2000);
+  }
+  updateApHud();
+  if(typeof updateAutopilotUI==='function')updateAutopilotUI();
+};
 
 // ---- Pause ----
 let _pauseShipAnimId=null;
@@ -1155,6 +1243,20 @@ function update(dt){
   const boost=normalBoost||warpBoosting;
   window._strafeL=strafeL; window._strafeR=strafeR;
   window._warpBoosting=warpBoosting;
+
+  // === AUTOPILOT ===
+  if(gs.autopilot&&!warpPhase){
+    const manualInput=thrusting||rotL||rotR||strafeL||strafeR;
+    if(manualInput){
+      gs.autopilot=false;
+      setMsg('Autopilot deaktivován (ruční vstup).',1500);
+      updateApHud();
+      if(typeof updateAutopilotUI==='function')updateAutopilotUI();
+    } else {
+      tickAutopilot(p,gs,dt);
+      // Manual control blocks are all guarded by their flags (all false) — skipped automatically
+    }
+  }
 
   const engMult=1+0.15*(p.upgrades.engine||0);
   const parkMult=parkingMode?0.28:1;
