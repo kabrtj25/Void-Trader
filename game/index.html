@@ -474,6 +474,48 @@
 
 </div>
 
+<!-- VOLBA ZÁKLADNY (nová hra) -->
+<div id="base-selector-overlay" style="display:none">
+  <div id="bso-bg"></div>
+  <div id="bso-inner">
+    <div id="bso-header">
+      <div id="bso-title">VYBER ZÁKLADNU</div>
+      <div id="bso-subtitle">Sluneční soustava · Zvol hangár jako své startovní sídlo</div>
+    </div>
+    <div id="bso-body">
+      <canvas id="bso-map" width="560" height="440"></canvas>
+      <div id="bso-detail">
+        <div id="bso-detail-empty">
+          <div style="font-size:36px;margin-bottom:12px;opacity:0.35">🏭</div>
+          <div style="color:rgba(180,200,255,0.4);font-size:13px">Klikni na hangár na mapě</div>
+        </div>
+        <div id="bso-detail-content" style="display:none">
+          <div id="bso-det-icon" style="font-size:40px;margin-bottom:10px">🏭</div>
+          <div id="bso-det-name" style="font-size:18px;font-weight:bold;color:#00ccff;margin-bottom:6px"></div>
+          <div id="bso-det-sector" style="font-size:12px;color:rgba(180,200,255,0.6);margin-bottom:16px"></div>
+          <div class="bso-stat-row">
+            <span class="bso-stat-label">Kapacita</span>
+            <span class="bso-stat-val">3 lodě</span>
+          </div>
+          <div class="bso-stat-row">
+            <span class="bso-stat-label">Cena</span>
+            <span class="bso-stat-val" style="color:#00ff88">ZDARMA ★</span>
+          </div>
+          <div class="bso-stat-row">
+            <span class="bso-stat-label">Vzdálenost</span>
+            <span class="bso-stat-val" id="bso-det-dist"></span>
+          </div>
+          <div id="bso-det-desc" style="margin-top:14px;font-size:11px;color:rgba(160,180,220,0.7);line-height:1.5"></div>
+        </div>
+      </div>
+    </div>
+    <div id="bso-footer">
+      <div id="bso-hint">← Vyber hangár na mapě pro zobrazení detailů</div>
+      <button id="btn-bso-confirm" disabled onclick="bsoConfirm()">POTVRDIT ZÁKLADNU →</button>
+    </div>
+  </div>
+</div>
+
 <!-- RESPAWN — GTA STYL -->
 <div id="respawn-screen" style="display:none">
   <div id="rsp-bg-glow"></div>

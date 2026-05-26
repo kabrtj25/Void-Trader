@@ -240,11 +240,21 @@ function startGame(fromSave=false){
   const save=fromSave?loadSave():null;
   window.currentGalaxy=(save?.galaxyId)||'sol';
 
-  // Výchozí spawn: u Země (SOL chunk 0,0; sunX=1500,sunY=1500; Země orbit 7000, phase 2.1)
-  // earthX = 1500 + cos(2.1)*7000 ≈ 1500-3534 = -2034,  earthY = 1500 + sin(2.1)*7000 ≈ 1500+6042 = 7542
+  // Startovní základna z výběrové obrazovky (nová hra)
+  const startGarage=window._startingGarage||null;
+  window._startingGarage=null;
+
+  // Výchozí spawn: u Země nebo u zvolené garáže
   const EARTH_X=-2034, EARTH_Y=7542;
+  let spawnX=save?.x||EARTH_X, spawnY=save?.y||EARTH_Y;
+  if(startGarage&&!fromSave){
+    // Spawn přibližně u startovní garáže (střed jejího chunku)
+    spawnX=startGarage.cx*C.CHUNK+C.CHUNK*0.5+300;
+    spawnY=startGarage.cy*C.CHUNK+C.CHUNK*0.5+300;
+  }
+
   const player={
-    x:save?.x||EARTH_X, y:save?.y||EARTH_Y,
+    x:spawnX, y:spawnY,
     vx:0, vy:0, angle:-Math.PI/2,
     hull:save?.hull||100, hullMax:100,
     shield:save?.shield||100, shieldMax:100,
@@ -270,6 +280,13 @@ function startGame(fromSave=false){
     fleet:save?.fleet||[],
     deathCount:save?.deathCount||0,
   };
+
+  // Přidej startovní garáž jako vlastněnou (zdarma)
+  if(startGarage&&!fromSave){
+    const gKey=garageKey('sol',startGarage.cx,startGarage.cy);
+    if(!player.ownedGarages.includes(gKey))player.ownedGarages.push(gKey);
+  }
+
   applyUpgrades(player);
 
   gameState={
@@ -295,7 +312,11 @@ function startGame(fromSave=false){
   if(typeof updateContractHUD==='function') updateContractHUD(player.activeContract||null);
   // Obnov navigaci z aktivní zakázky
   if(player.activeContract&&typeof _setContractNav==='function') _setContractNav(player.activeContract);
-  setMsg('Vítejte! [W] thrust  [AD] otočení  [QE] strafe  [F] přistání  [M] mapa  [N] galaxie  [R] warp',7000);
+  if(startGarage&&!fromSave){
+    setMsg(`Základna: ${startGarage.name} · [W] thrust  [AD] otočení  [F] přistání  [M] mapa  [N] galaxie`,7000);
+  } else {
+    setMsg('Vítejte! [W] thrust  [AD] otočení  [QE] strafe  [F] přistání  [M] mapa  [N] galaxie  [R] warp',7000);
+  }
 }
 
 function spawnInitialEnemies(){
@@ -1644,9 +1665,11 @@ function activateShipFromFleet(fleetIdx){
 
 function _goLobby(){
   SFX.stopEngine();
+  if(_bsoAnimId){cancelAnimationFrame(_bsoAnimId);_bsoAnimId=null;}
   ['death-screen','hud','dock-panel','delivery-overlay','pause-screen',
    'ship-shop-overlay','garage-menu-overlay','tuning-overlay',
-   'fleet-manager-overlay','garage-manager-overlay','respawn-screen'].forEach(id=>{
+   'fleet-manager-overlay','garage-manager-overlay','respawn-screen',
+   'base-selector-overlay'].forEach(id=>{
     const el=document.getElementById(id);if(el)el.style.display='none';
   });
   document.getElementById('menu').style.display='flex';
@@ -1775,7 +1798,186 @@ function startSlot(i){
   activeSlot=i;
   closeSlotScreen();
   const isNew=!getSaveData(i);
-  showLoadingScreen(i,isNew,()=>startGame(!isNew));
+  if(isNew){
+    // Nová hra → nejprve vyber základnu
+    showLoadingScreen(i,true,()=>showBaseSelector());
+  } else {
+    showLoadingScreen(i,false,()=>startGame(true));
+  }
+}
+
+// ---- Volba základny (ETS2 styl) ----
+let _bsoSelected=null;
+let _bsoAnimId=null;
+
+function showBaseSelector(){
+  const ov=document.getElementById('base-selector-overlay');
+  if(!ov)return;
+  _bsoSelected=null;
+  document.getElementById('btn-bso-confirm').disabled=true;
+  document.getElementById('bso-detail-empty').style.display='flex';
+  document.getElementById('bso-detail-content').style.display='none';
+  document.getElementById('bso-hint').textContent='← Vyber hangár na mapě pro zobrazení detailů';
+  ov.style.display='flex';
+
+  // Animation loop voor pulserende markers
+  let _bsoSelIdx=-1;
+  function _bsoLoop(){
+    _bsoAnimId=requestAnimationFrame(_bsoLoop);
+    _bsoDrawMap(_bsoSelIdx);
+  }
+  if(_bsoAnimId)cancelAnimationFrame(_bsoAnimId);
+  _bsoLoop();
+
+  const mapCanvas=document.getElementById('bso-map');
+  mapCanvas.onclick=e=>{
+    const rect=mapCanvas.getBoundingClientRect();
+    const mx=(e.clientX-rect.left)*(mapCanvas.width/rect.width);
+    const my=(e.clientY-rect.top)*(mapCanvas.height/rect.height);
+    const garages=GARAGES_DATA.sol||[];
+    const nodes=_bsoGetNodes(mapCanvas.width,mapCanvas.height);
+    let closest=null,closestD=999;
+    nodes.forEach((n,i)=>{
+      const d=Math.hypot(mx-n.x,my-n.y);
+      if(d<closestD){closestD=d;closest=i;}
+    });
+    if(closest!==null&&closestD<28){
+      _bsoSelected=garages[closest];
+      _bsoSelIdx=closest;
+      _bsoShowDetail(_bsoSelected,closest);
+    }
+  };
+}
+
+function _bsoGetNodes(W,H){
+  const garages=GARAGES_DATA.sol||[];
+  const xs=garages.map(g=>g.cx), ys=garages.map(g=>g.cy);
+  const minX=Math.min(...xs)-1, maxX=Math.max(...xs)+1;
+  const minY=Math.min(...ys)-1, maxY=Math.max(...ys)+1;
+  const pad=50;
+  return garages.map(g=>({
+    x:pad+(g.cx-minX)/(maxX-minX)*(W-pad*2),
+    y:pad+(g.cy-minY)/(maxY-minY)*(H-pad*2)
+  }));
+}
+
+function _bsoDrawMap(selectedIdx=-1){
+  const canvas=document.getElementById('bso-map');
+  if(!canvas)return;
+  const c=canvas.getContext('2d');
+  const W=canvas.width,H=canvas.height;
+  c.clearRect(0,0,W,H);
+
+  // Pozadí hvězdné pole
+  c.fillStyle='#000810';c.fillRect(0,0,W,H);
+  const rng=makeRng(12345);
+  for(let i=0;i<200;i++){
+    const alpha=0.1+rng()*0.4;
+    c.fillStyle=`rgba(200,220,255,${alpha.toFixed(2)})`;
+    c.beginPath();c.arc(rng()*W,rng()*H,rng()*1.2+0.3,0,Math.PI*2);c.fill();
+  }
+
+  // Sol hvězda — přibližně uprostřed mapy
+  const garages=GARAGES_DATA.sol||[];
+  const xs=garages.map(g=>g.cx), ys=garages.map(g=>g.cy);
+  const minX=Math.min(...xs)-1, maxX=Math.max(...xs)+1;
+  const minY=Math.min(...ys)-1, maxY=Math.max(...ys)+1;
+  const pad=50;
+  const toX=cx=>pad+(cx-minX)/(maxX-minX)*(W-pad*2);
+  const toY=cy=>pad+(cy-minY)/(maxY-minY)*(H-pad*2);
+  const solX=toX(0),solY=toY(0);
+
+  // Záře sluníčka
+  const sg=c.createRadialGradient(solX,solY,0,solX,solY,80);
+  sg.addColorStop(0,'rgba(255,220,100,0.45)');sg.addColorStop(1,'rgba(255,180,0,0)');
+  c.fillStyle=sg;c.beginPath();c.arc(solX,solY,80,0,Math.PI*2);c.fill();
+  c.fillStyle='#ffe87a';c.shadowColor='#ffcc00';c.shadowBlur=20;
+  c.beginPath();c.arc(solX,solY,10,0,Math.PI*2);c.fill();
+  c.shadowBlur=0;
+  c.font='9px "Courier New",monospace';c.fillStyle='rgba(255,220,100,0.7)';c.textAlign='center';
+  c.fillText('SOL',solX,solY-15);
+
+  // Osy mřížky
+  c.strokeStyle='rgba(0,80,180,0.12)';c.lineWidth=1;c.setLineDash([4,8]);
+  for(let cx=Math.floor(minX);cx<=Math.ceil(maxX);cx++){
+    const sx=toX(cx);c.beginPath();c.moveTo(sx,0);c.lineTo(sx,H);c.stroke();
+  }
+  for(let cy=Math.floor(minY);cy<=Math.ceil(maxY);cy++){
+    const sy=toY(cy);c.beginPath();c.moveTo(0,sy);c.lineTo(W,sy);c.stroke();
+  }
+  c.setLineDash([]);
+
+  // Garážové uzly
+  const nodes=_bsoGetNodes(W,H);
+  const t=Date.now()/1000;
+  garages.forEach((g,i)=>{
+    const{x,y}=nodes[i];
+    const isSel=i===selectedIdx;
+    const pulse=0.5+Math.sin(t*2.2+i*1.1)*0.5;
+
+    // Záře vybraného
+    if(isSel){
+      c.fillStyle='rgba(0,200,255,0.18)';
+      c.beginPath();c.arc(x,y,26,0,Math.PI*2);c.fill();
+    }
+
+    // Linka k Sol
+    c.strokeStyle=isSel?'rgba(0,200,255,0.3)':'rgba(0,100,200,0.15)';
+    c.lineWidth=isSel?1.5:0.8;c.setLineDash([3,6]);
+    c.beginPath();c.moveTo(solX,solY);c.lineTo(x,y);c.stroke();
+    c.setLineDash([]);
+
+    // Hexagon symbol garáže
+    c.save();c.translate(x,y);
+    const r=isSel?12:9;
+    c.strokeStyle=isSel?'#00ccff':('rgba(0,180,255,'+(0.4+pulse*0.3)+')');
+    c.lineWidth=isSel?2:1.2;
+    if(isSel){c.shadowColor='#00ccff';c.shadowBlur=16;}
+    c.beginPath();
+    for(let j=0;j<6;j++){const a=j*Math.PI/3;c.lineTo(Math.cos(a)*r,Math.sin(a)*r);}
+    c.closePath();c.stroke();
+    if(isSel){
+      c.fillStyle='rgba(0,200,255,0.18)';c.fill();
+    }
+    c.shadowBlur=0;
+
+    // Číslo garáže
+    c.font=`bold ${isSel?10:8}px "Courier New",monospace`;
+    c.fillStyle=isSel?'#00ccff':'rgba(0,180,255,0.7)';
+    c.textAlign='center';c.textBaseline='middle';
+    c.fillText(i+1,0,0);
+    c.restore();
+
+    // Název pod markerem
+    c.font='8px "Courier New",monospace';
+    c.fillStyle=isSel?'rgba(0,220,255,0.9)':'rgba(0,150,220,0.55)';
+    c.textAlign='center';
+    c.fillText(g.name.replace('Hangár ',''),x,y+(isSel?18:14));
+  });
+}
+
+function _bsoShowDetail(gDef,idx){
+  document.getElementById('bso-detail-empty').style.display='none';
+  document.getElementById('bso-detail-content').style.display='block';
+  document.getElementById('bso-det-name').textContent=gDef.name;
+  document.getElementById('bso-det-sector').textContent=`Sektor ${gDef.cx>=0?'+':''}${gDef.cx}, ${gDef.cy>=0?'+':''}${gDef.cy} · Sluneční soustava`;
+  const d=Math.hypot(gDef.cx,gDef.cy);
+  document.getElementById('bso-det-dist').textContent=d<1.5?'Střed soustavy':d<3?'Vnitřní pásmo':d<6?'Střední pásmo':'Vnější pásmo';
+  const descs=['Vnitřní hangár blízko středu soustavy. Krátké trasy, dobrý přístup k obchodním stanicím.',
+    'Středně vzdálená základna. Vyvážená poloha pro obchod i průzkum.',
+    'Vzdálený okrajový hangár. Lepší přístup k vnějším sektorům a nebezpečnějším trasám.'];
+  document.getElementById('bso-det-desc').textContent=d<3?descs[0]:d<6?descs[1]:descs[2];
+  document.getElementById('btn-bso-confirm').disabled=false;
+  document.getElementById('bso-hint').textContent='✓ '+gDef.name+' vybrán — potvrď start';
+}
+
+function bsoConfirm(){
+  if(!_bsoSelected)return;
+  if(_bsoAnimId){cancelAnimationFrame(_bsoAnimId);_bsoAnimId=null;}
+  window._startingGarage=_bsoSelected;
+  const ov=document.getElementById('base-selector-overlay');
+  if(ov)ov.style.display='none';
+  startGame(false);
 }
 
 function deleteSlot(i){
