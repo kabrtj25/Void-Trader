@@ -1,6 +1,34 @@
 // ===== SPACE TRADER — generace světa =====
 const chunkCache = new Map();
 
+// Lehká mapa prozkoumáných chunků — uchovává jen data potřebná pro mapu (M),
+// takže lze bezpečně vyhodit plné chunky z paměti a na mapě zůstane vše vidět.
+const exploredMap = new Map();
+
+function _recordExplored(ch){
+  const key=chunkKey(ch.cx,ch.cy);
+  if(exploredMap.has(key))return;
+  const e={cx:ch.cx,cy:ch.cy};
+  if(ch.nebula)e.nebula={x:ch.nebula.x,y:ch.nebula.y,r:ch.nebula.r,col:ch.nebula.col};
+  if(ch.system){
+    e.system={sx:ch.system.sx,sy:ch.system.sy,r:ch.system.r,color:ch.system.color,glow:ch.system.glow};
+    if(ch.system.station){
+      const st=ch.system.station;
+      e.system.station={x:st.x,y:st.y,name:st.name,type:st.type,tier:st.tier,color:st.color};
+    }
+  }
+  exploredMap.set(key,e);
+}
+
+// Vyhazuje chunky vzdálené od hráče — volá se periodicky z herní smyčky
+function evictFarChunks(playerCx,playerCy){
+  const R=C.VIEW_R+3;
+  for(const [key,ch] of chunkCache){
+    if(Math.abs(ch.cx-playerCx)>R||Math.abs(ch.cy-playerCy)>R)
+      chunkCache.delete(key);
+  }
+}
+
 // Témata pro každou galaxii — různé názvy stanic a barvy mlhovin
 const GALAXY_THEMES = {
   sol:      {stNames:['Colonia Port','Kepler Hub','Orion Dock','Sirius Base','Vega Station','Tau Port','Ceti Hub','Nova Dock'],
@@ -21,7 +49,9 @@ function getChunk(cx,cy){
   const isSol=(window.currentGalaxy||'sol')==='sol';
   const isSolar=isSol&&cx===C.SOLAR_CHUNK.cx&&cy===C.SOLAR_CHUNK.cy;
   const ch=isSolar?generateSolarSystem(cx,cy):generateChunk(cx,cy);
-  chunkCache.set(key,ch);return ch;
+  chunkCache.set(key,ch);
+  _recordExplored(ch);
+  return ch;
 }
 
 function generateChunk(cx,cy){
@@ -173,6 +203,7 @@ function generateChunk(cx,cy){
       color:`hsl(${20+Math.floor(rng()*25)},${10+Math.floor(rng()*18)}%,${20+Math.floor(rng()*20)}%)`
     });
   }
+
   return ch;
 }
 

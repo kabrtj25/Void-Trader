@@ -480,31 +480,235 @@ function renderStation(st,t,nearDock,dockable,lo){
   ctx.restore();
 }
 
-// ---- Dealerská stanice (loděnice) — stejný vizuál jako normální stanice ----
+// ---- Dealerská stanice (loděnice) — drydock s rails ----
 function renderDealer(st,t,nearDock,dockable){
-  renderStation(st,t,nearDock,dockable,{
-    prefix:'◈ ',
-    dockHint:dockable?'▶ LODĚNICE — VSTUP':'▷ LODĚNICE — přiblíž se',
-    farColor:(st.color||'#ffaa00')+'88',
-    farPrefix:'⚙ '
-  });
+  const{x:sx,y:sy}=toScreen(st.x,st.y);
+  const R=st.r;
+  if(!inView(sx,sy,R*4))return;
+  const col=st.color||'#ffaa00';
+
+  ctx.save();ctx.translate(sx,sy);ctx.rotate(st.angle);
+
+  // Outer glow
+  const gg=ctx.createRadialGradient(0,0,0,0,0,R*3.5);
+  gg.addColorStop(0,col+'18');gg.addColorStop(1,col+'00');
+  ctx.fillStyle=gg;ctx.beginPath();ctx.arc(0,0,R*3.5,0,Math.PI*2);ctx.fill();
+
+  // === HORIZONTAL DRYDOCK RAILS ===
+  const armLen=R*1.75,railH=R*0.17,railGap=R*0.52;
+  ctx.fillStyle='#0b1520';ctx.strokeStyle=col+'55';ctx.lineWidth=1.2;
+  ctx.fillRect(-armLen,-railGap-railH/2,armLen*2,railH);ctx.strokeRect(-armLen,-railGap-railH/2,armLen*2,railH);
+  ctx.fillRect(-armLen,railGap-railH/2,armLen*2,railH);ctx.strokeRect(-armLen,railGap-railH/2,armLen*2,railH);
+  // Rail energy stripes
+  ctx.strokeStyle=col+'22';ctx.lineWidth=0.7;
+  for(let i=-4;i<=4;i++){
+    const px=i*(armLen*0.44);
+    ctx.beginPath();ctx.moveTo(px,-railGap-railH/2);ctx.lineTo(px,-railGap+railH/2);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(px,railGap-railH/2);ctx.lineTo(px,railGap+railH/2);ctx.stroke();
+  }
+
+  // === RAIL END CLAMPS ===
+  for(const side of[-1,1]){
+    const ex=side*armLen;
+    ctx.fillStyle='#0e1c2a';ctx.strokeStyle=col+'88';ctx.lineWidth=1.5;ctx.shadowColor=col;ctx.shadowBlur=8;
+    ctx.fillRect(ex-R*0.11,-railGap-railH,R*0.22,railGap*2+railH*2);
+    ctx.strokeRect(ex-R*0.11,-railGap-railH,R*0.22,railGap*2+railH*2);ctx.shadowBlur=0;
+    const cp=0.35+Math.sin(t*1.8+side*2)*0.65;
+    ctx.save();ctx.globalAlpha=cp;ctx.fillStyle=col;ctx.shadowColor=col;ctx.shadowBlur=10;
+    ctx.beginPath();ctx.arc(ex,0,R*0.06,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;ctx.restore();
+  }
+
+  // === CROSS BEAMS ===
+  ctx.strokeStyle=col+'22';ctx.lineWidth=R*0.038;
+  for(const px of[-armLen*0.62,-armLen*0.3,0,armLen*0.3,armLen*0.62]){
+    ctx.beginPath();ctx.moveTo(px,-railGap);ctx.lineTo(px,railGap);ctx.stroke();
+  }
+
+  // === CENTRAL HEX CORE ===
+  const cR=R*0.40;
+  ctx.fillStyle='#060e18';ctx.strokeStyle=col+'aa';ctx.lineWidth=1.8;ctx.shadowColor=col;ctx.shadowBlur=14;
+  ctx.beginPath();
+  for(let i=0;i<=6;i++){const a=(i/6)*Math.PI*2;i===0?ctx.moveTo(Math.cos(a)*cR,Math.sin(a)*cR):ctx.lineTo(Math.cos(a)*cR,Math.sin(a)*cR);}
+  ctx.fill();ctx.stroke();ctx.shadowBlur=0;
+  ctx.strokeStyle=col+'44';ctx.lineWidth=1;
+  ctx.beginPath();ctx.arc(0,0,cR*0.64,0,Math.PI*2);ctx.stroke();
+  const cp2=0.5+Math.sin(t*2.2)*0.5;
+  ctx.save();ctx.globalAlpha=0.5+cp2*0.5;ctx.fillStyle=col;ctx.shadowColor=col;ctx.shadowBlur=16;
+  ctx.beginPath();ctx.arc(0,0,cR*0.21,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;ctx.restore();
+  ctx.strokeStyle=col+'33';ctx.lineWidth=0.9;
+  for(let i=0;i<6;i++){const a=(i/6)*Math.PI*2;ctx.beginPath();ctx.moveTo(Math.cos(a)*cR*0.27,Math.sin(a)*cR*0.27);ctx.lineTo(Math.cos(a)*cR*0.74,Math.sin(a)*cR*0.74);ctx.stroke();}
+
+  // === SHIP CRADLE (below) ===
+  const crdY=railGap+railH+R*0.08;
+  ctx.fillStyle='#0a1825';ctx.strokeStyle=col+'44';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(-R*0.48,crdY);ctx.lineTo(-R*0.33,crdY+R*0.26);ctx.lineTo(R*0.33,crdY+R*0.26);ctx.lineTo(R*0.48,crdY);ctx.closePath();ctx.fill();ctx.stroke();
+  ctx.save();ctx.globalAlpha=0.22;ctx.fillStyle=col;
+  ctx.beginPath();ctx.ellipse(0,crdY+R*0.13,R*0.26,R*0.065,0,0,Math.PI*2);ctx.fill();ctx.restore();
+  for(const lx of[-R*0.28,0,R*0.28]){
+    const lp=0.4+Math.sin(t*3.1+lx)*0.6;
+    ctx.save();ctx.globalAlpha=lp*0.8;ctx.fillStyle='#ffee88';ctx.shadowColor='#ffcc00';ctx.shadowBlur=6;
+    ctx.beginPath();ctx.arc(lx,crdY+R*0.04,R*0.033,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;ctx.restore();
+  }
+
+  // === COMM TOWER ===
+  ctx.strokeStyle=col+'77';ctx.lineWidth=1.2;
+  ctx.beginPath();ctx.moveTo(0,-cR*0.85);ctx.lineTo(0,-cR*0.85-R*0.46);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(-R*0.17,-cR*0.85-R*0.22);ctx.lineTo(R*0.17,-cR*0.85-R*0.22);ctx.stroke();
+  const tp=0.3+Math.sin(t*4.1)*0.7;
+  ctx.save();ctx.globalAlpha=tp;ctx.fillStyle='#ff4444';ctx.shadowColor='#ff2222';ctx.shadowBlur=8;
+  ctx.beginPath();ctx.arc(0,-cR*0.85-R*0.46,R*0.038,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;ctx.restore();
+
+  // === DOCKING PORT ===
+  const dpX=R*1.08,dpW=R*0.27,dpH=R*0.36;
+  ctx.fillStyle='#040810';ctx.strokeStyle=dockable?'#00ff88':'rgba(255,150,0,0.8)';ctx.lineWidth=2;
+  ctx.fillRect(dpX,-dpH/2,dpW,dpH);ctx.strokeRect(dpX,-dpH/2,dpW,dpH);
+  ctx.strokeStyle=dockable?'rgba(0,255,136,0.35)':'rgba(255,150,0,0.22)';ctx.lineWidth=0.8;
+  ctx.beginPath();ctx.moveTo(dpX,0);ctx.lineTo(dpX+dpW,0);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(dpX+dpW/2,-dpH/2);ctx.lineTo(dpX+dpW/2,dpH/2);ctx.stroke();
+  ctx.globalAlpha=dockable?0.6:0.15;ctx.fillStyle=dockable?'#00ff88':col;
+  ctx.fillRect(dpX+2,-dpH/2+2,dpW-4,dpH-4);ctx.globalAlpha=1;
+  const dlB=0.4+Math.sin(t*4.5)*0.6;
+  ctx.save();ctx.globalAlpha=dlB;ctx.fillStyle=dockable?'#00ff88':'#ffaa00';ctx.shadowColor=ctx.fillStyle;ctx.shadowBlur=8;
+  ctx.beginPath();ctx.arc(dpX+dpW/2,-dpH/2,R*0.04,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(dpX+dpW/2,dpH/2,R*0.04,0,Math.PI*2);ctx.fill();ctx.restore();
+
+  ctx.restore();
+
+  // === LABEL ===
+  ctx.save();ctx.textAlign='center';
+  if(nearDock){
+    ctx.font='bold 14px "Courier New",monospace';ctx.fillStyle=col;ctx.shadowColor=col;ctx.shadowBlur=8;
+    ctx.fillText('⧈ '+st.name,sx,sy-R*3.1);ctx.shadowBlur=0;
+    ctx.font='11px "Courier New",monospace';ctx.fillStyle=dockable?'#00ff88':'rgba(255,150,40,0.85)';
+    ctx.fillText(dockable?'▶ LODEŇNICE — VSTUP':'▷ LODEŇNICE — přiblíž se',sx,sy-R*3.1-18);
+  } else {
+    ctx.font='10px "Courier New",monospace';ctx.fillStyle=col+'88';
+    ctx.fillText('⚙ '+st.name,sx,sy-R*2.4);
+  }
+  ctx.restore();
 }
 
-// ---- Garážová stanice — stejný vizuál jako normální stanice ----
+// ---- Garážová stanice — hranaté průmyslové moduly ----
 function renderGarage(st,t,nearDock,dockable){
-  const owned=window.gameState?.player?.ownedGarages?.includes(garageKey(st.garageGalaxy,st.garageCx,st.garageCy));
+  const{x:sx,y:sy}=toScreen(st.x,st.y);
+  const R=st.r;
+  if(!inView(sx,sy,R*4))return;
   const col=st.color||'#00ccff';
-  const dispCol=owned?col:'rgba(0,200,255,0.5)';
-  const buyHint=st.garageCost?`▶ KOUPIT HANGÁR (${st.garageCost.toLocaleString('cs')} Cr)`:'▶ KOUPIT HANGÁR';
-  renderStation(st,t,nearDock,dockable,{
-    color:dispCol,
-    prefix:owned?'◈ ':'⊘ ',
-    dockHint:dockable?(owned?'▶ HANGÁR — VSTUP':buyHint):(owned?'▷ HANGÁR — přiblíž se':'▷ HANGÁR — přiblíž se pro koupi'),
-    farColor:owned?col+'88':'rgba(0,200,255,0.4)',
-    farPrefix:owned?'🏭 ':'🔒 '
-  });
-}
+  const owned=window.gameState?.player?.ownedGarages?.includes(garageKey(st.garageGalaxy,st.garageCx,st.garageCy));
+  const dispCol=owned?col:col;
+  const dA=owned?1.0:0.5;
 
+  ctx.save();ctx.translate(sx,sy);ctx.rotate(st.angle);ctx.globalAlpha=dA;
+
+  // Outer glow
+  const gg=ctx.createRadialGradient(0,0,0,0,0,R*3.2);
+  gg.addColorStop(0,col+'1a');gg.addColorStop(1,col+'00');
+  ctx.fillStyle=gg;ctx.beginPath();ctx.arc(0,0,R*3.2,0,Math.PI*2);ctx.fill();
+
+  // === MAIN RECTANGULAR HULL ===
+  const hW=R*2.0,hH=R*1.0;
+  ctx.fillStyle='#080f1a';ctx.strokeStyle=col+(owned?'88':'44');ctx.lineWidth=1.8;ctx.shadowColor=col;ctx.shadowBlur=owned?10:4;
+  ctx.fillRect(-hW/2,-hH/2,hW,hH);ctx.strokeRect(-hW/2,-hH/2,hW,hH);ctx.shadowBlur=0;
+  // Hull inner border
+  ctx.strokeStyle=col+'22';ctx.lineWidth=0.8;
+  ctx.strokeRect(-hW/2+4,-hH/2+4,hW-8,hH-8);
+
+  // === BAY DOORS (3 doors on top half) ===
+  const bW=hW*0.24,bH=hH*0.62,bY=-hH/2;
+  const bXs=[-hW*0.3,0,hW*0.3];
+  bXs.forEach((bx,i)=>{
+    // Door frame
+    ctx.fillStyle=owned?'#020608':'#0c1824';
+    ctx.strokeStyle=col+(owned?'55':'22');ctx.lineWidth=1;
+    ctx.fillRect(bx-bW/2,bY+3,bW,bH-3);ctx.strokeRect(bx-bW/2,bY+3,bW,bH-3);
+    if(owned){
+      // Sliding door gap (open)
+      const openH=bH*0.35;
+      ctx.globalAlpha=dA*0.55;ctx.fillStyle=col;
+      ctx.fillRect(bx-bW/2+3,bY+3,bW-6,openH);
+      ctx.globalAlpha=dA;
+      // Inner glow
+      const igr=ctx.createLinearGradient(bx,bY+3,bx,bY+3+openH);
+      igr.addColorStop(0,col+'44');igr.addColorStop(1,col+'00');
+      ctx.fillStyle=igr;ctx.fillRect(bx-bW/2+3,bY+3,bW-6,bH-6);
+    }
+    // Bay number
+    ctx.fillStyle=col+(owned?'66':'33');
+    ctx.font=`bold ${Math.round(R*0.15)}px "Courier New",monospace`;
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(i+1,bx,bY+bH*0.78);
+    ctx.textBaseline='alphabetic';
+  });
+
+  // === HULL PANEL LINES ===
+  ctx.strokeStyle=col+'18';ctx.lineWidth=R*0.013;
+  ctx.beginPath();ctx.moveTo(-hW/2,0);ctx.lineTo(hW/2,0);ctx.stroke();
+  for(let i=1;i<4;i++){const px=-hW/2+i*(hW/4);ctx.beginPath();ctx.moveTo(px,-hH/2);ctx.lineTo(px,hH/2);ctx.stroke();}
+
+  // === ROOF SUPERSTRUCTURE ===
+  ctx.fillStyle='#0a1422';ctx.strokeStyle=col+'55';ctx.lineWidth=1;
+  ctx.fillRect(-hW*0.32,-hH/2-R*0.26,hW*0.64,R*0.26);ctx.strokeRect(-hW*0.32,-hH/2-R*0.26,hW*0.64,R*0.26);
+  // Sensor dome
+  ctx.strokeStyle=col+'77';ctx.lineWidth=1.2;
+  ctx.beginPath();ctx.arc(0,-hH/2-R*0.26,R*0.15,Math.PI,Math.PI*2);ctx.stroke();
+
+  // === ANTENNA ===
+  ctx.strokeStyle=col+'88';ctx.lineWidth=1.2;
+  ctx.beginPath();ctx.moveTo(0,-hH/2-R*0.41);ctx.lineTo(0,-hH/2-R*0.41-R*0.38);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(-R*0.14,-hH/2-R*0.59);ctx.lineTo(R*0.14,-hH/2-R*0.59);ctx.stroke();
+  const bp=0.3+Math.sin(t*3.5)*0.7;
+  ctx.save();ctx.globalAlpha=bp;ctx.fillStyle='#ff3333';ctx.shadowColor='#ff2200';ctx.shadowBlur=8;
+  ctx.beginPath();ctx.arc(0,-hH/2-R*0.79,R*0.038,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;ctx.restore();
+
+  // === SIDE ENGINE PODS ===
+  for(const ly of[-hH*0.22,hH*0.22]){
+    ctx.fillStyle='#060f1c';ctx.strokeStyle=col+(owned?'55':'28');ctx.lineWidth=1;
+    ctx.fillRect(hW/2,ly-R*0.1,R*0.28,R*0.2);ctx.strokeRect(hW/2,ly-R*0.1,R*0.28,R*0.2);
+    const ep=0.35+Math.sin(t*1.4+ly)*0.4;
+    ctx.save();ctx.globalAlpha=ep*(owned?0.7:0.3);ctx.fillStyle=col;ctx.shadowColor=col;ctx.shadowBlur=8;
+    ctx.beginPath();ctx.arc(hW/2+R*0.28,ly,R*0.06,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;ctx.restore();
+  }
+
+  // === DOCKING PORT (bottom center) ===
+  const dpW2=R*0.36,dpH2=R*0.24,dpY=hH/2;
+  ctx.fillStyle='#040810';ctx.strokeStyle=dockable?'#00ff88':'rgba(255,150,0,0.8)';ctx.lineWidth=2;
+  ctx.fillRect(-dpW2/2,dpY,dpW2,dpH2);ctx.strokeRect(-dpW2/2,dpY,dpW2,dpH2);
+  ctx.strokeStyle=dockable?'rgba(0,255,136,0.35)':'rgba(255,150,0,0.22)';ctx.lineWidth=0.8;
+  ctx.beginPath();ctx.moveTo(0,dpY);ctx.lineTo(0,dpY+dpH2);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(-dpW2/2,dpY+dpH2/2);ctx.lineTo(dpW2/2,dpY+dpH2/2);ctx.stroke();
+  ctx.globalAlpha=dA*(dockable?0.6:0.15);ctx.fillStyle=dockable?'#00ff88':col;
+  ctx.fillRect(-dpW2/2+2,dpY+2,dpW2-4,dpH2-4);ctx.globalAlpha=dA;
+  const dlB=0.4+Math.sin(t*4.5)*0.6;
+  ctx.save();ctx.globalAlpha=dlB*dA;ctx.fillStyle=dockable?'#00ff88':col;ctx.shadowColor=ctx.fillStyle;ctx.shadowBlur=8;
+  ctx.beginPath();ctx.arc(-dpW2/2,dpY+dpH2/2,R*0.038,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(dpW2/2,dpY+dpH2/2,R*0.038,0,Math.PI*2);ctx.fill();ctx.restore();
+
+  // === STATUS LIGHTS along bottom (owned only) ===
+  if(owned){
+    for(let i=0;i<5;i++){
+      const lx=-hW*0.33+i*(hW*0.66/4);
+      const lp=0.3+Math.sin(t*1.9+i*0.85)*0.7;
+      ctx.save();ctx.globalAlpha=lp;ctx.fillStyle=col;ctx.shadowColor=col;ctx.shadowBlur=6;
+      ctx.beginPath();ctx.arc(lx,hH/2-R*0.08,R*0.033,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;ctx.restore();
+    }
+  }
+
+  ctx.restore();
+
+  // === LABEL ===
+  ctx.save();ctx.textAlign='center';
+  const buyHint=st.garageCost?`▶ KOUPIT HANGÁŘ (${st.garageCost.toLocaleString('cs')} Cr)`:'▶ KOUPIT HANGÁŘ';
+  if(nearDock){
+    ctx.font='bold 14px "Courier New",monospace';ctx.fillStyle=dispCol;ctx.shadowColor=dispCol;ctx.shadowBlur=owned?8:3;
+    ctx.fillText((owned?'◈ ':'⊘ ')+st.name,sx,sy-R*2.9);ctx.shadowBlur=0;
+    ctx.font='11px "Courier New",monospace';ctx.fillStyle=dockable?'#00ff88':'rgba(255,150,40,0.85)';
+    ctx.fillText(dockable?(owned?'▶ HANGÁR — VSTUP':buyHint):(owned?'▷ HANGÁR — přiblíž se':'▷ HANGÁR — přiblíž se pro koupi'),sx,sy-R*2.9-18);
+  } else {
+    ctx.font='10px "Courier New",monospace';ctx.fillStyle=dispCol+(owned?'88':'55');
+    ctx.fillText((owned?'🏭 ':'🔒 ')+st.name,sx,sy-R*2.3);
+  }
+  ctx.restore();
+}
 // ---- Velká stanice — Coriolis / Transformers styl ----
 function renderLargeStation(st,t,nearDock,dockable){
   const{x:sx,y:sy}=toScreen(st.x,st.y);
@@ -728,127 +932,234 @@ function renderLargeStation(st,t,nearDock,dockable){
   ctx.restore();
 }
 
-// ---- Vnitřek stanice ----
+// ---- Parkovacia loď v hangáru ----
+function _renderParkedShip(ctx,x,y,size,side,t,LM){
+  const sc=size*0.38;
+  const flipY=side==='top'?1:-1;
+  ctx.save();
+  ctx.translate(x,y);
+  ctx.scale(sc,-sc*flipY);
+  ctx.globalAlpha=0.7+Math.sin(t*1.3)*0.1;
+  ctx.fillStyle=LM?'#2a3a4a':'#445566';ctx.strokeStyle=LM?'#334466':'#7799bb';ctx.lineWidth=0.04;
+  ctx.beginPath();ctx.moveTo(0,-1.1);ctx.lineTo(0.35,0.2);ctx.lineTo(0.15,0.6);ctx.lineTo(-0.15,0.6);ctx.lineTo(-0.35,0.2);ctx.closePath();ctx.fill();ctx.stroke();
+  ctx.beginPath();ctx.moveTo(0.32,0.1);ctx.lineTo(0.9,0.7);ctx.lineTo(0.6,0.75);ctx.lineTo(0.15,0.55);ctx.closePath();ctx.fill();ctx.stroke();
+  ctx.beginPath();ctx.moveTo(-0.32,0.1);ctx.lineTo(-0.9,0.7);ctx.lineTo(-0.6,0.75);ctx.lineTo(-0.15,0.55);ctx.closePath();ctx.fill();ctx.stroke();
+  ctx.fillStyle=LM?'#111d2e':'#223355';ctx.strokeStyle=LM?'#2255aa':'#4488cc';ctx.lineWidth=0.06;
+  ctx.beginPath();ctx.ellipse(0,-0.5,0.16,0.3,0,0,Math.PI*2);ctx.fill();ctx.stroke();
+  ctx.fillStyle=LM?'rgba(20,60,180,0.5)':'rgba(80,140,255,0.4)';ctx.shadowColor=LM?'#2244cc':'#4488ff';ctx.shadowBlur=0.3;
+  ctx.beginPath();ctx.ellipse(0,0.65,0.12,0.08,0,0,Math.PI*2);ctx.fill();
+  ctx.shadowBlur=0;
+  ctx.restore();
+}
+
+// ---- Vnitřek stanice (Elite Dangerous style rectangular hangar) ----
 function renderInterior(data,t){
+  const LM=window.lightMode;
   const st=data.station;
   const{x:sx,y:sy}=toScreen(st.x,st.y);
-  const iR=data.iR;
+  const iW=data.iW,iH=data.iH;
+  const col=st.color;
 
-  // Vnitřní prostor — tmavé pozadí
+  // Main space background
   ctx.save();
-  ctx.beginPath();ctx.arc(sx,sy,iR*1.08,0,Math.PI*2);
-  ctx.fillStyle='#000208';ctx.fill();
+  ctx.fillStyle=LM?'#c0ccd8':'#00020e';
+  ctx.fillRect(sx-iW*0.5,sy-iH*0.5,iW,iH);
   ctx.restore();
 
-  // Tloušťka prstence — rotuje se stanicí
-  ctx.save();
-  ctx.translate(sx,sy);ctx.rotate(st.angle);
-  // Vnější zeď (tlustý kroužek)
-  ctx.strokeStyle=st.color+'cc';ctx.lineWidth=iR*0.22;
-  ctx.shadowColor=st.color;ctx.shadowBlur=22;
-  ctx.beginPath();ctx.arc(0,0,iR*0.89,0,Math.PI*2);ctx.stroke();
-  ctx.shadowBlur=0;
-  // Vnitřní akcentní kroužek
-  ctx.strokeStyle=st.color+'55';ctx.lineWidth=iR*0.04;
-  ctx.beginPath();ctx.arc(0,0,iR*0.77,0,Math.PI*2);ctx.stroke();
-  // Segmenty zdi (24 panelů)
-  for(let i=0;i<24;i++){
-    const a0=(i/24)*Math.PI*2,a1=((i+0.72)/24)*Math.PI*2;
-    ctx.strokeStyle=i%3===0?st.color+'66':st.color+'22';
-    ctx.lineWidth=iR*0.05;
-    ctx.beginPath();ctx.arc(0,0,iR*0.89,a0,a1);ctx.stroke();
+  // Ambient gradient from ceiling lights
+  const amb=ctx.createLinearGradient(sx,sy-iH*0.5,sx,sy+iH*0.5);
+  if(LM){
+    amb.addColorStop(0,'rgba(40,60,120,0.10)');
+    amb.addColorStop(0.5,'rgba(20,30,60,0.04)');
+    amb.addColorStop(1,'rgba(40,60,120,0.10)');
+  } else {
+    amb.addColorStop(0,'rgba(60,90,160,0.08)');
+    amb.addColorStop(0.5,'rgba(20,30,60,0.03)');
+    amb.addColorStop(1,'rgba(60,90,160,0.08)');
   }
-  // Radiální nosníky
-  ctx.strokeStyle=st.color+'22';ctx.lineWidth=iR*0.012;
-  for(let i=0;i<8;i++){
-    const a=(i/8)*Math.PI*2;
+  ctx.save();ctx.fillStyle=amb;
+  ctx.fillRect(sx-iW*0.5,sy-iH*0.5,iW,iH);
+  ctx.restore();
+
+  // Thick structural ceiling, floor, and side walls
+  ctx.save();
+  ctx.fillStyle=LM?'#7a8a9a':'#0a0e1a';
+  ctx.fillRect(sx-iW*0.5,sy-iH*0.5,iW,iH*0.085);
+  ctx.fillRect(sx-iW*0.5,sy+iH*0.415,iW,iH*0.085);
+  ctx.fillRect(sx-iW*0.5,sy-iH*0.5,iW*0.045,iH);
+  ctx.fillRect(sx+iW*0.455,sy-iH*0.5,iW*0.045,iH);
+  ctx.restore();
+
+  // Wall accent glow border
+  ctx.save();
+  ctx.strokeStyle=col+(LM?'99':'66');ctx.lineWidth=3;
+  ctx.shadowColor=col;ctx.shadowBlur=LM?6:14;
+  ctx.strokeRect(sx-iW*0.5+2,sy-iH*0.5+2,iW-4,iH-4);
+  ctx.shadowBlur=0;
+  ctx.strokeStyle=col+(LM?'55':'22');ctx.lineWidth=1.5;
+  ctx.strokeRect(sx-iW*0.48,sy-iH*0.42,iW*0.96,iH*0.84);
+  ctx.restore();
+
+  // Vertical structural girders
+  ctx.save();
+  for(let i=1;i<=4;i++){
+    const gx=sx-iW*0.5+i*(iW/5);
+    ctx.strokeStyle=col+(LM?'55':'28');ctx.lineWidth=iH*0.022;
+    ctx.beginPath();ctx.moveTo(gx,sy-iH*0.5);ctx.lineTo(gx,sy+iH*0.5);ctx.stroke();
+    ctx.lineWidth=1;ctx.strokeStyle=col+(LM?'99':'44');
+    const by1=sy-iH*0.32,by2=sy+iH*0.32;
     ctx.beginPath();
-    ctx.moveTo(Math.cos(a)*iR*0.16,Math.sin(a)*iR*0.16);
-    ctx.lineTo(Math.cos(a)*iR*0.72,Math.sin(a)*iR*0.72);
+    ctx.moveTo(gx-iH*0.025,by1);ctx.lineTo(gx+iH*0.025,by1);
+    ctx.moveTo(gx-iH*0.025,by2);ctx.lineTo(gx+iH*0.025,by2);
     ctx.stroke();
   }
+  ctx.lineWidth=iH*0.012;ctx.strokeStyle=col+(LM?'44':'18');
+  ctx.beginPath();ctx.moveTo(sx-iW*0.5,sy-iH*0.18);ctx.lineTo(sx+iW*0.5,sy-iH*0.18);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(sx-iW*0.5,sy+iH*0.18);ctx.lineTo(sx+iW*0.5,sy+iH*0.18);ctx.stroke();
   ctx.restore();
 
-  // Ambientní záře uvnitř
-  const amb=ctx.createRadialGradient(sx,sy,0,sx,sy,iR*0.72);
-  amb.addColorStop(0,st.color+'0c');amb.addColorStop(1,st.color+'00');
-  ctx.fillStyle=amb;ctx.beginPath();ctx.arc(sx,sy,iR*0.72,0,Math.PI*2);ctx.fill();
-
-  // Centrální hub (kontra-rotace)
-  const hubR=iR*0.11;
+  // Overhead lights
   ctx.save();
-  ctx.translate(sx,sy);ctx.rotate(-st.angle*1.4);
-  ctx.fillStyle='#020810';ctx.strokeStyle=st.color+'99';ctx.lineWidth=2.5;
-  ctx.shadowColor=st.color;ctx.shadowBlur=14;
-  ctx.beginPath();
-  for(let i=0;i<=6;i++){const a=(i/6)*Math.PI*2;i===0?ctx.moveTo(Math.cos(a)*hubR,Math.sin(a)*hubR):ctx.lineTo(Math.cos(a)*hubR,Math.sin(a)*hubR);}
-  ctx.fill();ctx.stroke();ctx.shadowBlur=0;
-  ctx.strokeStyle=st.color+'44';ctx.lineWidth=1.5;
-  ctx.beginPath();ctx.arc(0,0,hubR*0.6,0,Math.PI*2);ctx.stroke();
-  const cp=0.5+Math.sin(t*3.8)*0.5;
-  ctx.globalAlpha=0.5+cp*0.5;ctx.fillStyle=st.color;ctx.shadowColor=st.color;ctx.shadowBlur=18;
-  ctx.beginPath();ctx.arc(0,0,hubR*0.22,0,Math.PI*2);ctx.fill();
-  ctx.shadowBlur=0;ctx.globalAlpha=1;
+  const nLights=9;
+  for(let i=0;i<nLights;i++){
+    const lx=sx-iW*0.42+i*(iW*0.84/(nLights-1));
+    const flicker=0.75+Math.sin(t*6.7+i*1.9)*0.12+Math.sin(t*2.3+i*0.7)*0.13;
+    const ly=sy-iH*0.45;
+    if(LM){
+      // Dark housing visible on light wall
+      ctx.fillStyle=`rgba(30,50,90,${0.7*flicker})`;
+      ctx.fillRect(lx-iW*0.02,ly,iW*0.04,iH*0.022);
+      ctx.fillStyle=`rgba(10,20,60,${0.9*flicker})`;
+      ctx.shadowColor='rgba(20,50,160,0.8)';ctx.shadowBlur=8*flicker;
+      ctx.fillRect(lx-iW*0.013,ly+iH*0.005,iW*0.026,iH*0.012);
+      ctx.shadowBlur=0;
+      const coneGrad=ctx.createLinearGradient(lx,ly+iH*0.02,lx,sy+iH*0.05);
+      coneGrad.addColorStop(0,`rgba(60,100,200,${0.10*flicker})`);
+      coneGrad.addColorStop(1,'rgba(60,100,200,0)');
+      ctx.fillStyle=coneGrad;
+    } else {
+      ctx.fillStyle=`rgba(120,160,220,${0.5*flicker})`;
+      ctx.fillRect(lx-iW*0.02,ly,iW*0.04,iH*0.022);
+      ctx.fillStyle=`rgba(200,220,255,${0.8*flicker})`;
+      ctx.shadowColor='rgba(160,200,255,0.9)';ctx.shadowBlur=12*flicker;
+      ctx.fillRect(lx-iW*0.013,ly+iH*0.005,iW*0.026,iH*0.012);
+      ctx.shadowBlur=0;
+      const coneGrad=ctx.createLinearGradient(lx,ly+iH*0.02,lx,sy+iH*0.05);
+      coneGrad.addColorStop(0,`rgba(160,200,255,${0.07*flicker})`);
+      coneGrad.addColorStop(1,'rgba(160,200,255,0)');
+      ctx.fillStyle=coneGrad;
+    }
+    ctx.beginPath();
+    ctx.moveTo(lx-iW*0.013,ly+iH*0.02);ctx.lineTo(lx+iW*0.013,ly+iH*0.02);
+    ctx.lineTo(lx+iW*0.11,sy+iH*0.05);ctx.lineTo(lx-iW*0.11,sy+iH*0.05);
+    ctx.fill();
+  }
   ctx.restore();
 
-  // Vstupní indikátory u slotu (na vnitřní straně zdi)
+  // Floor center line
+  ctx.save();
+  ctx.strokeStyle=col+(LM?'44':'18');ctx.lineWidth=1.5;ctx.setLineDash([iW*0.012,iW*0.018]);
+  ctx.beginPath();ctx.moveTo(sx-iW*0.46,sy);ctx.lineTo(sx+iW*0.46,sy);ctx.stroke();
+  ctx.setLineDash([]);ctx.restore();
+
+  // Entry port (left wall) indicator lights
   {
     const blink=0.4+Math.sin(t*5.5)*0.6;
-    const ex=sx+Math.cos(data.station.angle)*iR*0.78;
-    const ey=sy+Math.sin(data.station.angle)*iR*0.78;
-    const perpX=-Math.sin(data.station.angle),perpY=Math.cos(data.station.angle);
+    const entCol=LM?'#00aa55':'#00ff88';
+    const ex=sx-iW*0.495;
+    const dotR=iH*0.022;
     ctx.save();ctx.globalAlpha=blink;
-    ctx.fillStyle='#00ff88';ctx.shadowColor='#00ff88';ctx.shadowBlur=12;
-    ctx.beginPath();ctx.arc(ex+perpX*iR*0.12,ey+perpY*iR*0.12,iR*0.025,0,Math.PI*2);ctx.fill();
-    ctx.beginPath();ctx.arc(ex-perpX*iR*0.12,ey-perpY*iR*0.12,iR*0.025,0,Math.PI*2);ctx.fill();
-    ctx.shadowBlur=0;ctx.globalAlpha=1;
-    ctx.restore();
+    ctx.fillStyle=entCol;ctx.shadowColor=entCol;ctx.shadowBlur=LM?8:14;
+    ctx.beginPath();ctx.arc(ex+dotR,sy-iH*0.11,dotR,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(ex+dotR,sy+iH*0.11,dotR,0,Math.PI*2);ctx.fill();
+    ctx.shadowBlur=0;ctx.globalAlpha=1;ctx.restore();
+    ctx.save();ctx.strokeStyle=LM?'#00aa5566':'#00ff8844';ctx.lineWidth=2;
+    ctx.strokeRect(ex,sy-iH*0.18,iW*0.035,iH*0.36);ctx.restore();
   }
 
-  // Parkovací hangáry
+  // Bay pads
   data.bays.forEach(bay=>{
     const{x:bsx,y:bsy}=toScreen(bay.x,bay.y);
     const isNear=bay===data.nearBay;
-    const col=bay.occupied?'#ff3300':(isNear?'#00ff88':st.color);
-    const pulse=isNear?0.6+Math.sin(t*4)*0.4:1;
+    const isDocking=!!(data.dockAnim&&data.dockAnim.bay===bay);
+    const freeCol=LM?(isNear||isDocking?'#008855':col):(isNear||isDocking?'#00ff88':col);
+    const bcol=bay.occupied?(LM?'#cc2200':'#ff4400'):freeCol;
+    const pulse=isNear?0.7+Math.sin(t*4)*0.3:1;
+    const bW=bay.w,bH=bay.h;
+    const dirY=bay.side==='top'?1:-1;
 
-    // Okolní záře hangáru (vodící zóna)
-    if(!bay.occupied){
-      ctx.save();
-      ctx.globalAlpha=(isNear?0.14:0.05);
-      ctx.fillStyle=col;
-      ctx.beginPath();ctx.arc(bsx,bsy,bay.r*3,0,Math.PI*2);ctx.fill();
-      ctx.globalAlpha=1;ctx.restore();
-    }
-
-    // Hlavní kroužek hangáru
     ctx.save();
-    ctx.globalAlpha=pulse;
-    ctx.strokeStyle=col+(bay.occupied?'88':'cc');
-    ctx.lineWidth=bay.r*0.2;
-    ctx.shadowColor=col;ctx.shadowBlur=isNear?18:7;
-    ctx.beginPath();ctx.arc(bsx,bsy,bay.r,0,Math.PI*2);ctx.stroke();
-    if(!bay.occupied){
-      ctx.globalAlpha=(0.12+(isNear?0.22:0))*pulse;
-      ctx.fillStyle=col;
-      ctx.beginPath();ctx.arc(bsx,bsy,bay.r,0,Math.PI*2);ctx.fill();
-      // Kříž uvnitř jako přistávací sign
-      ctx.globalAlpha=(0.5+(isNear?0.4:0))*pulse;
-      ctx.strokeStyle=col+'88';ctx.lineWidth=bay.r*0.06;
-      ctx.beginPath();
-      ctx.moveTo(bsx-bay.r*0.5,bsy);ctx.lineTo(bsx+bay.r*0.5,bsy);
-      ctx.moveTo(bsx,bsy-bay.r*0.5);ctx.lineTo(bsx,bsy+bay.r*0.5);
-      ctx.stroke();
+    ctx.fillStyle=bay.occupied?(LM?'#c89080':'#1a0400'):(LM?'#90b4a8':'#001510');
+    ctx.fillRect(bsx-bW*0.5,bsy-bH*0.5,bW,bH);
+
+    if(!bay.occupied&&!isDocking){
+      ctx.globalAlpha=(isNear?0.85:0.3)*pulse;
+      ctx.strokeStyle=bcol;ctx.lineWidth=1.5;
+      for(let ci=1;ci<=3;ci++){
+        const chevy=bsy+dirY*(bH*0.65+ci*bH*0.5);
+        const cw=bW*(0.42-ci*0.06);
+        ctx.beginPath();
+        ctx.moveTo(bsx-cw,chevy);ctx.lineTo(bsx,chevy-dirY*bH*0.18);ctx.lineTo(bsx+cw,chevy);
+        ctx.stroke();
+      }
+      ctx.globalAlpha=1;
     }
+
+    ctx.globalAlpha=pulse;
+    ctx.strokeStyle=bcol+(bay.occupied?'99':'cc');
+    ctx.lineWidth=2.5;ctx.shadowColor=bcol;ctx.shadowBlur=LM?8:(isNear||isDocking?20:8);
+    ctx.strokeRect(bsx-bW*0.5,bsy-bH*0.5,bW,bH);
+    ctx.shadowBlur=0;
+
+    if(!bay.occupied&&!isDocking){
+      ctx.globalAlpha=0.55*pulse;
+      ctx.strokeStyle=bcol+'99';ctx.lineWidth=1.5;
+      ctx.beginPath();
+      ctx.moveTo(bsx-bW*0.36,bsy);ctx.lineTo(bsx+bW*0.36,bsy);
+      ctx.moveTo(bsx,bsy-bH*0.36);ctx.lineTo(bsx,bsy+bH*0.36);
+      ctx.stroke();
+      const cm=bW*0.14;
+      ctx.globalAlpha=0.8*pulse;ctx.strokeStyle=bcol;ctx.lineWidth=2;
+      [[-0.5,-0.5],[0.5,-0.5],[0.5,0.5],[-0.5,0.5]].forEach(([dx,dy])=>{
+        ctx.beginPath();
+        ctx.moveTo(bsx+dx*bW,bsy+dy*bH);ctx.lineTo(bsx+dx*bW+(dx>0?-cm:cm),bsy+dy*bH);
+        ctx.moveTo(bsx+dx*bW,bsy+dy*bH);ctx.lineTo(bsx+dx*bW,bsy+dy*bH+(dy>0?-cm:cm));
+        ctx.stroke();
+      });
+    } else if(bay.occupied){
+      _renderParkedShip(ctx,bsx,bsy,bW,bay.side,t,LM);
+    }
+
+    if(isDocking){
+      const prog=data.dockAnim.progress;
+      const eased=Math.pow(prog,0.4);
+      const armStartY=bsy+(bay.side==='top'?-bH*0.5:bH*0.5);
+      ctx.globalAlpha=0.9;
+      ctx.strokeStyle=LM?'#334466':'#99bbdd';ctx.lineWidth=bH*0.09;
+      ctx.shadowColor=LM?'#3366aa':'#aaccff';ctx.shadowBlur=LM?8:14;
+      ctx.beginPath();ctx.moveTo(bsx,armStartY);ctx.lineTo(bsx,armStartY-dirY*bH*0.75*eased);ctx.stroke();
+      ctx.lineWidth=bH*0.05;ctx.shadowBlur=LM?5:8;
+      const armMid=armStartY-dirY*bH*0.4*eased;
+      ctx.beginPath();
+      ctx.moveTo(bsx-bW*0.2,armMid);ctx.lineTo(bsx-bW*0.35,armMid-dirY*bH*0.2*eased);
+      ctx.moveTo(bsx+bW*0.2,armMid);ctx.lineTo(bsx+bW*0.35,armMid-dirY*bH*0.2*eased);
+      ctx.stroke();
+      ctx.fillStyle=LM?'#224488':'#cce0ff';ctx.shadowBlur=LM?8:16;
+      ctx.beginPath();ctx.arc(bsx,armStartY-dirY*bH*0.75*eased,bH*0.07,0,Math.PI*2);ctx.fill();
+      ctx.globalAlpha=(0.3+Math.sin(t*8)*0.3)*eased;
+      ctx.strokeStyle=LM?'#008855':'#00ff88';ctx.lineWidth=1.5;
+      ctx.shadowColor=LM?'#008855':'#00ff88';ctx.shadowBlur=LM?5:10;
+      ctx.beginPath();ctx.arc(bsx,armStartY-dirY*bH*0.75*eased,bH*0.15*(1-prog*0.3),0,Math.PI*2);ctx.stroke();
+      ctx.shadowBlur=0;
+    }
+
     ctx.shadowBlur=0;ctx.globalAlpha=1;ctx.restore();
   });
 }
-
 function renderInteriorScene(data,p,t,dt){
   const st=data.station;
 
-  // Černé pozadí
-  ctx.fillStyle='#000208';ctx.fillRect(0,0,W,H);
+  ctx.fillStyle=window.lightMode?'#c8d4e2':'#000208';ctx.fillRect(0,0,W,H);
 
   // Svět se zoom transformem
   ctx.save();
@@ -857,21 +1168,25 @@ function renderInteriorScene(data,p,t,dt){
   renderParticles([...engineTrails,...gameState.particles]);
   ctx.restore();
 
-  // Štítky hangárů — v screen coords (vyhnou se scale problémům)
+  // Bay labels in screen coords
   data.bays.forEach(bay=>{
     const{x:bsx,y:bsy}=toScreen(bay.x,bay.y);
     const screenX=(bsx-W/2)*camZoom+W/2;
     const screenY=(bsy-H/2)*camZoom+H/2;
-    const screenR=bay.r*camZoom;
+    const screenH=(bay.h||bay.r*2)*camZoom;
     const isNear=bay===data.nearBay;
-    const col=bay.occupied?'#ff3300':(isNear?'#00ff88':st.color);
+    const isDocking=!!(data.dockAnim&&data.dockAnim.bay===bay);
+    const LM2=window.lightMode;
+    const col=bay.occupied?(LM2?'#cc2200':'#ff4400'):(isNear||isDocking?(LM2?'#007744':'#00ff88'):st.color);
+    const labelY=bay.side==='top'?screenY-screenH*0.5-9:screenY+screenH*0.5+18;
     ctx.save();ctx.textAlign='center';
     ctx.font='bold 11px "Courier New",monospace';
-    ctx.fillStyle=col;ctx.shadowColor=col;ctx.shadowBlur=6;
-    ctx.fillText(`BAY-${String(bay.num).padStart(2,'0')}`,screenX,screenY-screenR-7);
+    ctx.fillStyle=col;ctx.shadowColor=col;ctx.shadowBlur=LM2?3:6;
+    ctx.fillText(`BAY-${String(bay.num).padStart(2,'0')}`,screenX,labelY);
     ctx.shadowBlur=0;ctx.font='9px "Courier New",monospace';
-    ctx.fillStyle=bay.occupied?'#ff5500':'#aaaaaa';
-    ctx.fillText(bay.occupied?'■ OBSAZENO':'□ VOLNÉ',screenX,screenY+screenR+13);
+    ctx.fillStyle=bay.occupied?(LM2?'#aa3300':'#ff5500'):(isDocking?(LM2?'#006633':'#00ffcc'):(LM2?'#445566':'#888888'));
+    const statusText=bay.occupied?'■ OBSAZENO':(isDocking?'▶ DOKOVÁNÍ...':'□ VOLNÉ');
+    ctx.fillText(statusText,screenX,labelY+(bay.side==='top'?-12:14));
     ctx.restore();
   });
 
@@ -893,12 +1208,17 @@ function renderInteriorScene(data,p,t,dt){
   // Nápověda dole
   ctx.save();ctx.textAlign='center';
   ctx.font='12px "Courier New",monospace';
-  if(data.nearBay&&!data.nearBay.occupied){
-    ctx.fillStyle='#00ff88';ctx.shadowColor='#00ff88';ctx.shadowBlur=10;
-    ctx.fillText(`[ BAY-${String(data.nearBay.num).padStart(2,'0')} — ZAROVNÁNO — PŘISTÁT: F ]`,W/2,H-55);
+  if(data.dockAnim){
+    const pct=Math.round(data.dockAnim.progress*100);
+    const _lm=window.lightMode;
+    ctx.fillStyle=_lm?'#006644':'#00ffcc';ctx.shadowColor=_lm?'#006644':'#00ffcc';ctx.shadowBlur=_lm?4:12;
+    ctx.fillText(`[ DOKOVACÍ RAMENO — ${pct}% — ČEKEJ... ]`,W/2,H-55);
+  } else if(data.nearBay&&!data.nearBay.occupied){
+    ctx.fillStyle=_lm?'#007744':'#00ff88';ctx.shadowColor=_lm?'#007744':'#00ff88';ctx.shadowBlur=_lm?4:10;
+    ctx.fillText(`[ BAY-${String(data.nearBay.num).padStart(2,'0')} — ZAROVNÁNO — AKTIVOVAT RAMENO: F ]`,W/2,H-55);
   } else {
-    ctx.fillStyle='rgba(255,150,40,0.75)';ctx.shadowColor='rgba(255,150,40,0.5)';ctx.shadowBlur=8;
-    ctx.fillText('Namiř na volný hangár  •  ESC = nouzový výstup',W/2,H-55);
+    ctx.fillStyle=_lm?'rgba(160,80,0,0.9)':'rgba(255,150,40,0.75)';ctx.shadowColor=_lm?'rgba(120,60,0,0.5)':'rgba(255,150,40,0.5)';ctx.shadowBlur=_lm?3:8;
+    ctx.fillText('Naleti k volnému hangáru  •  ESC = nouzový výstup',W/2,H-55);
   }
   ctx.shadowBlur=0;ctx.restore();
 
@@ -1867,6 +2187,7 @@ function renderLoot(l){
   ctx.beginPath();ctx.moveTo(0,-10);ctx.lineTo(8,0);ctx.lineTo(0,10);ctx.lineTo(-8,0);ctx.closePath();ctx.fill();ctx.stroke();
   ctx.restore();
 }
+
 
 // ---- Helper color ----
 function lighten(hex,pct){

@@ -226,14 +226,13 @@ document.addEventListener('keydown',e=>{
   } else if(state==='paused'){
     if(codeMatchesAction(e.code,'pause')){e.preventDefault();closePause();}
   } else if(state==='map'){
-    if(codeMatchesAction(e.code,'sysMap')||codeMatchesAction(e.code,'pause')){e.preventDefault();closeMap();}
+    if(codeMatchesAction(e.code,'sysMap')){e.preventDefault();closeMap();}
   } else if(state==='galaxy'){
-    if(codeMatchesAction(e.code,'galaxy')||codeMatchesAction(e.code,'pause')){e.preventDefault();closeGalaxyMap();}
+    if(codeMatchesAction(e.code,'galaxy')){e.preventDefault();closeGalaxyMap();}
   } else if(state==='interior'){
     if(codeMatchesAction(e.code,'dock')){e.preventDefault();completeParkingInInterior();}
-    if(codeMatchesAction(e.code,'pause')){e.preventDefault();exitInterior();}
   } else if(state==='docked'){
-    if(codeMatchesAction(e.code,'dock')||codeMatchesAction(e.code,'pause')){e.preventDefault();undock();}
+    if(codeMatchesAction(e.code,'dock')){e.preventDefault();undock();}
   }
 });
 document.addEventListener('keyup',e=>{keys[e.code]=false;});
@@ -444,9 +443,7 @@ function initDockingSequence(station){
 function completeDocking(station){
   const anim=gameState.dockAnim;
   if(station.type==='large'){
-    // Phase 1 done — fly through slot into interior (phase 2)
     const p=gameState.player;
-    const iR=station.r*0.82;
     anim.phase=2;
     anim.timer=0;
     anim.duration=1.6;
@@ -499,32 +496,28 @@ function selectParkingBay(station,bayNum){
 function enterInterior(station){
   const gs=gameState,p=gs.player;
   gs.dockAnim=null;
-  const iR=station.r*0.82;
-  // Bays built into the ring wall — far from center, spread in a wide arc
-  const bayDist=iR*0.80;
-  const entryA=station.angle;
-  // 6 bays spread across 270° arc, leaving 90° gap at the entry/exit slot
-  const bayOffs=[55,110,165,195,250,305].map(d=>d*Math.PI/180);
+  const iW=station.r*4.8;
+  const iH=station.r*2.2;
+  const cx=station.x,cy=station.y;
   const seed=station.name.split('').reduce((s,c)=>s+c.charCodeAt(0),0);
   const rngB=makeRng(seed+777);
-  const bays=bayOffs.map((off,i)=>{
-    const a=entryA+off;
-    return{
-      x:station.x+Math.cos(a)*bayDist,
-      y:station.y+Math.sin(a)*bayDist,
-      angle:a, num:i+1,
-      occupied:rngB()<0.3,
-      r:iR*0.16
-    };
-  });
-  // Player arrives at hub center — zero velocity, facing the interior
-  p.vx=0;p.vy=0;
-  p.angle=station.angle+Math.PI; // face back toward entry slot
+  const bays=[];
+  const cols=4;
+  const bayW=iW*0.11,bayH=iH*0.13;
+  for(let i=0;i<cols;i++){
+    const bx=cx-iW*0.34+(i/(cols-1))*iW*0.68;
+    bays.push({x:bx,y:cy-iH*0.41,num:i+1,occupied:rngB()<0.35,side:'top',w:bayW,h:bayH});
+    bays.push({x:bx,y:cy+iH*0.41,num:i+5,occupied:rngB()<0.35,side:'bottom',w:bayW,h:bayH});
+  }
+  // Player enters from left side
+  p.x=cx-iW*0.40;p.y=cy;
+  p.vx=2;p.vy=0;
+  p.angle=0;
   p.thrusting=false;p.boosting=false;
-  interiorData={station,iR,bays,entryFlash:1.0,nearBay:null};
+  interiorData={station,iW,iH,bays,entryFlash:1.0,nearBay:null,dockAnim:null};
   state='interior';
   document.getElementById('hud').style.display='block';
-  setMsg('VNITŘEK STANICE — [WASDQE] pro let  •  [F] přistát u hangáru  •  ESC = nouzový výstup',8000);
+  setMsg('HANGÁR CORIOLIS — [WASDQE] pro let  •  [F] přistát u hangáru  •  ESC = nouzový výstup',8000);
 }
 
 function updateInterior(dt){
@@ -532,7 +525,25 @@ function updateInterior(dt){
   const id=interiorData,gs=gameState,p=gs.player,st=id.station;
   if(p.dead)return;
 
-  // Fade entry flash
+  // Dock arm animation — freeze player until arm connects
+  if(id.dockAnim){
+    id.dockAnim.progress=Math.min(1,id.dockAnim.progress+dt/id.dockAnim.duration);
+    p.vx=0;p.vy=0;
+    st.angle+=st.rotSpeed*dt;
+    gs.t+=dt;
+    gs.chunks=getVisibleChunks(p.x,p.y);
+    camX=p.x-W/2;camY=p.y-H/2;
+    if(id.dockAnim.progress>=1){
+      const bay=id.dockAnim.bay;
+      bay.occupied=true;
+      const stRef=st;
+      interiorData=null;
+      setMsg(`BAY-${String(bay.num).padStart(2,'0')} — přistání potvrzeno.`,3500);
+      startDocking(stRef);
+    }
+    return;
+  }
+
   if(id.entryFlash>0)id.entryFlash=Math.max(0,id.entryFlash-dt*2.5);
 
   st.angle+=st.rotSpeed*dt;
@@ -540,7 +551,6 @@ function updateInterior(dt){
   gs.t+=dt;
   if(shootCd>0)shootCd=Math.max(0,shootCd-dt);
 
-  // Full flight controls — spacious interior, only slightly reduced thrust
   const intMult=0.70;
   const thrusting=isAction('thrust');
   const boost=isAction('boost')&&p.fuel>0;
@@ -565,7 +575,6 @@ function updateInterior(dt){
 
   p.thrusting=thrusting;p.boosting=boost&&thrusting;
 
-  // Speed cap — generous inside the station
   const spd=Math.hypot(p.vx,p.vy);
   const maxIntSpd=boost?C.MAX_SPD*1.4:C.MAX_SPD*0.85;
   if(spd>maxIntSpd){p.vx*=maxIntSpd/spd;p.vy*=maxIntSpd/spd;}
@@ -573,29 +582,31 @@ function updateInterior(dt){
   p.vx*=drag;p.vy*=drag;
   p.x+=p.vx;p.y+=p.vy;
 
-  // Soft wall boundary — ring wall, slight damage on hard impact
-  const wallD=Math.hypot(p.x-st.x,p.y-st.y);
-  const wallR=id.iR*0.86;
-  if(wallD>wallR){
-    const nx=(p.x-st.x)/wallD,ny=(p.y-st.y)/wallD;
-    const dot=p.vx*nx+p.vy*ny;
-    p.vx=(p.vx-2*dot*nx)*0.60;p.vy=(p.vy-2*dot*ny)*0.60;
-    p.x=st.x+nx*wallR;p.y=st.y+ny*wallR;
-    if(dot>2.0)hitPlayer(Math.ceil(dot*2));
+  // Rectangular wall boundary
+  const halfW=id.iW*0.46,halfH=id.iH*0.43;
+  const relX=p.x-st.x,relY=p.y-st.y;
+  if(Math.abs(relX)>halfW){
+    const sign=relX>0?1:-1;
+    const dotWall=p.vx*sign;
+    p.vx=(p.vx-2*dotWall*sign)*0.60;
+    p.x=st.x+sign*halfW;
+    if(Math.abs(dotWall)>2.0)hitPlayer(Math.ceil(Math.abs(dotWall)*2));
+  }
+  if(Math.abs(relY)>halfH){
+    const sign=relY>0?1:-1;
+    const dotWall=p.vy*sign;
+    p.vy=(p.vy-2*dotWall*sign)*0.60;
+    p.y=st.y+sign*halfH;
+    if(Math.abs(dotWall)>2.0)hitPlayer(Math.ceil(Math.abs(dotWall)*2));
   }
 
-  // Engine trails
-  engineTrails.forEach(t=>{t.x+=t.vx;t.y+=t.vy;t.life-=dt;t.vx*=0.92;t.vy*=0.92;});
-  engineTrails=engineTrails.filter(t=>t.life>0);
-
-  // Particles
+  engineTrails.forEach(tr=>{tr.x+=tr.vx;tr.y+=tr.vy;tr.life-=dt;tr.vx*=0.92;tr.vy*=0.92;});
+  engineTrails=engineTrails.filter(tr=>tr.life>0);
   gs.particles.forEach(pt=>{pt.x+=pt.vx;pt.y+=pt.vy;pt.life-=dt;pt.vx*=0.93;pt.vy*=0.93;});
   gs.particles=gs.particles.filter(pt=>pt.life>0);
 
-  // Camera follows PLAYER — station interior shifts as you move through it
   camX=p.x-W/2;camY=p.y-H/2;
-  // Zoom: enough to see the ring wall from the center; feels vast when flying
-  const targetZoom=Math.min(W,H)*0.30/id.iR;
+  const targetZoom=Math.min(W/id.iW,H/id.iH)*0.72;
   camZoom+=(targetZoom-camZoom)*Math.min(1,dt*2.5);
 
   gs.chunks=getVisibleChunks(p.x,p.y);
@@ -606,7 +617,8 @@ function updateInterior(dt){
   id.bays.forEach(bay=>{
     if(bay.occupied)return;
     const bd=Math.hypot(p.x-bay.x,p.y-bay.y);
-    if(bd<bay.r*2.2&&bd<closestBD){closestBD=bd;id.nearBay=bay;}
+    const approachDist=bay.w*2.8;
+    if(bd<approachDist&&bd<closestBD){closestBD=bd;id.nearBay=bay;}
   });
 
   if(p.invTimer>0)p.invTimer=Math.max(0,p.invTimer-dt);
@@ -616,25 +628,30 @@ function updateInterior(dt){
 
 function completeParkingInInterior(){
   if(!interiorData)return;
+  if(interiorData.dockAnim)return;
   const bay=interiorData.nearBay;
   if(!bay){setMsg('Nejsi dostatečně blízko hangáru.',2000);return;}
-  const st=interiorData.station;
-  bay.occupied=true;
-  interiorData=null;
-  setMsg(`BAY-${String(bay.num).padStart(2,'0')} — přistání potvrzeno.`,3500);
-  startDocking(st);
+  const p=gameState.player;
+  // Snap ship to pad center, start dock arm animation
+  const dirY=bay.side==='top'?1:-1;
+  p.x=bay.x;p.y=bay.y+dirY*bay.h*0.35;
+  p.vx=0;p.vy=0;
+  p.angle=bay.side==='top'?Math.PI/2:-Math.PI/2;
+  interiorData.nearBay=null;
+  interiorData.dockAnim={bay,progress:0,duration:2.6};
+  setMsg(`BAY-${String(bay.num).padStart(2,'0')} — DOKOVACÍ RAMENO AKTIVOVÁNO...`,3000);
 }
 
 function exitInterior(){
   if(!interiorData)return;
   const st=interiorData.station,p=gameState.player;
+  const iW=interiorData.iW||st.r*4.8;
   interiorData=null;
   state='playing';
-  // Eject out through slot
-  p.x=st.x+Math.cos(st.angle)*st.r*0.45;
-  p.y=st.y+Math.sin(st.angle)*st.r*0.45;
-  p.vx=Math.cos(st.angle)*3.5;p.vy=Math.sin(st.angle)*3.5;
-  p.angle=st.angle;
+  // Eject through left entry port
+  p.x=st.x-iW*0.62;p.y=st.y;
+  p.vx=-3.5;p.vy=0;
+  p.angle=Math.PI;
   camZoom=0.6;
   document.getElementById('hud').style.display='block';
   setMsg('Nouzový výstup ze stanice.',2500);
@@ -838,7 +855,7 @@ function completeWarp(){
   window.currentGalaxy=g.id;
   window.warpTarget=null;
   warpPhase=null;warpElapsed=0;
-  chunkCache.clear();
+  chunkCache.clear();exploredMap.clear();
   // Sol: přistání u Země; ostatní: zůstaň na aktuální pozici (nový svět se vygeneruje kolem)
   if(g.id==='sol'){p.x=-2034;p.y=7542;p.vx=0;p.vy=0;p.angle=-Math.PI/2;getChunk(C.SOLAR_CHUNK.cx,C.SOLAR_CHUNK.cy);}
   getChunk(Math.floor(p.x/C.CHUNK),Math.floor(p.y/C.CHUNK));
@@ -1210,6 +1227,7 @@ function spawnTrail(p){
 }
 
 // ---- Fyzika & update ----
+let _evictTimer=0;
 function update(dt){
   if(!gameState)return;
 
@@ -1336,8 +1354,13 @@ function update(dt){
   // Camera follow
   camX=p.x-W/2;camY=p.y-H/2;
 
-  // Chunks
+  // Chunks + periodická evikce dalekých chunků (každých 5 s)
   gs.chunks=getVisibleChunks(p.x,p.y);
+  _evictTimer+=dt;
+  if(_evictTimer>5){
+    _evictTimer=0;
+    evictFarChunks(Math.floor(p.x/C.CHUNK),Math.floor(p.y/C.CHUNK));
+  }
   // Sluneční soustava je vždy viditelná (planety na vzdálenost 120 000 jednotek)
   if(!gs.chunks.find(ch=>ch.cx===C.SOLAR_CHUNK.cx&&ch.cy===C.SOLAR_CHUNK.cy))
     gs.chunks.push(getChunk(C.SOLAR_CHUNK.cx,C.SOLAR_CHUNK.cy));
@@ -1617,7 +1640,7 @@ function showDeath(){
   p.invTimer=3;p.dead=false;
   // Teleport do Sol
   window.currentGalaxy='sol';
-  chunkCache.clear();
+  chunkCache.clear();exploredMap.clear();
   getChunk(C.SOLAR_CHUNK.cx,C.SOLAR_CHUNK.cy);
   gs.bullets=[];gs.enemies=[];gs.particles=[];gs.loots=[];gs.stationDebris=[];
   gs.navTarget=null;
@@ -1690,40 +1713,142 @@ function getGarageShips(p,gKey){
   return (p.fleet||[]).filter(s=>s.garageKey===gKey);
 }
 
-// ---- Nákup lodi ----
+// ---- Nákup lodi — ETS2 styl (výběr garáže pro doručení) ----
 function buyShip(shipDef, chosenColor, chosenThruster, chosenName){
   if(!gameState)return;
   const gs=gameState,p=gs.player;
   if(shipDef.cost>0&&p.credits<shipDef.cost){
     setMsg(`Nedostatek kreditů! Loď stojí ${shipDef.cost.toLocaleString('cs')} Cr.`,3500);return;
   }
-  // Ulož aktuální loď do garáže (pokud vlastní nějakou s místem)
-  const freeGarage=_findFreeGarage(p);
-  if(p.shipType&&p.shipType!=='viper'&&freeGarage){
-    p.fleet.push({
-      shipType:p.shipType,
-      shipColor:p.shipColor||'#aaccff',
-      thrusterColor:p.thrusterColor||'#ff7700',
-      shipCustomName:p.shipCustomName||null,
-      garageKey:freeGarage,
-      earns:p.shipEarns||0,
-      boughtAt:Date.now()
-    });
-    setMsg(`Stará loď uložena do garáže.`,2000);
+  // Základní viper zdarma — přesednout ihned (žádná garáž nepotřeba)
+  if(shipDef.id==='viper'){
+    p.shipType='viper';
+    p.shipColor=shipDef.color;
+    p.thrusterColor=shipDef.thruster;
+    p.shipCustomName=null;p.shipEarns=0;
+    applyUpgrades(p);saveGame();
+    setMsg('Viper Mk.I aktivována!',3000);
+    const to=document.getElementById('ship-shop-overlay');
+    if(to)to.style.display='none';
+    renderDockPanel(p,gameState.dockStation);
+    return;
   }
+  // Ostatní lodi — musíš mít garáž s volným místem
+  const owned=p.ownedGarages||[];
+  if(!owned.length){
+    setMsg('Nejdřív si kup garáž! Potřebuješ hangár pro parkování lodí.',4500);return;
+  }
+  const hasSpace=owned.some(gk=>getGarageShips(p,gk).length<getGarageCapacity(p,gk));
+  if(!hasSpace){
+    setMsg('Všechny garáže jsou plné! Rozšiř kapacitu hangáru nebo přeparkuj loď.',4500);return;
+  }
+  openGaragePicker(shipDef,chosenColor,chosenThruster,chosenName);
+}
+
+// ---- Garage Picker — výběr cílové garáže po nákupu ----
+let _gpickShipDef=null,_gpickColor=null,_gpickThruster=null,_gpickName=null,_gpickSelectedGKey=null;
+
+function openGaragePicker(shipDef,chosenColor,chosenThruster,chosenName){
+  if(!gameState)return;
+  _gpickShipDef=shipDef;
+  _gpickColor=chosenColor;
+  _gpickThruster=chosenThruster;
+  _gpickName=chosenName;
+  _gpickSelectedGKey=null;
+  const ov=document.getElementById('gpick-overlay');
+  if(!ov)return;
+  const p=gameState.player;
+  // Ship info header
+  const infoEl=document.getElementById('gpick-ship-info');
+  if(infoEl){
+    infoEl.innerHTML=`<span class="gpick-ship-icon">${shipDef.icon}</span>
+      <div class="gpick-ship-details">
+        <div class="gpick-ship-name">${shipDef.name.toUpperCase()}</div>
+        <div class="gpick-ship-price">${shipDef.cost.toLocaleString('cs')} Cr · Doručení zdarma</div>
+      </div>`;
+  }
+  const confirmBtn=document.getElementById('btn-gpick-confirm');
+  if(confirmBtn)confirmBtn.disabled=true;
+  _gpickRenderList(p);
+  ov.style.display='flex';
+}
+
+function closeGaragePicker(){
+  const ov=document.getElementById('gpick-overlay');
+  if(ov)ov.style.display='none';
+  _gpickShipDef=null;_gpickSelectedGKey=null;
+}
+
+function _gpickRenderList(p){
+  const list=document.getElementById('gpick-list');
+  if(!list)return;
+  list.innerHTML='';
+  (p.ownedGarages||[]).forEach(gk=>{
+    const parts=gk.split('_');
+    const gid=parts[0];
+    const cx2=parseInt(parts[1]),cy2=parseInt(parts[2]);
+    const gDef=(GARAGES_DATA[gid]||[]).find(g=>g.cx===cx2&&g.cy===cy2);
+    const galDef=(GALAXIES||[]).find(g=>g.id===gid);
+    const ships=getGarageShips(p,gk);
+    const cap=getGarageCapacity(p,gk);
+    const full=ships.length>=cap;
+    const sel=gk===_gpickSelectedGKey;
+    const row=document.createElement('div');
+    row.className='gpick-row'+(sel?' gpick-selected':'')+(full?' gpick-full':'');
+    row.innerHTML=`
+      <div class="gpick-row-icon">🏭</div>
+      <div class="gpick-row-info">
+        <div class="gpick-row-name">${gDef?.name||gk}</div>
+        <div class="gpick-row-gal">${galDef?.name||gid.toUpperCase()}</div>
+      </div>
+      <div class="gpick-row-right">
+        <div class="gpick-row-cap">${ships.length}/${cap}</div>
+        <div class="gpick-row-status ${full?'gpick-status-full':'gpick-status-ok'}">${full?'PLNÝ':'VOLNÉ MÍSTO'}</div>
+      </div>`;
+    if(!full){
+      row.onclick=()=>{
+        _gpickSelectedGKey=gk;
+        _gpickRenderList(p);
+        const confirmBtn=document.getElementById('btn-gpick-confirm');
+        if(confirmBtn)confirmBtn.disabled=false;
+        const hint=document.getElementById('gpick-hint');
+        if(hint)hint.textContent=`Doručit do: ${gDef?.name||gk} (${galDef?.name||gid})`;
+      };
+    }
+    list.appendChild(row);
+  });
+}
+
+function _gpickConfirm(){
+  if(!_gpickShipDef||!_gpickSelectedGKey||!gameState)return;
+  const p=gameState.player;
+  const shipDef=_gpickShipDef;
+  if(shipDef.cost>0&&p.credits<shipDef.cost){setMsg('Nedostatek kreditů!',2500);return;}
   if(shipDef.cost>0)p.credits-=shipDef.cost;
-  p.shipType=shipDef.id;
-  p.shipColor=chosenColor||shipDef.color;
-  p.thrusterColor=chosenThruster||shipDef.thruster;
-  p.shipCustomName=chosenName||null;
-  p.shipEarns=0;
-  applyUpgrades(p);
+  p.fleet=p.fleet||[];
+  p.fleet.push({
+    shipType:shipDef.id,
+    shipColor:_gpickColor||shipDef.color,
+    thrusterColor:_gpickThruster||shipDef.thruster,
+    shipCustomName:_gpickName||null,
+    garageKey:_gpickSelectedGKey,
+    earns:0,
+    boughtAt:Date.now()
+  });
   saveGame();
   SFX.playLevelUp();
-  setMsg(`✓ ${shipDef.name} zakoupena a přiřazena!`,4000);
-  // Zavři trade overlay pokud je otevřen
-  const to=document.getElementById('ship-shop-overlay');
-  if(to)to.style.display='none';
+  const gkParts=_gpickSelectedGKey.split('_');
+  const gDef=(GARAGES_DATA[gkParts[0]]||[]).find(g=>g.cx===parseInt(gkParts[1])&&g.cy===parseInt(gkParts[2]));
+  const galDef=(GALAXIES||[]).find(g=>g.id===gkParts[0]);
+  const gName=(gDef?.name||_gpickSelectedGKey)+' ('+(galDef?.name||gkParts[0])+')';
+  setMsg(`✓ ${shipDef.name} doručena do ${gName}. Přileť tam a nastoupit!`,7000);
+  closeGaragePicker();
+  // Obnov katalog pokud je otevřen
+  const ssOv=document.getElementById('ship-shop-overlay');
+  if(ssOv&&ssOv.style.display!=='none'){
+    document.getElementById('ss-credits-hdr').textContent=p.credits.toLocaleString('cs')+' Cr';
+    if(typeof _renderShipShopList==='function'){_renderShipShopList(p);_updateShipShopDetail(p);}
+  }
   renderDockPanel(p,gameState.dockStation);
 }
 
@@ -1736,24 +1861,23 @@ function _findFreeGarage(p){
   return null;
 }
 
-// Přesun lodi z garáže do aktivního slotu
+// Nastoupení do lodi z garáže — ETS2 styl: aktivní loď se zaparkuje zde, zvolená se aktivuje
 function activateShipFromFleet(fleetIdx){
   if(!gameState)return;
   const p=gameState.player;
   const fleetShip=p.fleet[fleetIdx];
   if(!fleetShip)return;
-  // Ulož aktuální loď zpět do garáže fleetShipu
-  if(p.shipType!=='viper'){
-    p.fleet.push({
-      shipType:p.shipType,
-      shipColor:p.shipColor,
-      thrusterColor:p.thrusterColor,
-      shipCustomName:p.shipCustomName,
-      garageKey:fleetShip.garageKey,
-      earns:p.shipEarns||0,
-      boughtAt:Date.now()
-    });
-  }
+  // Zaparkuj aktivní loď do stejné garáže (kde stojí zvolená loď)
+  p.fleet.push({
+    shipType:p.shipType,
+    shipColor:p.shipColor||'#aaccff',
+    thrusterColor:p.thrusterColor||'#ff7700',
+    shipCustomName:p.shipCustomName||null,
+    garageKey:fleetShip.garageKey,
+    earns:p.shipEarns||0,
+    boughtAt:Date.now()
+  });
+  // Nastoupit do zvolené lodi
   p.shipType=fleetShip.shipType;
   p.shipColor=fleetShip.shipColor;
   p.thrusterColor=fleetShip.thrusterColor;
@@ -1762,14 +1886,14 @@ function activateShipFromFleet(fleetIdx){
   p.fleet.splice(fleetIdx,1);
   applyUpgrades(p);
   saveGame();
-  setMsg(`✓ ${getShipDef(p.shipType).name} aktivována!`,3000);
+  setMsg(`✓ Nastoupeno do ${getShipDef(p.shipType).name}. Předchozí loď zaparkována.`,4000);
 }
 
 function _goLobby(){
   SFX.stopEngine();
   if(_bsoAnimId){cancelAnimationFrame(_bsoAnimId);_bsoAnimId=null;}
   ['death-screen','hud','dock-panel','delivery-overlay','pause-screen',
-   'ship-shop-overlay','garage-menu-overlay','tuning-overlay',
+   'ship-shop-overlay','gpick-overlay','garage-menu-overlay','tuning-overlay',
    'fleet-manager-overlay','garage-manager-overlay','respawn-screen',
    'base-selector-overlay'].forEach(id=>{
     const el=document.getElementById(id);if(el)el.style.display='none';
@@ -1968,18 +2092,32 @@ function _bsoDrawMap(selectedIdx=-1){
   if(!canvas)return;
   const c=canvas.getContext('2d');
   const W=canvas.width,H=canvas.height;
+  const LM=window.lightMode;
   c.clearRect(0,0,W,H);
 
-  // Pozadí hvězdné pole
-  c.fillStyle='#000810';c.fillRect(0,0,W,H);
-  const rng=makeRng(12345);
-  for(let i=0;i<200;i++){
-    const alpha=0.1+rng()*0.4;
-    c.fillStyle=`rgba(200,220,255,${alpha.toFixed(2)})`;
-    c.beginPath();c.arc(rng()*W,rng()*H,rng()*1.2+0.3,0,Math.PI*2);c.fill();
+  // Pozadí
+  if(LM){
+    const bgGrad=c.createLinearGradient(0,0,W,H);
+    bgGrad.addColorStop(0,'#cddaee');bgGrad.addColorStop(1,'#dce8f8');
+    c.fillStyle=bgGrad;c.fillRect(0,0,W,H);
+    // Subtle dot texture
+    const rng=makeRng(12345);
+    for(let i=0;i<120;i++){
+      const alpha=0.06+rng()*0.10;
+      c.fillStyle=`rgba(0,40,120,${alpha.toFixed(2)})`;
+      c.beginPath();c.arc(rng()*W,rng()*H,rng()*1.0+0.2,0,Math.PI*2);c.fill();
+    }
+  } else {
+    c.fillStyle='#000810';c.fillRect(0,0,W,H);
+    const rng=makeRng(12345);
+    for(let i=0;i<200;i++){
+      const alpha=0.1+rng()*0.4;
+      c.fillStyle=`rgba(200,220,255,${alpha.toFixed(2)})`;
+      c.beginPath();c.arc(rng()*W,rng()*H,rng()*1.2+0.3,0,Math.PI*2);c.fill();
+    }
   }
 
-  // Sol hvězda — přibližně uprostřed mapy
+  // Sol hvězda
   const garages=GARAGES_DATA.sol||[];
   const xs=garages.map(g=>g.cx), ys=garages.map(g=>g.cy);
   const minX=Math.min(...xs)-1, maxX=Math.max(...xs)+1;
@@ -1989,18 +2127,23 @@ function _bsoDrawMap(selectedIdx=-1){
   const toY=cy=>pad+(cy-minY)/(maxY-minY)*(H-pad*2);
   const solX=toX(0),solY=toY(0);
 
-  // Záře sluníčka
   const sg=c.createRadialGradient(solX,solY,0,solX,solY,80);
-  sg.addColorStop(0,'rgba(255,220,100,0.45)');sg.addColorStop(1,'rgba(255,180,0,0)');
+  if(LM){
+    sg.addColorStop(0,'rgba(220,160,20,0.55)');sg.addColorStop(1,'rgba(220,140,0,0)');
+  } else {
+    sg.addColorStop(0,'rgba(255,220,100,0.45)');sg.addColorStop(1,'rgba(255,180,0,0)');
+  }
   c.fillStyle=sg;c.beginPath();c.arc(solX,solY,80,0,Math.PI*2);c.fill();
-  c.fillStyle='#ffe87a';c.shadowColor='#ffcc00';c.shadowBlur=20;
+  c.fillStyle=LM?'#cc9900':'#ffe87a';c.shadowColor=LM?'#cc8800':'#ffcc00';c.shadowBlur=LM?12:20;
   c.beginPath();c.arc(solX,solY,10,0,Math.PI*2);c.fill();
   c.shadowBlur=0;
-  c.font='9px "Courier New",monospace';c.fillStyle='rgba(255,220,100,0.7)';c.textAlign='center';
-  c.fillText('SOL',solX,solY-15);
+  c.font='9px "Courier New",monospace';
+  c.fillStyle=LM?'rgba(100,60,0,0.7)':'rgba(255,220,100,0.7)';
+  c.textAlign='center';c.fillText('SOL',solX,solY-15);
 
   // Osy mřížky
-  c.strokeStyle='rgba(0,80,180,0.12)';c.lineWidth=1;c.setLineDash([4,8]);
+  c.strokeStyle=LM?'rgba(0,60,160,0.12)':'rgba(0,80,180,0.12)';
+  c.lineWidth=1;c.setLineDash([4,8]);
   for(let cx=Math.floor(minX);cx<=Math.ceil(maxX);cx++){
     const sx=toX(cx);c.beginPath();c.moveTo(sx,0);c.lineTo(sx,H);c.stroke();
   }
@@ -2017,42 +2160,41 @@ function _bsoDrawMap(selectedIdx=-1){
     const isSel=i===selectedIdx;
     const pulse=0.5+Math.sin(t*2.2+i*1.1)*0.5;
 
-    // Záře vybraného
     if(isSel){
-      c.fillStyle='rgba(0,200,255,0.18)';
+      c.fillStyle=LM?'rgba(0,80,200,0.14)':'rgba(0,200,255,0.18)';
       c.beginPath();c.arc(x,y,26,0,Math.PI*2);c.fill();
     }
 
     // Linka k Sol
-    c.strokeStyle=isSel?'rgba(0,200,255,0.3)':'rgba(0,100,200,0.15)';
+    c.strokeStyle=isSel?(LM?'rgba(0,80,200,0.35)':'rgba(0,200,255,0.3)'):(LM?'rgba(0,60,160,0.18)':'rgba(0,100,200,0.15)');
     c.lineWidth=isSel?1.5:0.8;c.setLineDash([3,6]);
     c.beginPath();c.moveTo(solX,solY);c.lineTo(x,y);c.stroke();
     c.setLineDash([]);
 
-    // Hexagon symbol garáže
+    // Hexagon
     c.save();c.translate(x,y);
     const r=isSel?12:9;
-    c.strokeStyle=isSel?'#00ccff':('rgba(0,180,255,'+(0.4+pulse*0.3)+')');
-    c.lineWidth=isSel?2:1.2;
-    if(isSel){c.shadowColor='#00ccff';c.shadowBlur=16;}
+    const nodeCol=LM?(isSel?'#0044cc':('rgba(0,80,180,'+(0.5+pulse*0.3)+')')):(isSel?'#00ccff':('rgba(0,180,255,'+(0.4+pulse*0.3)+')'));
+    c.strokeStyle=nodeCol;c.lineWidth=isSel?2:1.2;
+    if(isSel){c.shadowColor=LM?'#0044cc':'#00ccff';c.shadowBlur=LM?10:16;}
     c.beginPath();
     for(let j=0;j<6;j++){const a=j*Math.PI/3;c.lineTo(Math.cos(a)*r,Math.sin(a)*r);}
     c.closePath();c.stroke();
     if(isSel){
-      c.fillStyle='rgba(0,200,255,0.18)';c.fill();
+      c.fillStyle=LM?'rgba(0,80,200,0.14)':'rgba(0,200,255,0.18)';c.fill();
     }
     c.shadowBlur=0;
 
-    // Číslo garáže
+    // Číslo
     c.font=`bold ${isSel?10:8}px "Courier New",monospace`;
-    c.fillStyle=isSel?'#00ccff':'rgba(0,180,255,0.7)';
+    c.fillStyle=LM?(isSel?'#002299':'rgba(0,60,160,0.7)'):(isSel?'#00ccff':'rgba(0,180,255,0.7)');
     c.textAlign='center';c.textBaseline='middle';
     c.fillText(i+1,0,0);
     c.restore();
 
-    // Název pod markerem
+    // Název
     c.font='8px "Courier New",monospace';
-    c.fillStyle=isSel?'rgba(0,220,255,0.9)':'rgba(0,150,220,0.55)';
+    c.fillStyle=LM?(isSel?'rgba(0,30,140,0.9)':'rgba(0,50,130,0.5)'):(isSel?'rgba(0,220,255,0.9)':'rgba(0,150,220,0.55)');
     c.textAlign='center';
     c.fillText(g.name.replace('Hangár ',''),x,y+(isSel?18:14));
   });
@@ -2541,7 +2683,16 @@ window.addEventListener('load',()=>{
   W=canvas.width=window.innerWidth;
   H=canvas.height=window.innerHeight;
   W2=W;H2=H;
-  window.addEventListener('resize',()=>{W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight;});
+  window.addEventListener('resize',()=>{
+    W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight;
+    if(state==='galaxy')resizeGalaxyCanvas();
+    if(state==='map'){
+      const mh=document.getElementById('map-header');
+      const mhH=mh?mh.offsetHeight||48:48;
+      const mc=document.getElementById('map-canvas');
+      if(mc){mc.width=Math.max(300,window.innerWidth-240);mc.height=Math.max(300,window.innerHeight-mhH);}
+    }
+  });
 
   SFX.init();
   loadBindings();

@@ -385,7 +385,7 @@ function drawBigMap(){
   function wp(wx,wy){return{x:cx+wx*baseScale,y:cy+wy*baseScale};}
 
   // Mlhoviny
-  chunkCache.forEach(ch=>{
+  exploredMap.forEach(ch=>{
     if(!ch.nebula)return;
     const{x:px,y:py}=wp(ch.nebula.x-player.x,ch.nebula.y-player.y);
     const pr=ch.nebula.r*baseScale;
@@ -395,7 +395,7 @@ function drawBigMap(){
   });
 
   // Hvězdné systémy & stanice
-  chunkCache.forEach(ch=>{
+  exploredMap.forEach(ch=>{
     if(!ch.system)return;
     const sys=ch.system;
     const{x:px,y:py}=wp(sys.sx-player.x,sys.sy-player.y);
@@ -411,7 +411,8 @@ function drawBigMap(){
     if(sys.station){
       const st=sys.station;
       const{x:spx,y:spy}=wp(st.x-player.x,st.y-player.y);
-      const isNav=window.gameState.navTarget===st;
+      const nav=window.gameState.navTarget;
+      const isNav=nav&&nav.name===st.name&&Math.abs(nav.x-st.x)<1&&Math.abs(nav.y-st.y)<1;
       mapCtx.save();
       if(st.type==='large'){
         // Velká Coriolis — výrazný prstencový symbol
@@ -550,8 +551,8 @@ function drawBigMap(){
     LARGE_STATIONS.forEach(ls=>{
       const chKey=chunkKey(ls.cx,ls.cy);
       let stx,sty;
-      if(chunkCache.has(chKey)){
-        const ch=chunkCache.get(chKey);
+      if(exploredMap.has(chKey)){
+        const ch=exploredMap.get(chKey);
         if(ch.system?.station?.type==='large'){stx=ch.system.station.x;sty=ch.system.station.y;}
         else{stx=ls.cx*C.CHUNK+C.CHUNK*0.65;sty=ls.cy*C.CHUNK+C.CHUNK*0.65;}
       } else {
@@ -559,7 +560,7 @@ function drawBigMap(){
       }
       const{x:spx,y:spy}=wp(stx-player.x,sty-player.y);
       if(spx<-60||spx>MW+60||spy<-60||spy>MH+60)return;
-      const discovered=chunkCache.has(chKey);
+      const discovered=exploredMap.has(chKey);
       const stR=13;
       mapCtx.save();
       mapCtx.globalAlpha=discovered?1:0.55;
@@ -608,7 +609,7 @@ function drawBigMap(){
     dealers.forEach(dl=>{
       const chKey=chunkKey(dl.cx,dl.cy);
       let stx,sty;
-      if(chunkCache.has(chKey)){const ch=chunkCache.get(chKey);stx=ch.system?.station?.x||(dl.cx*C.CHUNK+C.CHUNK*.65);sty=ch.system?.station?.y||(dl.cy*C.CHUNK+C.CHUNK*.65);}
+      if(exploredMap.has(chKey)){const ch=exploredMap.get(chKey);stx=ch.system?.station?.x||(dl.cx*C.CHUNK+C.CHUNK*.65);sty=ch.system?.station?.y||(dl.cy*C.CHUNK+C.CHUNK*.65);}
       else{stx=dl.cx*C.CHUNK+C.CHUNK*.65;sty=dl.cy*C.CHUNK+C.CHUNK*.65;}
       const{x:spx,y:spy}=wp(stx-player.x,sty-player.y);
       if(spx<-20||spx>MW+20||spy<-20||spy>MH+20)return;
@@ -634,7 +635,7 @@ function drawBigMap(){
     garages.forEach(gr=>{
       const chKey=chunkKey(gr.cx,gr.cy);
       let stx,sty;
-      if(chunkCache.has(chKey)){const ch=chunkCache.get(chKey);stx=ch.system?.station?.x||(gr.cx*C.CHUNK+C.CHUNK*.65);sty=ch.system?.station?.y||(gr.cy*C.CHUNK+C.CHUNK*.65);}
+      if(exploredMap.has(chKey)){const ch=exploredMap.get(chKey);stx=ch.system?.station?.x||(gr.cx*C.CHUNK+C.CHUNK*.65);sty=ch.system?.station?.y||(gr.cy*C.CHUNK+C.CHUNK*.65);}
       else{stx=gr.cx*C.CHUNK+C.CHUNK*.65;sty=gr.cy*C.CHUNK+C.CHUNK*.65;}
       const{x:spx,y:spy}=wp(stx-player.x,sty-player.y);
       if(spx<-20||spx>MW+20||spy<-20||spy>MH+20)return;
@@ -775,17 +776,18 @@ function handleMapClick(e){
   const MW=mapCanvas.width,MH=mapCanvas.height,baseScale=Math.min(MW,MH)/8000*mapZoom;
   const cx=MW/2+mapPan.x,cy=MH/2+mapPan.y;
   let closest=null,closestD=30;
+  // Stanice z exploredMap (prozkoumané i eviktované chunky)
+  exploredMap.forEach(ch=>{
+    if(!ch.system?.station)return;
+    const st=ch.system.station;
+    const px=cx+(st.x-player.x)*baseScale,py=cy+(st.y-player.y)*baseScale;
+    const d=Math.hypot(mx-px,my-py);
+    if(d<closestD){closestD=d;closest=st;}
+  });
+  // Planetární stanice — jen z aktuálně načtených chunků (pohybují se s planetou)
   chunkCache.forEach(ch=>{
-    if(!ch.system)return;
-    const checkSt=(st)=>{
-      if(!st)return;
-      const px=cx+(st.x-player.x)*baseScale,py=cy+(st.y-player.y)*baseScale;
-      const d=Math.hypot(mx-px,my-py);
-      if(d<closestD){closestD=d;closest=st;}
-    };
-    checkSt(ch.system.station);
-    // Planetární stanice — hledej i v solárním chunku
-    ch.system.planets?.forEach(pl=>{
+    if(!ch.system?.planets)return;
+    ch.system.planets.forEach(pl=>{
       if(!pl.station)return;
       const pos=getPlanetPos(pl,ch.system.sx,ch.system.sy,window.gameState.t||0);
       const stx=pos.x+(pl.r+pl.station.r)*1.9, sty=pos.y;
@@ -799,14 +801,14 @@ function handleMapClick(e){
     LARGE_STATIONS.forEach(ls=>{
       const chKey=chunkKey(ls.cx,ls.cy);
       let stx,sty;
-      if(chunkCache.has(chKey)){
-        const ch=chunkCache.get(chKey);
+      if(exploredMap.has(chKey)){
+        const ch=exploredMap.get(chKey);
         if(ch.system?.station?.type==='large'){stx=ch.system.station.x;sty=ch.system.station.y;}
         else{stx=ls.cx*C.CHUNK+C.CHUNK*0.65;sty=ls.cy*C.CHUNK+C.CHUNK*0.65;}
       } else {stx=ls.cx*C.CHUNK+C.CHUNK*0.65;sty=ls.cy*C.CHUNK+C.CHUNK*0.65;}
       const px2=cx+(stx-player.x)*baseScale,py2=cy+(sty-player.y)*baseScale;
       if(Math.hypot(mx-px2,my-py2)<22&&!closest){
-        closest={x:stx,y:sty,name:ls.name+(chunkCache.has(chKey)?'':' [neobjeveno]')};
+        closest={x:stx,y:sty,name:ls.name+(exploredMap.has(chKey)?'':' [neobjeveno]')};
       }
     });
   }
@@ -1129,12 +1131,18 @@ function _setContractNav(contract){
     return;
   }
 
-  // Same-galaxy: hledej stanici podle jména v chunkcache
+  // Same-galaxy: hledej stanici v exploredMap (obsahuje i eviktované chunky)
   let found=null;
-  if(typeof chunkCache!=='undefined'){
-    chunkCache.forEach(ch=>{
+  if(typeof exploredMap!=='undefined'){
+    exploredMap.forEach(ch=>{
       if(found)return;
       if(ch.system?.station?.name===contract.to) found=ch.system.station;
+    });
+  }
+  // Planetární stanice — jen z aktuálně načtených chunků
+  if(!found&&typeof chunkCache!=='undefined'){
+    chunkCache.forEach(ch=>{
+      if(found)return;
       ch.system?.planets?.forEach(pl=>{
         if(pl.station?.name===contract.to) found=pl.station;
       });
@@ -1423,7 +1431,7 @@ function getCargoMax(p){
 
 // ===== GALAXY MAP =====
 let _mapHoverX=-999,_mapHoverY=-999;
-let galaxyCanvas,galaxyCtx,selectedGalaxyId=null,_galaxyAnimId=null;
+let galaxyCanvas,galaxyCtx,selectedGalaxyId=null,_galaxyAnimId=null,_galaxyScale=1;
 
 function initGalaxyCanvas(){
   galaxyCanvas=document.getElementById('galaxy-canvas');
@@ -1435,7 +1443,8 @@ function initGalaxyCanvas(){
 function resizeGalaxyCanvas(){
   const hdr=document.getElementById('galaxy-header');
   const hdrH=hdr?hdr.offsetHeight||48:48;
-  galaxyCanvas.width=Math.max(200,window.innerWidth-300);
+  const infoW=window.innerWidth<640?0:300;
+  galaxyCanvas.width=Math.max(200,window.innerWidth-infoW);
   galaxyCanvas.height=Math.max(200,window.innerHeight-hdrH);
 }
 
@@ -1447,6 +1456,17 @@ function startGalaxyAnim(){
 
 function stopGalaxyAnim(){
   if(_galaxyAnimId){cancelAnimationFrame(_galaxyAnimId);_galaxyAnimId=null;}
+}
+
+function _galaxyFitScale(GW,GH){
+  // Bounding box všech galaxií vč. glow a popisků
+  const maxBaseR=88;
+  const allX=GALAXIES.map(g=>g.mapX),allY=GALAXIES.map(g=>g.mapY);
+  const padX=maxBaseR*2.2, padYtop=maxBaseR*2.2, padYbot=maxBaseR*1.15+38;
+  const cW=(Math.max(...allX)+padX)-(Math.min(...allX)-padX);
+  const cH=(Math.max(...allY)+padYbot)-(Math.min(...allY)-padYtop);
+  const PAD=44;
+  return Math.min((GW-PAD*2)/cW,(GH-PAD*2)/cH,0.82);
 }
 
 function drawGalaxyMap(t){
@@ -1485,23 +1505,29 @@ function drawGalaxyMap(t){
   g2.globalAlpha=1;
 
   const currentGid=window.currentGalaxy||'sol';
+  const sc=_galaxyFitScale(GW,GH);
+  _galaxyScale=sc;
+
+  // Vše nakreslíme ve scaled prostoru (translate na střed, scale)
+  g2.save();
+  g2.translate(gcx,gcy);
+  g2.scale(sc,sc);
 
   // Slabé spojovací čáry mezi galaxiemi
   g2.save();
-  g2.strokeStyle=window.lightMode?'rgba(0,40,180,0.08)':'rgba(255,149,0,0.04)';g2.lineWidth=1;g2.setLineDash([4,12]);
+  g2.strokeStyle=window.lightMode?'rgba(0,40,180,0.08)':'rgba(255,149,0,0.04)';
+  g2.lineWidth=1/sc;g2.setLineDash([4,12]);
   GALAXIES.forEach(ga=>{
     GALAXIES.forEach(gb=>{
       if(ga.id>=gb.id)return;
-      const ax=gcx+ga.mapX,ay=gcy+ga.mapY;
-      const bx2=gcx+gb.mapX,by2=gcy+gb.mapY;
-      g2.beginPath();g2.moveTo(ax,ay);g2.lineTo(bx2,by2);g2.stroke();
+      g2.beginPath();g2.moveTo(ga.mapX,ga.mapY);g2.lineTo(gb.mapX,gb.mapY);g2.stroke();
     });
   });
   g2.setLineDash([]);g2.restore();
 
-  // Kreslení každé galaxie
+  // Kreslení každé galaxie (pozice relativně k (0,0) = střed)
   GALAXIES.forEach(ga=>{
-    const gx=gcx+ga.mapX,gy=gcy+ga.mapY;
+    const gx=ga.mapX,gy=ga.mapY;
     const isCurrent=currentGid===ga.id;
     const isSelected=selectedGalaxyId===ga.id;
     const baseR=isCurrent?88:isSelected?78:62;
@@ -1537,35 +1563,44 @@ function drawGalaxyMap(t){
 
     g2.restore();
 
-    // Rámečky (mimo rotaci)
+    // Rámečky (mimo rotaci, ale stále ve scaled prostoru)
     if(isCurrent){
       const ra=0.5+Math.sin(t*2)*0.25;
-      g2.save();g2.strokeStyle=`rgba(255,149,0,${ra})`;g2.lineWidth=2;
+      g2.save();g2.strokeStyle=`rgba(255,149,0,${ra})`;g2.lineWidth=2/sc;
       g2.shadowColor='rgba(255,149,0,0.7)';g2.shadowBlur=12;
       g2.beginPath();g2.arc(gx,gy,baseR+14,0,Math.PI*2);g2.stroke();
       g2.restore();
     }
     if(isSelected&&!isCurrent){
       const ra=0.6+Math.sin(t*3)*0.4;
-      g2.save();g2.strokeStyle=`rgba(0,255,136,${ra})`;g2.lineWidth=2;
+      g2.save();g2.strokeStyle=`rgba(0,255,136,${ra})`;g2.lineWidth=2/sc;
       g2.shadowColor='rgba(0,255,136,0.8)';g2.shadowBlur=16;
-      g2.setLineDash([8,5]);
+      g2.setLineDash([8/sc,5/sc]);
       g2.beginPath();g2.arc(gx,gy,baseR+22,0,Math.PI*2);g2.stroke();
       g2.setLineDash([]);g2.restore();
     }
+  });
 
-    // Název galaxie
+  g2.restore(); // konec scaled prostoru
+
+  // Popisky galaxií — kreslíme ve screen souřadnicích aby font zůstal čitelný
+  GALAXIES.forEach(ga=>{
+    const isCurrent=currentGid===ga.id;
+    const isSelected=selectedGalaxyId===ga.id;
+    const baseR=(isCurrent?88:isSelected?78:62)*sc;
+    const sgx=gcx+ga.mapX*sc, sgy=gcy+ga.mapY*sc;
+
     g2.save();
     g2.textAlign='center';
     g2.font=`bold ${isCurrent||isSelected?13:11}px "Courier New", monospace`;
     g2.fillStyle=isCurrent?'#ff9500':isSelected?'#00ff88':ga.color;
     g2.shadowColor=isCurrent?'rgba(255,149,0,0.6)':isSelected?'rgba(0,255,136,0.5)':ga.glow+'0.4)';
     g2.shadowBlur=8;
-    g2.fillText(ga.name,gx,gy+baseR*1.15+18);
+    g2.fillText(ga.name,sgx,sgy+baseR*1.15+18);
     if(isCurrent){
       g2.font='10px "Courier New", monospace';
       g2.fillStyle='rgba(255,149,0,0.55)';
-      g2.fillText('⊙ AKTUÁLNÍ POLOHA',gx,gy+baseR*1.15+33);
+      g2.fillText('⊙ AKTUÁLNÍ POLOHA',sgx,sgy+baseR*1.15+33);
     }
     g2.restore();
   });
@@ -1578,12 +1613,14 @@ function drawGalaxyMap(t){
 
 function handleGalaxyClick(e){
   const rect=galaxyCanvas.getBoundingClientRect();
-  const mx=e.clientX-rect.left,my=e.clientY-rect.top;
+  // Převod CSS souřadnic na canvas souřadnice (canvas může mít jiný display size)
+  const scaleX=galaxyCanvas.width/rect.width, scaleY=galaxyCanvas.height/rect.height;
+  const mx=(e.clientX-rect.left)*scaleX, my=(e.clientY-rect.top)*scaleY;
   const GW=galaxyCanvas.width,GH=galaxyCanvas.height;
   let hit=null;
   GALAXIES.forEach(ga=>{
-    const gx=GW/2+ga.mapX,gy=GH/2+ga.mapY;
-    if(Math.hypot(mx-gx,my-gy)<90)hit=ga;
+    const gx=GW/2+ga.mapX*_galaxyScale, gy=GH/2+ga.mapY*_galaxyScale;
+    if(Math.hypot(mx-gx,my-gy)<Math.max(60,90*_galaxyScale))hit=ga;
   });
   if(!hit)return;
   selectedGalaxyId=hit.id;
@@ -1805,9 +1842,10 @@ function _tunRefreshPreview(){
 }
 
 // ================================================================
-//  GARAGE MENU (for docked garage)
+//  GARAGE MENU — ETS2 styl (docked garage)
 // ================================================================
 let _gmGarageKey=null;
+let _gmSelectedIdx=null; // index do p.fleet, null = nic nevybráno
 
 function openGarageMenu(){
   const ov=document.getElementById('garage-menu-overlay');
@@ -1816,6 +1854,7 @@ function openGarageMenu(){
   const st=window.gameState.dockStation;
   if(!st||st.type!=='garage')return;
   _gmGarageKey=garageKey(st.garageGalaxy,st.garageCx,st.garageCy);
+  _gmSelectedIdx=null;
   document.getElementById('gm-garage-name').textContent=st.name;
   _renderGarageMenuContent(p);
   ov.style.display='flex';
@@ -1824,6 +1863,7 @@ function openGarageMenu(){
 function closeGarageMenu(){
   const ov=document.getElementById('garage-menu-overlay');
   if(ov)ov.style.display='none';
+  _gmSelectedIdx=null;
 }
 
 function _renderGarageMenuContent(p){
@@ -1835,7 +1875,6 @@ function _renderGarageMenuContent(p){
   const upgBtn=document.getElementById('btn-gm-upgrade');
   if(upgBtn){
     const upgCost=200000+(cap-3)*150000;
-    const canUpg=cap<6&&p.credits>=upgCost;
     upgBtn.textContent=cap>=6?'MAX KAPACITA':`⬆ ROZŠÍŘIT (+1 SLOT) — ${upgCost.toLocaleString('cs')} Cr`;
     upgBtn.disabled=cap>=6;
     upgBtn.onclick=()=>{
@@ -1843,60 +1882,77 @@ function _renderGarageMenuContent(p){
       _renderGarageMenuContent(p);
     };
   }
-  const parkBtn=document.getElementById('btn-gm-park');
-  if(parkBtn){
-    const full=ships.length>=cap;
-    parkBtn.disabled=full;
-    parkBtn.title=full?'Hangár je plný':'Zaparkovat aktivní loď';
-    parkBtn.onclick=()=>{
-      if(ships.length>=cap){setMsg('Hangár je plný!',2500);return;}
-      p.fleet=p.fleet||[];
-      p.fleet.push({shipType:p.shipType,shipColor:p.shipColor||'#aaccff',thrusterColor:p.thrusterColor||'#ff7700',shipCustomName:p.shipCustomName||null,garageKey:_gmGarageKey,earns:p.shipEarns||0,boughtAt:Date.now()});
-      p.shipType='viper';p.shipColor=getShipDef('viper').color;p.thrusterColor=getShipDef('viper').thruster;p.shipCustomName=null;p.shipEarns=0;
-      applyUpgrades(p);
-      if(typeof saveGame==='function')saveGame();
-      setMsg('Loď zaparkována. Pilotujete Viper Mk.I.',3000);
-      _renderGarageMenuContent(p);
-    };
-  }
+
   const grid=document.getElementById('gm-ships-grid');
   grid.innerHTML='';
-  // Active ship card
+
+  // Aktivní loď — vždy nahoře, označena jako "PILOTUJETE"
   {
     const shipDef=getShipDef(p.shipType||'viper');
     const card=document.createElement('div');
     card.className='gm-ship-card gm-active';
-    card.innerHTML=`<div class="gmc-name">${p.shipCustomName||shipDef.name}</div>
-      <div class="gmc-type">${shipDef.icon} ${shipDef.name} — AKTIVNÍ LOĎ</div>
+    card.innerHTML=`
+      <div class="gmc-pilot-badge">● PILOTUJETE</div>
+      <div class="gmc-name">${p.shipCustomName||shipDef.name}</div>
+      <div class="gmc-type">${shipDef.icon} ${shipDef.name}</div>
       <div class="gmc-color-strip" style="background:${p.shipColor||shipDef.color}"></div>
       <div class="gmc-earn">Vydělala: ${(p.shipEarns||0).toLocaleString('cs')} Cr</div>
       <button class="gmc-btn" onclick="openTuningMenu()">🎨 TUNING →</button>`;
     grid.appendChild(card);
   }
-  // Fleet ships in this garage
-  ships.forEach((fs,i)=>{
+
+  // Zaparkované lodě v této garáži — kliknutelné pro výběr
+  ships.forEach((fs)=>{
     const fleetIdx=(p.fleet||[]).findIndex(s=>s===fs);
     const shipDef=getShipDef(fs.shipType||'viper');
+    const isSelected=_gmSelectedIdx===fleetIdx;
     const card=document.createElement('div');
-    card.className='gm-ship-card';
-    card.innerHTML=`<div class="gmc-name">${fs.shipCustomName||shipDef.name}</div>
+    card.className='gm-ship-card gm-parked'+(isSelected?' gm-selected':'');
+    card.title='Klikni pro výběr';
+    card.innerHTML=`
+      <div class="gmc-parked-badge">${isSelected?'✓ VYBRÁNO':'ZAPARKOVÁNO'}</div>
+      <div class="gmc-name">${fs.shipCustomName||shipDef.name}</div>
       <div class="gmc-type">${shipDef.icon} ${shipDef.name}</div>
       <div class="gmc-color-strip" style="background:${fs.shipColor||shipDef.color}"></div>
       <div class="gmc-earn">Vydělala: ${(fs.earns||0).toLocaleString('cs')} Cr</div>
-      <button class="gmc-btn gmc-activate" data-idx="${fleetIdx}">⚡ AKTIVOVAT →</button>`;
-    card.querySelector('.gmc-activate').onclick=()=>{
-      if(typeof activateShipFromFleet==='function')activateShipFromFleet(fleetIdx);
+      <div class="gmc-select-hint">${isSelected?'→ stiskni NASTOUPIT':'Klikni pro výběr'}</div>`;
+    card.onclick=()=>{
+      _gmSelectedIdx=(_gmSelectedIdx===fleetIdx)?null:fleetIdx;
       _renderGarageMenuContent(window.gameState.player);
-      setMsg(`Loď aktivována!`,2500);
     };
     grid.appendChild(card);
   });
-  // Empty slots
-  for(let i=ships.length+1;i<cap;i++){
+
+  // Prázdné sloty (aktivní loď nezabírá trvalý slot v garáži — odlétí s vámi)
+  const emptyCount=cap-ships.length;
+  for(let i=0;i<emptyCount;i++){
     const slot=document.createElement('div');
     slot.className='gmc-empty-slot';
-    slot.textContent='[ PRÁZDNÝ SLOT ]';
+    slot.innerHTML='[ PRÁZDNÝ SLOT ]';
     grid.appendChild(slot);
+  }
+
+  // NASTOUPIT tlačítko
+  const boardBtn=document.getElementById('btn-gm-board');
+  const boardHint=document.getElementById('gm-board-hint');
+  if(boardBtn){
+    const hasSelected=_gmSelectedIdx!==null&&_gmSelectedIdx>=0;
+    boardBtn.disabled=!hasSelected;
+    if(hasSelected){
+      const fs=p.fleet[_gmSelectedIdx];
+      const sd=fs?getShipDef(fs.shipType||'viper'):null;
+      if(boardHint&&sd)boardHint.textContent=`Nastoupíš do ${fs.shipCustomName||sd.name} — aktivní loď se zaparkuje zde.`;
+      boardBtn.onclick=()=>{
+        if(typeof activateShipFromFleet==='function'){
+          activateShipFromFleet(_gmSelectedIdx);
+          _gmSelectedIdx=null;
+          _renderGarageMenuContent(window.gameState.player);
+        }
+      };
+    } else {
+      if(boardHint)boardHint.textContent='← Klikni na loď pro výběr';
+      boardBtn.onclick=null;
+    }
   }
 }
 

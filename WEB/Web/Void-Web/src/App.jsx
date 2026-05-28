@@ -77,10 +77,11 @@ const SITE = {
     '/screenshots/screen9.png',
   ],
   team: [
-    { role: 'Člen týmu', name: 'Jiří Kabrt' },
-    { role: 'Člen týmu', name: 'Lukáš Maisner' },
-    { role: 'Hlavní vedoucí týmu', name: 'Jakub Dostál' },
-    { role: 'Pomoc s webem', name: 'Claude Code' },
+    { role: 'Zvukař', name: 'Jiří Kabrt' },
+    { role: 'Zvukař', name: 'Lukáš Maisner'},
+    { role: 'Hlavní Tester', name: 'Lukáš Maisner' },
+    { role: 'Coder', name: 'Jakub Dostál' },
+    { role: 'Coder', name: 'Claude Code' },
   ],
   sources: [
     { label: 'React', href: 'https://react.dev/' },

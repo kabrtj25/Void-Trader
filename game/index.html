@@ -134,7 +134,7 @@
   <div id="map-box">
     <div id="map-header">
       <span id="map-title">// MAPA GALAXIE</span>
-      <span id="map-hint">Kliknutím na stanici nastavíš navigaci</span>
+      <span id="map-hint">Kliknutím na stanici nastavíš navigaci · [M] zavřít</span>
       <button id="btn-close-map">✕ Zavřít [M]</button>
     </div>
     <div id="map-main">
@@ -165,7 +165,7 @@
 <div id="galaxy-overlay" style="display:none">
   <div id="galaxy-header">
     <span id="galaxy-title">// MAPA GALAXIÍ</span>
-    <span id="galaxy-hint">Klikni na galaxii · [N] nebo [ESC] zavřít</span>
+    <span id="galaxy-hint">Klikni na galaxii · [N] zavřít</span>
     <button id="btn-close-galaxy">✕ Zavřít [N]</button>
   </div>
   <div id="galaxy-main">
@@ -194,6 +194,7 @@
   <div id="dock-header">
     <div id="dock-name">STANICE</div>
     <div id="dock-tier"></div>
+    <span id="dock-hint" style="font-size:0.75rem;color:#7ecfff;opacity:0.7;margin-right:auto;">[F] vzlétnout</span>
     <button id="btn-undock">↑ Vzlétnout [F]</button>
   </div>
   <div id="dock-tabs">
@@ -582,7 +583,24 @@
   </div>
 </div>
 
-<!-- SPRÁVA GARÁŽE (GARAGE MENU) -->
+<!-- VÝBĚR GARÁŽE PRO DORUČENÍ LODI (GARAGE PICKER) -->
+<div id="gpick-overlay" style="display:none">
+  <div id="gpick-inner">
+    <div id="gpick-header">
+      <div id="gpick-title">◈ VÝBĚR GARÁŽE PRO DORUČENÍ</div>
+      <div id="gpick-subtitle">Loď bude doručena do vybraného hangáru. Musíš tam osobně přiletět a nastoupit do ní.</div>
+    </div>
+    <div id="gpick-ship-info"></div>
+    <div id="gpick-list"></div>
+    <div id="gpick-footer">
+      <div id="gpick-hint">← Vyber hangár ze seznamu</div>
+      <button id="btn-gpick-cancel" onclick="closeGaragePicker()">✕ ZRUŠIT</button>
+      <button id="btn-gpick-confirm" disabled onclick="_gpickConfirm()">▶ DORUČIT SEM →</button>
+    </div>
+  </div>
+</div>
+
+<!-- SPRÁVA GARÁŽE — ETS2 STYL (GARAGE MENU) -->
 <div id="garage-menu-overlay" style="display:none">
   <div id="gm-header">
     <div id="gm-hdr-left">
@@ -596,9 +614,12 @@
     <div id="gm-top-bar">
       <div id="gm-cap-info">Kapacita: <span id="gm-cap-val">0/3</span></div>
       <button id="btn-gm-upgrade" class="svc-btn">⬆ ROZŠÍŘIT (+1 SLOT)</button>
-      <button id="btn-gm-park" class="svc-btn" style="background:rgba(0,200,100,0.1);border-color:#00cc66;color:#00cc66">🏭 PARKOVAT AKTIVNÍ LOĎ</button>
     </div>
     <div id="gm-ships-grid"></div>
+    <div id="gm-board-bar">
+      <div id="gm-board-hint">← Klikni na loď pro výběr</div>
+      <button id="btn-gm-board" disabled>▶ NASTOUPIT →</button>
+    </div>
   </div>
 </div>
 
